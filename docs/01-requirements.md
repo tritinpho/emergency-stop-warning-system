@@ -1,0 +1,188 @@
+# 01 — Requirements & Acceptance Criteria
+
+**Project:** Emergency Stop-Lane Automatic Warning System (ESW)
+**Status:** Proposed
+**Last updated:** 2026-06-26
+
+This document turns the proposal's prose objectives into testable requirements. It also adds three
+things the proposal needs before it can be built: a **safety framing**, the **warning-placement
+math**, and **measurable acceptance criteria**.
+
+---
+
+## 1. The safety reframe (read this first)
+
+The proposal treats the work as "detect a stopped car and show a sign." Functionally true, but the
+system is **safety-related**: its output influences how fast-moving drivers behave near a stationary
+obstacle. That changes how we must reason about failure.
+
+Two failure modes dominate, and they pull in opposite directions:
+
+| Failure | What happens | Consequence | Worse because… |
+|---------|--------------|-------------|----------------|
+| **Miss (false negative)** | Vehicle is stopped; warning never shows | No early warning — the exact situation we set out to fix | The system was *trusted* to cover this and silently didn't. |
+| **False alarm (false positive)** | Warning shows with no real hazard | Drivers slow/swerve needlessly; repeated → they stop believing it | "Cry wolf" — erodes the trust that makes the *real* warning work. |
+
+Design consequences (carried through every other document):
+
+- **Fail-safe + fail-loud.** The system must detect its own degradation and tell operators. A unit
+  that is blind must not appear healthy. See [ADR-0005](adr/ADR-0005-fail-safe-and-system-safety.md).
+- **Both error rates are first-class requirements** with numeric targets (§5), not an afterthought.
+- **Trust calibration.** Warning content and behaviour must stay credible; no flapping, no stale
+  warnings. Hysteresis and dwell logic exist for this reason ([doc 02](02-system-architecture.md)).
+- **The system advises; it never controls** other vehicles. Final responsibility stays with drivers.
+
+This is not "do ISO 26262 / SIL certification now" — that is for a productized field system. It is:
+*adopt the fail-safe mindset from day one so the prototype is honest about what it can and cannot do.*
+
+---
+
+## 2. Functional requirements
+
+Priority uses MoSCoW: **M**ust / **S**hould / **C**ould / **W**on't-now.
+
+| ID | Requirement | Pri |
+|----|-------------|-----|
+| FR-01 | Continuously monitor a configurable detection zone (ROI) covering the emergency lane within the sensor field of view. | M |
+| FR-02 | Detect the presence of a vehicle (car, truck, bus, motorcycle) inside the ROI. | M |
+| FR-03 | Distinguish a **stopped** vehicle (stationary ≥ dwell time) from one merely passing along/through the shoulder. | M |
+| FR-04 | Confirm a detection over a configurable **dwell time** before declaring "stopped" (default 5 s, range 3–10 s). | M |
+| FR-05 | On confirmation, automatically activate the upstream warning sign(s) showing "STOPPED VEHICLE AHEAD" (*PHÍA TRƯỚC CÓ XE DỪNG KHẨN CẤP*). | M |
+| FR-06 | Continue to track the stopped vehicle while the warning is active. | M |
+| FR-07 | Automatically clear the warning after the vehicle has left the ROI, applying a **hold/hysteresis** delay (default 10 s) so brief occlusion does not drop a live warning. | M |
+| FR-08 | Detect a **pedestrian** in or immediately beside the ROI (stranded occupant) and treat as a warrant for warning. | S |
+| FR-09 | Operate across day, night, rain, and fog (degraded but functional). | M |
+| FR-10 | Continuously self-monitor sensor, compute, link, and sign health; emit a heartbeat. | M |
+| FR-11 | Enter a defined **safe state** and alert operators on any critical fault (see ADR-0005). | M |
+| FR-12 | Send activation/clear/fault events with timestamps to the TMC and an audit log. | S |
+| FR-13 | Allow an operator to manually override (force-on, force-off, mute) a sign. | S |
+| FR-14 | Support remote configuration of ROI, thresholds, and dwell/hold timings. | S |
+| FR-15 | Support over-the-air (OTA) software/model updates with rollback. | C |
+| FR-16 | Log enough detection evidence (event snapshots/metadata, not continuous raw video) to audit a decision. | S |
+| FR-17 | Integrate with an existing operator-controlled VMS where one is present, instead of adding a sign. | S |
+| FR-18 | Detect generic obstacles (debris, animals) / wrong-way vehicles. | W (future) |
+| FR-19 | Notify emergency services / incident management automatically. | W (future) |
+
+### Detection-to-warning behaviour (canonical loop)
+
+```
+idle → (vehicle enters ROI) → tracking
+tracking → (stationary ≥ dwell) → CONFIRMED → WARN ON
+WARN ON → (vehicle still present) → hold
+WARN ON → (vehicle absent ≥ hold) → WARN OFF → idle
+any state → (critical fault) → SAFE STATE + operator alert
+```
+
+The full state machine, with timers and edge cases, is specified in
+[doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine).
+
+---
+
+## 3. Non-functional requirements
+
+| ID | Category | Requirement |
+|----|----------|-------------|
+| NFR-01 | **Latency** | Stop-confirmed → warning ON ≤ 2 s after dwell elapses (so total stop→warn ≈ dwell + ≤2 s). |
+| NFR-02 | **Latency** | Vehicle-gone → warning OFF within hold + ≤ 2 s. |
+| NFR-03 | **Availability** | ≥ 99% per monitored site over the pilot period, excluding scheduled maintenance. |
+| NFR-04 | **Reliability** | No single software fault may leave a **stale ON** warning indefinitely — a watchdog must time-bound any activation and re-confirm. |
+| NFR-05 | **Robustness** | Maintain target detection in rain and at night via multi-sensor sensing ([ADR-0001](adr/ADR-0001-sensing-modality.md)). |
+| NFR-06 | **Edge autonomy** | The detect→warn loop must function with the WAN/cloud fully offline ([ADR-0002](adr/ADR-0002-edge-vs-cloud-processing.md)). |
+| NFR-07 | **Power** | Run on mains, or solar+battery with ≥ 72 h autonomy without sun ([ADR-0006](adr/ADR-0006-connectivity-and-power.md)). |
+| NFR-08 | **Maintainability** | Remote health, remote config, OTA update; modular sensor/compute/sign units. |
+| NFR-09 | **Security** | Authenticated, encrypted control + telemetry channels; signed firmware; sign activation cannot be spoofed by an outside party. |
+| NFR-10 | **Privacy** | On-device inference; **no retention of continuous raw video**; event evidence minimized and access-controlled (see [doc 04](04-risk-and-safety.md)). |
+| NFR-11 | **Standards** | Warning signage conforms to **QCVN 41** (national technical regulation on road signs & signals) and expressway geometric standards (e.g., TCVN 5729 for expressway design). |
+| NFR-12 | **Cost** | Per-site bill of materials targeted for a credible field-pilot unit (tracked in [doc 03](03-roadmap-and-phasing.md)); the university build stays inside the 20M VND envelope (prototype/sim). |
+| NFR-13 | **Environment** | Field units rated for outdoor temperature, humidity, dust, vibration (IP65+ enclosures). |
+| NFR-14 | **Extensibility** | Architecture must allow adding sensor types and new event classes (FR-18/19) without redesign. |
+
+---
+
+## 4. Warning placement — the math the proposal omits
+
+The proposal says the sign goes "at the start of the emergency-lane section / before the danger
+zone." That is under-specified and is the single most safety-critical geometric decision. If the
+warning is too close to the stopped vehicle, drivers cannot act in time; the system would be
+**theatre**.
+
+A following driver must **detect → recognise → decide → manoeuvre** (slow and/or change lane). The
+governing standard is therefore not just Stopping Sight Distance (SSD) but **Decision Sight
+Distance (DSD)** for a speed/path-change manoeuvre on a high-speed road.
+
+**Stopping Sight Distance** (AASHTO metric form, level grade, perception-reaction t = 2.5 s,
+deceleration a = 3.4 m/s²):
+
+```
+SSD = 0.278 · V · t  +  0.039 · V² / a       (V in km/h, SSD in m)
+```
+
+| Design speed V | SSD (must stop) | DSD — manoeuvre C* (perceive + change lane/slow) |
+|---------------:|----------------:|--------------------------------------------------:|
+| 80 km/h | ≈ 130 m | ≈ 230 m |
+| 100 km/h | ≈ 185 m | ≈ 315 m |
+| 120 km/h | ≈ 250 m | ≈ 360 m |
+
+\* DSD manoeuvre C = "speed/path/direction change on a rural/high-speed road" (AASHTO). It is the
+appropriate basis because the safe response here is a **lane change**, not an emergency stop.
+
+**Requirement PL (placement):**
+
+- **PL-01 (M):** The warning sign must be displayed **at least DSD (manoeuvre C) upstream of the
+  detection zone** for the corridor's design speed (the table above is the design floor; confirm
+  against the governing Vietnamese standard for each site).
+- **PL-02 (M):** Add a **legibility distance** so the sign is *readable* by the time the driver is
+  DSD away — for a LED text VMS, legibility is on the order of 1 m per 4–8 mm of character height;
+  size the sign accordingly, or place it correspondingly farther upstream.
+- **PL-03 (M):** Account for **activation latency**: during stop→warn time (≈ dwell + ≤2 s) traffic
+  keeps approaching. The sign is fixed upstream, so once lit every following driver gets the full
+  DSD; latency only bounds the brief window before it lights. Keep total stop→warn small (NFR-01) so
+  that window is short relative to vehicle headways.
+- **PL-04 (S):** Where geometry (curve, crest, tunnel mouth) blocks sight of a single sign at the
+  required distance, use a **second repeater sign** or relocate; if neither fits, the site is
+  unsuitable for a single-unit deployment — record this as a siting constraint (assumption A4).
+
+> This makes warning placement a **derived, defensible number per site**, not a guess. It is one of
+> the most valuable additions over the original proposal.
+
+---
+
+## 5. Evaluation metrics & acceptance criteria
+
+The proposal says to "evaluate detection capability and auto on/off." This section says **against
+what**. Targets are split into *university-prototype* (bench/sim) and *field-pilot* (follow-on)
+because they are validated very differently.
+
+| Metric | Definition | Prototype target (bench/sim) | Field-pilot target |
+|--------|-----------|------------------------------|--------------------|
+| **Detection rate / recall** | genuine stopped-vehicle events detected ÷ all such events | ≥ 95% day · ≥ 90% night/adverse | ≥ 98% / ≥ 95% |
+| **False activation rate** | warnings raised with no real hazard | ≤ 1 per 100 test scenarios | ≤ 1 per site per week |
+| **Detection latency** | vehicle becomes stationary → warning ON | ≤ dwell + 2 s | same |
+| **Clear latency** | vehicle leaves ROI → warning OFF | ≤ hold + 2 s | same |
+| **Effective warning lead distance** | upstream distance at which the active warning is visible/legible | ≥ DSD for the modelled speed | ≥ DSD on-site, surveyed |
+| **Availability** | uptime ÷ total time | ≥ 99% (rig) | ≥ 99% |
+| **Fault-detection coverage** | injected faults that the self-monitor catches & escalates | ≥ 95% of the FMEA fault list ([doc 04](04-risk-and-safety.md)) | ≥ 95% |
+| **MTBF / MTTR** | mean time between failures / to repair | characterise on rig | MTBF target set at pilot |
+
+**Acceptance for the university task** = demonstrate, on the bench rig and/or simulation, the full
+closed loop (detect → confirm → warn → track → clear) meeting the prototype-column targets across a
+defined scenario set (day, night, rain, transient pass-through, occlusion, multiple vehicles,
+pedestrian, and **injected sensor/compute/sign faults**), plus the feasibility report and the
+field-pilot development proposal the grant calls for.
+
+---
+
+## Appendix A — Changes and corrections vs. the proposal
+
+| # | In the proposal | Change / addition here | Why |
+|---|-----------------|------------------------|-----|
+| 1 | "Detect a stopped car, show a sign." | Reframed as a **safety-related** system with fail-safe + trust requirements. | Silent failure and cry-wolf are the real risks. |
+| 2 | Sign "at the start of the lane." | **DSD-based placement requirement** with per-speed numbers (§4). | Otherwise the warning may be too late to be useful. |
+| 3 | Multi-sensor listed as optional "can develop toward." | **Camera+radar elevated to core** for night/rain/fog. | Those are the named high-risk conditions and camera-only is weakest there. |
+| 4 | "Closed loop: detect–confirm–warn–track–cancel." | Made a **concrete state machine** with dwell + hysteresis + watchdog. | Prevents false triggers, flapping, and stale-ON. |
+| 5 | "Central processor." | Specified as **edge-local**; cloud non-critical. | A safety warning must not wait on a network round-trip. |
+| 6 | "Evaluate detection." | **Numeric acceptance criteria** (§5). | "Evaluate" needs a pass/fail bar. |
+| 7 | New signs implied everywhere. | **Reuse existing VMS** where present; solar LED sign as fallback. | Cheaper, avoids sign clutter, faster approval. |
+| 8 | Privacy not addressed. | **Data minimization, no raw-video retention, QCVN 41 conformance.** | Public-road cameras carry PII and legal duties. |
+| 9 | Budget 20M VND, field ambitions. | **Scope reality check**: prototype/sim now, field pilot = cấp sở follow-on. | Honest scoping; the proposal itself anticipates the follow-on. |
+| 10 | Section numbering (5→2.x, 6→3.x) is template residue. | Cosmetic — renumber in the final proposal. | Document hygiene only. |
