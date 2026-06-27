@@ -37,7 +37,7 @@ triangles) to **active, automatic warning** — the central thesis of the propos
 | 03 | [docs/03-roadmap-and-phasing.md](docs/03-roadmap-and-phasing.md) | Engineering roadmap mapped onto the proposal's 6 phases, MVP definition, **budget reality check** |
 | 04 | [docs/04-risk-and-safety.md](docs/04-risk-and-safety.md) | Risk register, FMEA-lite, fail-safe design, privacy & legal compliance |
 | 05 | [docs/05-field-pilot-proposal.md](docs/05-field-pilot-proposal.md) | Provincial (cấp sở) field-pilot proposal — draft (the follow-on docs 03–04 set up) |
-| — | [docs/adr/README.md](docs/adr/README.md) | Architecture Decision Records index (9 ADRs covering the load-bearing technical choices) |
+| — | [docs/adr/README.md](docs/adr/README.md) | Architecture Decision Records index (10 ADRs covering the load-bearing technical choices) |
 
 Figure 1 from the proposal (the concept infographic) is preserved at
 [docs/assets/figure-1-concept-infographic.jpeg](docs/assets/figure-1-concept-infographic.jpeg) and is

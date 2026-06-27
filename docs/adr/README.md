@@ -15,6 +15,7 @@ accepts them.
 | [ADR-0007](ADR-0007-validation-and-data-strategy.md) | Validation & data strategy — what bench/sim proves vs. field-deferred; the data-acquisition plan | Proposed |
 | [ADR-0008](ADR-0008-detection-persistence-and-multitrack.md) | Detection persistence — occlusion vs. departure, radar-corroborated hold, multi-track set semantics | Proposed |
 | [ADR-0009](ADR-0009-failsafe-placement-and-degraded-modes.md) | Fail-safe actuation placement (sign-controller dead-man's switch), asymmetric degraded modes, renewable occlusion hold | Proposed |
+| [ADR-0010](ADR-0010-operator-override-and-manual-control.md) | Operator override & manual-control policy — bounded, fail-loud, heartbeat-honoring (never latch, never silently persist) | Proposed |
 
 **Scope note (in lieu of a separate ADR):** the deployment **coverage model is discrete monitored
 zones at high-value locations**, not continuous coverage, and the funded scope is **one pilot zone /

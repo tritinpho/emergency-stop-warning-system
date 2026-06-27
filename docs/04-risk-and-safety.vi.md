@@ -23,6 +23,13 @@ là sự trung thực, vừa là biện pháp kiểm soát chính đối với s
   chỉ một xe *đã xác nhận dừng* (≥ thời gian dwell) mới làm dấy lên một cảnh báo;
 - bảo vệ phần **giữa** các vùng được giám sát — phạm vi phủ là các vùng giá trị cao rời rạc, không phải
   toàn bộ một hành lang ([doc 02 §6](02-system-architecture.vi.md#6-mô-hình-phạm-vi-giám-sát));
+- **khẳng định cảnh báo lề đường trong lúc ùn tắc nặng / dừng-chạy (stop-and-go)** — khi chính làn lưu
+  thông sát ROI cũng đứng yên, cảnh báo bị **ngăn chặn hoặc đổi thông điệp** một cách có chủ đích để tránh
+  kích hoạt giả vào giữa một đám kẹt xe ([doc 02 §4](02-system-architecture.vi.md#4-máy-trạng-thái-phát-hiệncảnh-báo),
+  R14). Lưu ý sự sắc bén: *mật độ giao thông cao* là một điều kiện nguy-hiểm-hàng-đầu **có tên gọi**
+  ([doc 00 §1](00-context-and-glossary.vi.md)), nên biện pháp chống báo-động-giả mở ra một khoảng trống
+  phạm vi phủ **đúng trong một điều kiện rủi ro cao** — được mang vào khái niệm vận hành và xem xét lại
+  với dữ liệu ùn tắc thực tại thử nghiệm hiện trường;
 - buộc bất kỳ tài xế nào phải hành động — nó mang tính **khuyến cáo**; một tài xế phớt lờ bảng cảnh báo
   thì không được bảo vệ;
 - cảnh báo trong **cửa sổ xác nhận** — trong khoảng ~`T_dwell + T_activate` (≈ 7 s) sau khi một xe vừa
@@ -48,6 +55,15 @@ phụ thuộc* vào bảng cảnh báo khi đó **còn tệ hơn so với khi kh
 *và* lại không có cảnh báo). Biện pháp kiểm soát là **báo lỗi rõ ràng tới đơn vị vận hành** (điều động
 tuần tra / CCTV) và không bao giờ để niềm tin vượt quá phạm vi phủ (R7); rủi ro còn lại mang tính hành vi
 và không thể loại bỏ hoàn toàn bằng kỹ thuật.
+
+**Phạm vi bảo vệ thực tế tích lũy (hãy phát biểu một lần, rõ ràng).** Mỗi giới hạn ở trên được nêu riêng
+lẻ, nhưng *tích* của chúng hẹp hơn "phát hiện xe đang dừng." Hệ thống chủ động bảo vệ trước một xe **đã
+dừng hẳn trong ≳ `T_dwell` + `T_activate` (~7 s)**, **trong dòng xe lưu thông tự do (không ùn tắc)**,
+**bên trong một vùng được giám sát**, **trong các điều kiện đã kiểm chứng** (ban ngày bây giờ; ban
+đêm/bất lợi chỉ khi cổng radar [ADR-0001](adr/ADR-0001-sensing-modality.vi.md) được thông qua), được nhìn
+bởi một thiết bị **khỏe mạnh hoặc còn-camera**. Ngoài phạm vi đó hệ thống **im lặng theo thiết kế** — chỉ
+chấp nhận được vì nó *được phát biểu* và khái niệm vận hành (tuần tra / CCTV) bao phủ phần còn lại. Câu
+tổng hợp này chính là tiêu đề trung thực mà các gạch đầu dòng theo từng mục cộng lại thành.
 
 ---
 
@@ -85,7 +101,7 @@ Khả năng xảy ra (L) và Mức tác động (I): 1 = thấp, 5 = cao. Mức 
 | R9 | **Quyền riêng tư / pháp lý** — thu thập PII (biển số, khuôn mặt) và lưu giữ | 3 | 3 | 9 | Suy luận trên thiết bị; **không lưu giữ video thô**; tối thiểu hóa bằng chứng sự kiện; kiểm soát truy cập (§4). |
 | R10 | **Trách nhiệm pháp lý của sự phụ thuộc** — một hệ thống an toàn được triển khai nhưng có thể mắc lỗi có thể *làm tăng* mức phơi nhiễm của đơn vị vận hành so với khi không có hệ thống nào (sự phụ thuộc được tạo ra), cộng thêm sự mơ hồ về việc ai chịu trách nhiệm nếu một cảnh báo bị lỗi | 2 | 4 | 8 | Khái niệm vận hành rõ ràng; nhật ký sự kiện (audit log) chứng minh hành vi đúng đặc tả; định hình rõ ràng "khuyến cáo, tài xế chịu trách nhiệm"; **thỏa thuận với đơn vị vận hành giải quyết minh thị câu hỏi về sự phụ thuộc**; phát biểu giới hạn bảo vệ (§0). |
 | R11 | **Vượt ngân sách / vượt phạm vi** — cố gắng triển khai hiện trường trên một nguồn tài trợ nguyên mẫu | 4 | 3 | 12 | MVP và giới hạn ngân sách được giới hạn phạm vi ([doc 03](03-roadmap-and-phasing.vi.md)); thử nghiệm hiện trường được hoãn sang cấp sở. |
-| R12 | **Che khuất** — xe tải đi ngang che mất xe đang dừng | 3 | 3 | 9 | Thời gian giữ hysteresis hấp thụ che khuất ngắn; radar (hình học khác); vị trí/độ cao đặt cảm biến. |
+| R12 | **Che khuất** — xe tải đi ngang che mất xe đang dừng | 3 | 3 | 9 | Thời gian giữ hysteresis hấp thụ che khuất ngắn; radar (hình học khác); vị trí/độ cao đặt cảm biến. **Phụ thuộc vào việc radar phân biệt làn ([ADR-0001](adr/ADR-0001-sensing-modality.vi.md) cổng b); nếu yếu, khoảng giữ-khi-che-khuất có thể _đảo_ thành một lần giữ-giả (kẹt-BẬT) trên chính chiếc xe tải che khuất — kiểm chứng tại hiện trường, không khép lại được trên bàn thử.** |
 | R13 | **Lớp đối tượng giả** — mảnh vỡ/bóng đổ/động vật kích hoạt hoặc gây nhầm lẫn | 2 | 3 | 6 | Bộ phát hiện học máy có phân lớp; cổng lọc ROI; dwell; chứng thực bằng radar. |
 | R14 | **Kích hoạt giả do ùn tắc** — dòng xe lưu thông đang dừng cạnh ROI bị đọc nhầm thành một xe dừng trên lề; điều kiện "mật độ cao" là tệ nhất cho việc phân biệt ROI | 3 | 3 | 9 | Phát hiện ùn tắc (các vết đứng yên trải dài qua các làn lưu thông) → ngăn chặn/đổi thông điệp; hình học ROI + phân biệt làn bằng radar; kịch bản nghiệm thu minh thị ([doc 02 §4](02-system-architecture.vi.md#4-máy-trạng-thái-phát-hiệncảnh-báo)). |
 | R15 | **Lỗi hiệu chuẩn / trôi hiệu chuẩn** — homography sai hoặc thông số ngoại lai camera↔radar sai, hoặc trôi do cột rung lắc / chấn động / nhiệt, làm dịch chuyển ROI một cách thầm lặng → bỏ sót hoặc báo động giả có hệ thống | 3 | 4 | 12 | Quy trình hiệu chuẩn theo từng vị trí; kiểm tra lại định kỳ; **bộ giám sát trôi** trong bộ giám sát tình trạng; cảnh báo khi vượt dung sai ([doc 02 §4](02-system-architecture.vi.md#4-máy-trạng-thái-phát-hiệncảnh-báo)). |
@@ -114,12 +130,19 @@ ADR-0005, doc 01 §4).
 | **Đẩy cấu hình sai (bad config push)** (ROI sai / bộ định thời ngoài dải) | Chức năng an toàn bị phá vỡ thầm lặng — bỏ sót hoặc báo động giả | **Kiểm tra biên tại thiết bị**; triển khai theo từng giai đoạn; canary sau thay đổi | Từ chối/kẹp cấu hình ngoài biên (FR-20); cảnh báo; giữ bản tốt gần nhất; khôi phục có ký (R16) |
 | **OTA / khởi động lại khi một cảnh báo đang hoạt động** | Một cảnh báo đang sống bị rớt trong cửa sổ cập nhật | Tập vết khác rỗng tại thời điểm cập nhật | **Hoãn** việc cập nhật, hoặc để trống *báo lỗi rõ ràng tới đơn vị vận hành* trong cửa sổ (FR-21) — không bao giờ rớt thầm lặng |
 | **Lỗi hiệu chuẩn / trôi hiệu chuẩn** (homography hoặc thông số ngoại lai camera↔radar) | ROI dịch chuyển → bỏ sót hoặc báo động giả có hệ thống, không có triệu chứng rõ ràng | **Bộ giám sát trôi** so với các mốc tham chiếu; kiểm tra lại định kỳ | Cảnh báo khi vượt dung sai; hiệu chuẩn lại; coi như chế độ suy giảm cho tới khi được khắc phục (R15) |
+| **Người vận hành ép tắt / tắt tạm trong khi có mối nguy thật** | Bỏ sót thầm lặng do người vận hành gây ra | Ghi đè được ghi nhật ký + tư thế nhịp tim **OVERRIDDEN**; tự hết hiệu lực bắt buộc; leo thang qua TMC | Có giới hạn, báo động lớn khi sự cố, giới hạn thời gian; tự tiếp tục khi hết hạn ([ADR-0010](adr/ADR-0010-operator-override-and-manual-control.vi.md)) |
+| **Lệnh ép bật bị chốt / ghi đè bị giả mạo** | Kẹt-BẬT hoặc báo động giả; ngăn-hoặc-khẳng-định trái phép | Ép bật do hộp biên trung chuyển, **được làm mới (không chốt)**; kênh ghi đè đã xác thực; đọc lại trạng thái | Cơ chế tự ngắt an toàn vẫn xóa trống khi giết-hộp / cắt-liên-kết / hết hạn; từ chối ghi đè không xác thực / ngoài chính sách (ADR-0010, NFR-09) |
 
 Danh sách FMEA này cũng là **tập kiểm thử tiêm lỗi** cho nghiệm thu (doc 01 §5 — mục tiêu ≥95%
 độ phủ phát hiện). **Lưu ý:** mục tiêu đó kiểm chứng các bộ phát hiện mà bạn *đã xây dựng* đối với các
 lỗi mà bạn *đã liệt kê*; nó không giới hạn các lỗi *chưa được liệt kê*. Hãy xem 95% là độ phủ của các
 kiểu lỗi đã biết và tiếp tục bổ sung các kiểu lỗi khi chúng lộ ra — những lỗi bạn không nghĩ tới mới là
-những lỗi quan trọng nhất.
+những lỗi quan trọng nhất. **Hãy phân tầng danh sách này nữa:** một số kiểu lỗi ở đây là
+**chỉ-hiện-trường** — trôi hiệu chuẩn (R15, cần cột rung lắc / nhiệt), **hộp biên / liên kết chết ở cự ly
+≥ DSD** (liên kết qua khoảng cách, [ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)),
+và **cạn pin mặt trời** — nên bàn thử không thể tiêm chúng. Hãy báo cáo độ phủ phát hiện lỗi như một phần
+của các chế độ **tiêm-được-trên-bàn-thử** và mang các chế độ chỉ-hiện-trường sang giai đoạn thử nghiệm,
+nếu không con số 95% âm thầm loại trừ đúng các chế độ cần đến hiện trường mới xuất hiện.
 
 ## 3. Bản tóm tắt an toàn khi sự cố
 

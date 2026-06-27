@@ -31,6 +31,15 @@ chứ không phải một lắp đặt bên đường. Một thiết bị đạt
 và có thể tài trợ được. **Cùng một kiến trúc logic (doc 02) chạy không đổi từ mô hình trên bàn đến thiết bị hiện trường** —
 chỉ có *backend* cảm biến/bảng cảnh báo/nguồn điện thay đổi — nên không có gì xây dựng bây giờ là bỏ đi.
 
+> **Kiểm tra _loại hình_ dự án của nguồn tài trợ so với phạm vi này — một việc kiểm soát về quản trị,
+> không phải kỹ thuật.** Loại hình được nêu trong đề xuất là **SXTN — *sản xuất thử nghiệm***
+> ([doc 00 bảng thuật ngữ](00-context-and-glossary.vi.md)), vốn có thể mang theo kỳ vọng về một *đơn vị
+> sản xuất thử*, không chỉ một nguyên mẫu nguyên lý — mâu thuẫn với phạm vi bàn thử/mô phỏng ở trên (vốn
+> là cái mà mức ngân sách 20M VND thực sự hỗ trợ; một thiết bị đạt chuẩn hiện trường đơn lẻ đã vượt toàn
+> bộ kinh phí). Hãy giải quyết tường minh với đơn vị tài trợ: xác nhận sản phẩm cấp-trường là một
+> **nguyên mẫu nguyên lý** (lộ trình này), hoặc — nếu một đơn vị sản xuất thử SXTN được kỳ vọng theo hợp
+> đồng — nêu sự không khớp về phạm vi/ngân sách **ngay bây giờ**, chứ không phải lúc rà soát cuối cùng.
+
 ### Phân bổ ngân sách dự kiến (phạm vi cấp trường)
 
 | Hạng mục | Dự kiến | Ghi chú |
@@ -70,7 +79,7 @@ Nếu điều đó được chứng minh đối chiếu với các mục tiêu n
 | Giai đoạn | Nội dung đề xuất (tháng) | Sản phẩm kỹ thuật (bổ sung) | Tiêu chí kết thúc |
 |------:|---------------------------|----------------------------------|---------------|
 | **1** | Khảo sát & yêu cầu (2) | Hoàn thiện [yêu cầu](01-requirements.vi.md); nghiên cứu **bố trí DSD theo từng vị trí** (đối chiếu với TCVN 5729); **kế hoạch thu thập dữ liệu** ([ADR-0007](adr/ADR-0007-validation-and-data-strategy.vi.md)); **thử nghiệm khả thi radar sớm** để giảm thiểu R5 *trước khi* thiết kế dồn trọng tâm vào radar ([ADR-0001](adr/ADR-0001-sensing-modality.vi.md)); danh mục kịch bản (ngày/đêm/mưa/**che khuất ngắn+kéo dài**/thoáng qua/**ùn tắc**/người đi bộ/**đa phương tiện**/**xe đã hiện diện lúc khởi động**/sự cố). | Yêu cầu + tiêu chí nghiệm thu được phê duyệt; kế hoạch dữ liệu được thống nhất; **ghi nhận quyết định go/no-go của thử nghiệm radar**. |
-| **2** | Mô hình nguyên lý & thiết kế hệ thống (2) | [Kiến trúc](02-system-architecture.vi.md) được phê chuẩn; **cả 9 ADR được chấp nhận**; hợp đồng giao diện; đặc tả ROI + **biên thoát** + máy trạng thái (gồm che khuất/đa vết [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md); bộ điều khiển biển báo an toàn khi sự cố + chế độ suy giảm [ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)); lựa chọn cảm biến/tính toán/bảng cảnh báo. | Các ADR được Chấp nhận; giao diện được đóng băng. |
+| **2** | Mô hình nguyên lý & thiết kế hệ thống (2) | [Kiến trúc](02-system-architecture.vi.md) được phê chuẩn; **cả 10 ADR được chấp nhận**; hợp đồng giao diện; đặc tả ROI + **biên thoát** + máy trạng thái (gồm che khuất/đa vết [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md); bộ điều khiển biển báo an toàn khi sự cố + chế độ suy giảm [ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md); **chính sách ghi đè của người vận hành** [ADR-0010](adr/ADR-0010-operator-override-and-manual-control.vi.md)); lựa chọn cảm biến/tính toán/bảng cảnh báo. | Các ADR được Chấp nhận; giao diện được đóng băng. |
 | **3** | Mô phỏng, thuật toán, giao diện (3) | **Khung mô phỏng** (mô hình cảm biến tổng hợp có tài liệu, [ADR-0007](adr/ADR-0007-validation-and-data-strategy.vi.md)); nhận diện + cổng lọc ROI + bộ theo dõi; **máy trạng thái với dwell/hysteresis/giữ-khi-che-khuất/đa vết/watchdog** ([ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md)); **cổng phát hiện xe đứng yên bằng radar** ([ADR-0001](adr/ADR-0001-sensing-modality.vi.md)); nội dung giao diện cảnh báo (tuân thủ QCVN-41). | Vòng kín vượt qua trong mô phỏng trên toàn bộ danh mục kịch bản; cổng radar được quyết định. |
 | **4** | Xây dựng/mô phỏng mô hình thử nghiệm (3) | **Mô hình trên bàn**: camera (+radar) → biên → bảng LED; bộ chuyển đổi cơ cấu cảnh báo với **cơ chế tự ngắt an toàn của bộ điều khiển biển báo** (làm trống khi mất nhịp tim); **bộ giám sát tình trạng + trạng thái an toàn + ba chế độ suy giảm** ([ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)); telemetry tới một TMC tối thiểu; **khung tiêm lỗi** (giết tiến trình SM, **giết hộp biên, cắt liên kết biển báo**, ngắt từng cảm biến). | Vòng kín + an toàn khi sự cố được trình diễn trên mô hình; **giết-SM, giết-hộp, và cắt-liên-kết mỗi cái đều làm bảng cảnh báo trống**; các chế độ suy giảm leo thang đúng cách. |
 | **5** | Đánh giá & phản biện chuyên gia (1) | Chạy **bộ nghiệm thu** (doc 01 §5); thu thập số liệu; **phản biện chuyên gia** (giao thông, điện tử, AI, an toàn đường bộ) theo phương pháp của đề xuất. | Số liệu đạt mục tiêu nguyên mẫu; ghi nhận phản hồi phản biện. |

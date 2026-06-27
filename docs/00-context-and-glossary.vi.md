@@ -119,7 +119,7 @@ flowchart TB
 | Pilot / field trial | thử nghiệm ngoài hiện trường | Thử nghiệm trên đường (đề tài cấp sở tiếp nối). |
 | Provincial-level task | đề tài cấp sở | Đề tài tiếp nối lớn hơn sau mô hình thử nghiệm cấp trường. |
 | University-level task | nhiệm vụ cấp trường | Nhiệm vụ được cấp kinh phí này (phạm vi mô hình thử nghiệm/mô phỏng). |
-| Pilot production project | dự án sản xuất thử nghiệm | Loại hình dự án được nêu trong đề xuất (SXTN). |
+| Pilot production project | dự án sản xuất thử nghiệm | Loại hình dự án được nêu trong đề xuất (SXTN) — *sản xuất thử nghiệm*, vốn có thể hàm ý một sản phẩm **sản xuất thử**; **đối chiếu với phạm vi nguyên mẫu trên bàn** ([tài liệu 03 §1](03-roadmap-and-phasing.vi.md#1-rà-soát-thực-tế-phạm-vi--ngân-sách-đọc-trước)). |
 | Smart transportation / ITS | giao thông thông minh | Lĩnh vực Hệ thống giao thông thông minh (Intelligent Transportation Systems). |
 | Dead-man's switch | (cơ chế tự ngắt an toàn) | **Bộ điều khiển biển báo** tự động làm trống bảng khi nhịp tim `SHOW` được làm mới ngừng lại — nên một hộp biên bị chết hoặc một liên kết bị cắt không thể để một cảnh báo kẹt ở trạng thái bật ([ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)). |
 | Ground-plane homography / calibration | (phép đồng dạng mặt phẳng mặt đường / hiệu chuẩn) | Ánh xạ theo từng vị trí từ điểm ảnh sang tọa độ mặt đường, cần thiết cho diện tích phủ của ROI và hợp nhất camera↔radar; **có thể trôi lệch** do trụ lắc / rung động / nhiệt. |

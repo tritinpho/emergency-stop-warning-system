@@ -132,7 +132,7 @@ flowchart TB
 | Pilot / field trial | thử nghiệm ngoài hiện trường | On-road test (the follow-on provincial project). |
 | Provincial-level task | đề tài cấp sở | The larger follow-on grant after the university prototype. |
 | University-level task | nhiệm vụ cấp trường | This funded task (the prototype/simulation scope). |
-| Pilot production project | dự án sản xuất thử nghiệm | The proposal's declared project type (SXTN). |
+| Pilot production project | dự án sản xuất thử nghiệm | The proposal's declared project type (SXTN) — *experimental / pilot production*, which may imply a **trial-production** deliverable; **reconcile with the bench-prototype scope** ([doc 03 §1](03-roadmap-and-phasing.md#1-scope--budget-reality-check-read-first)). |
 | Smart transportation / ITS | giao thông thông minh | Intelligent Transportation Systems domain. |
 | Dead-man's switch | (cơ chế tự ngắt an toàn) | The **sign controller** blanks the sign automatically when the refreshed `SHOW` heartbeat stops — so a dead edge box or a cut link cannot leave a warning stuck on ([ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)). |
 | Ground-plane homography / calibration | (hiệu chuẩn mặt phẳng mặt đường) | Per-site mapping from image pixels to road coordinates, required for ROI footprint and camera↔radar fusion; **can drift** with pole sway / vibration / heat. |

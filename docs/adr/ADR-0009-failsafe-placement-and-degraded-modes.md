@@ -67,6 +67,19 @@ true crash. The default **2 s ≈ 4× `T_assert_refresh`** is a starting point t
 flap risk is bounded by keeping `T_assert_refresh` well below `T_signhold` and by smoothing transient
 edge-box latency below the refresh period.
 
+**The heartbeat's worst enemy is the _link_, not the edge box — and the bench cannot see it.** The sign
+sits **≥ DSD upstream** (≈ 315 m at 100 km/h,
+[doc 02 §3](../02-system-architecture.md#3-physical--deployment-architecture)), so the refreshed `SHOW`
+runs over a **300 m+ cable or RF link**, not the 1 m bench cable. A lossy or congested field link is a
+far more likely source of `T_signhold`-length gaps than an edge-box GC pause — and every such gap blanks
+a valid warning (a brief silent miss + a cry-wolf flicker), while a *jammed* link is a deliberate
+denial-of-warning ([doc 04 §5 Q5](../04-risk-and-safety.md#5-open-safety-questions-for-the-team)). So
+`T_signhold` / `T_assert_refresh` must be tuned against the **field link's** loss and latency
+distribution, the link needs its **own reliability / latency / energy / authentication budget** as a
+first-class interface ([doc 02 §7](../02-system-architecture.md#7-interfaces--contracts-initial)), and —
+because the bench runs this over a metre of cable — **the over-distance heartbeat is itself
+field-deferred validation**, not something a bench pass can close.
+
 **Backend caveat — a latching third-party VMS cannot give the hardware guarantee.** An operator VMS
 reached over its own protocol ([ADR-0004](ADR-0004-warning-actuator-integration.md)) may *latch* a
 message and may not honour a heartbeat-refresh contract. For that backend the strong guarantee above
@@ -160,7 +173,8 @@ three buy out silent-miss modes for modest, testable engineering, consistent wit
   degraded modes and one degraded state to implement and fault-inject; `T_signhold` / `T_assert_refresh`
   become safety-relevant timing parameters to tune.
 - **Revisit when:** a VMS vendor exposes a hardware interlock or refreshed-assertion mode (collapse the
-  latching caveat), or field data quantifies real edge-box stall distributions (tune `T_signhold`).
+  latching caveat), or field data quantifies real edge-box stall **and field-link loss** distributions
+  (tune `T_signhold`).
 
 ## Action Items
 
@@ -179,3 +193,7 @@ three buy out silent-miss modes for modest, testable engineering, consistent wit
        (ties [ADR-0008](ADR-0008-detection-persistence-and-multitrack.md) AI#5).
 5. [ ] Document the **latching-VMS backend caveat** and its residual stale-ON window in the
        [ADR-0004](ADR-0004-warning-actuator-integration.md) VMS adapter spec.
+6. [ ] Characterise the **edge↔sign link** (cable / RF) loss + latency budget at the ≥ DSD deployment
+       distance; tune `T_signhold` / `T_assert_refresh` against it; tag the over-distance heartbeat as
+       **field-deferred** validation (the bench exercises only a short cable) and give the link its own
+       entry in the [doc 02 §7](../02-system-architecture.md#7-interfaces--contracts-initial) contracts.

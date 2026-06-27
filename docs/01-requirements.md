@@ -55,12 +55,12 @@ Priority uses MoSCoW: **M**ust / **S**hould / **C**ould / **W**on't-now.
 | FR-05 | On confirmation, automatically activate the upstream warning sign(s) showing "STOPPED VEHICLE AHEAD" (*PHÍA TRƯỚC CÓ XE DỪNG KHẨN CẤP*). | M |
 | FR-06 | Continue to track the stopped vehicle while the warning is active. | M |
 | FR-07 | Automatically clear the warning after the vehicle has left the ROI, applying a **hold/hysteresis** delay (default 10 s) so brief occlusion does not drop a live warning. | M |
-| FR-08 | Detect a **pedestrian** in or immediately beside the ROI (stranded occupant) and treat as a warrant for warning. *(Harder sensing profile than vehicles — small radar cross-section + camera weakest at night; §5 sets a separate, realistic pedestrian target rather than folding it into vehicle recall.)* | S |
+| FR-08 | Detect a **pedestrian** in or immediately beside the ROI (stranded occupant) and treat as a warrant for warning. *(Harder sensing profile than vehicles — small radar cross-section + camera weakest at night; §5 sets a separate, realistic pedestrian target rather than folding it into vehicle recall. Persistence guarantees are **vehicle-grade**: a pedestrian-only warrant gets no radar occlusion hold — [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md).)* | S |
 | FR-09 | Operate across day, night, rain, and fog (degraded but functional). | M |
 | FR-10 | Continuously self-monitor sensor, compute, link, and sign health; emit a heartbeat. | M |
 | FR-11 | Enter a defined **safe state** and alert operators on any critical fault (see ADR-0005). | M |
 | FR-12 | Send activation/clear/fault events with timestamps to the TMC and an audit log. | S |
-| FR-13 | Allow an operator to manually override (force-on, force-off, mute) a sign. | S |
+| FR-13 | Allow an operator to manually override (force-on, force-off, mute) a sign — **bounded, fail-loud, heartbeat-honoring; never latching or silently persistent** ([ADR-0010](adr/ADR-0010-operator-override-and-manual-control.md)). | S |
 | FR-14 | Support remote configuration of ROI, thresholds, and dwell/hold timings. | S |
 | FR-15 | Support over-the-air (OTA) software/model updates with rollback. | C |
 | FR-16 | Log enough detection evidence (event snapshots/metadata, not continuous raw video) to audit a decision. | S |
@@ -91,7 +91,7 @@ The full state machine, with timers and edge cases, is specified in
 |----|----------|-------------|
 | NFR-01 | **Latency** | Stop-confirmed → warning ON ≤ 2 s after dwell elapses (so total stop→warn ≈ dwell + ≤2 s). **Backend-qualified:** met directly by the dedicated LED sign; for an existing operator **VMS** the operator's command/refresh and message-arbitration cycle may exceed 2 s, so NFR-01 carries the VMS adapter's own latency budget ([ADR-0004](adr/ADR-0004-warning-actuator-integration.md), [ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)). |
 | NFR-02 | **Latency** | Vehicle-gone → warning OFF within hold + ≤ 2 s. |
-| NFR-03 | **Availability** | **Functional** availability ≥ 99% per monitored site over the pilot period — the fraction of time the unit can actually *detect-and-warn to spec*, not merely "powered and reporting"; time spent in a degraded/safe state counts as **unavailable**. Excludes scheduled maintenance. Field-measured (see §3a). |
+| NFR-03 | **Availability** | **Functional** availability ≥ 99% per monitored site over the pilot period — the fraction of time the unit can actually *detect-and-warn to spec*, not merely "powered and reporting"; time spent in a degraded/safe state counts as **unavailable**. Excludes scheduled maintenance. Field-measured (see §3a); the **≥ 99% figure is provisional pending an MTBF/MTTR reliability budget** — a single multi-day remote repair can exhaust it ([doc 04 §5 Q6](04-risk-and-safety.md#5-open-safety-questions-for-the-team)). |
 | NFR-04 | **Reliability** | No single software fault may leave a **stale ON** warning indefinitely — a watchdog must time-bound any activation and re-confirm. |
 | NFR-05 | **Robustness** | Maintain target detection in rain and at night via multi-sensor sensing ([ADR-0001](adr/ADR-0001-sensing-modality.md)) — **contingent on the radar stationary-detection validation gate**; field-validated, not claimable from a synthetic-radar bench (§3a, §5). |
 | NFR-06 | **Edge autonomy** | The detect→warn loop must function with the WAN/cloud fully offline ([ADR-0002](adr/ADR-0002-edge-vs-cloud-processing.md)). |
@@ -169,6 +169,14 @@ over-long required distance can mark otherwise-viable sites "unsuitable", so tre
 **design floor** and, per site, also compute "SSD + a comfortable lane-change distance" as a lower
 bound; use engineering judgement (and operator agreement) where the two diverge.
 
+**Two corrections the table does _not_ include — both push the distance up at the worst sites.** (1) The
+table is **level-grade**; on a **downgrade** (common at the tunnel/bridge approaches and long descents
+that are exactly the high-value sites, [doc 02 §6](02-system-architecture.md#6-coverage-model)) braking
+distance grows, so SSD/DSD must carry a grade correction. (2) The table keys off **design speed**, but
+Vietnamese expressway **operating speeds often exceed design speed**, so placement should key off the
+**85th-percentile operating speed (or posted speed + margin)** — otherwise it is non-conservative exactly
+where vehicles are fastest. Both are **Phase-1 siting-study inputs**, not per-site afterthoughts.
+
 **Reconcile with the Vietnamese standard.** The numbers above are AASHTO. For approvals, the
 sight-distance basis must be expressed against the **governing Vietnamese standard — TCVN 5729
 (expressway geometric design), alongside QCVN 41 for the signage itself**. Map the DSD-C argument onto
@@ -179,8 +187,8 @@ afterthought.
 **Requirement PL (placement):**
 
 - **PL-01 (M):** The warning sign must be displayed **at least DSD (manoeuvre C) upstream of the
-  detection zone** for the corridor's design speed (the table above is the design floor; confirm
-  against the governing Vietnamese standard for each site).
+  upstream (near) edge of the detection zone** for the corridor's design speed (the table above is the
+  design floor; confirm against the governing Vietnamese standard for each site).
 - **PL-02 (M):** Add a **legibility distance** so the sign is *readable* by the time the driver is
   DSD away — for a LED text VMS, legibility is on the order of 1 m per 4–8 mm of character height;
   size the sign accordingly, or place it correspondingly farther upstream.
@@ -232,7 +240,7 @@ because they are validated very differently.
 | **Clear latency** | vehicle leaves ROI → warning OFF | ≤ hold + 2 s **on a confirmed exit** (a held occlusion is not a clear-latency failure — [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md)) | same |
 | **Effective warning lead distance** | upstream distance at which the active warning is visible/legible | ≥ DSD for the modelled speed | ≥ DSD on-site, surveyed |
 | **Functional availability** | time able to *detect-and-warn to spec* ÷ total time (degraded/safe-state time counts as down — NFR-03) | software-loop MTBF under fault injection (availability itself is **field-deferred**) | ≥ 99% |
-| **Fault-detection coverage** | injected faults the self-monitor catches & escalates | ≥ 95% of the FMEA fault list ([doc 04 §2](04-risk-and-safety.md#2-fmea-lite-failure-mode--effect--detection--response)) — **caveat:** this measures detection of *enumerated* faults, not unknown ones | ≥ 95% |
+| **Fault-detection coverage** | injected faults the self-monitor catches & escalates | ≥ 95% of the FMEA fault list ([doc 04 §2](04-risk-and-safety.md#2-fmea-lite-failure-mode--effect--detection--response)) — **caveat:** this measures detection of *enumerated* faults, not unknown ones, **and not faults the bench cannot inject** (calibration drift, box/link death at field distance, solar depletion are field-deferred; report coverage as a fraction of **bench-injectable** modes — §3a) | ≥ 95% |
 | **MTBF / MTTR** | mean time between failures / to repair | characterise on rig | MTBF target set at pilot |
 
 **Statistical sufficiency (so a target is actually testable).** A bare "≥ 95%" is not a pass/fail bar

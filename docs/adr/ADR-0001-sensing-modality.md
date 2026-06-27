@@ -36,6 +36,24 @@ imaging is held as an optional add-on for sites with severe night/fog where budg
 > **resolve the shoulder lane from the adjacent through lane** at the monitored range
 > (azimuth/lane discrimination) — without (b), a corroborating return cannot be attributed to the ROI,
 > which is what [ADR-0008](ADR-0008-detection-persistence-and-multitrack.md)'s occlusion hold relies on.
+>
+> **The two criteria do not validate in the same venue — and saying so is part of claim honesty.**
+> Criterion (a) is *bench-testable at short range*. Criterion (b) is an **angular** problem and is
+> **not**: at 100 m a lane width (~3.5 m) subtends ≈ 2°, but at a few-metre bench the same gap subtends
+> tens of degrees and is trivially resolvable. A literal bench therefore **cannot exercise (b)** — it
+> needs lane separation **at the monitored range** (a test track or a field setting, not a desk). Treat
+> (a) as bench/Phase-3 and **(b) as field-deferred** (or test-track), and never let a clean short-range
+> demo of (a) be read as having passed the whole gate ([ADR-0007](ADR-0007-validation-and-data-strategy.md)).
+>
+> **If (b) is weak, the failure _inverts_ — from silent miss to stale-ON.** The occlusion hold and the
+> `CAMERA_OCCLUDED_DEGRADED` state ([ADR-0008](ADR-0008-detection-persistence-and-multitrack.md),
+> [ADR-0009 §C](ADR-0009-failsafe-placement-and-degraded-modes.md)) keep a warning ON because *radar
+> still corroborates a return in the ROI*. If radar cannot tell shoulder from through-lane, the
+> "corroborating return" during a truck occlusion may be the **occluding truck in the through lane**, not
+> the shoulder car — so the rule written to prevent a silent miss instead **manufactures a stale-ON
+> (cry-wolf)**. Until (b) is validated, those persistence guarantees are *designed, not proven*, and the
+> inverted-failure residual is tracked at [doc 04 R12/R14](../04-risk-and-safety.md#1-risk-register).
+>
 > Because the whole night/rain/fog robustness argument rests on this, it is also the system's **top risk
 > exposure** ([doc 04 R5](../04-risk-and-safety.md#1-risk-register)).
 >
@@ -115,6 +133,12 @@ claim, do not quietly rest it on synthetic data**.
 - **Conditional:** the entire adverse-condition benefit is **contingent on the radar gate**. Until it
   passes on real hardware, treat night/rain/fog robustness as a *designed hypothesis*, not a measured
   result ([ADR-0007](ADR-0007-validation-and-data-strategy.md)).
+- **Venue-bound:** even "real hardware" is not enough for criterion (b) — lane discrimination needs the
+  *monitored range*, so it is **test-track/field-deferred**, and with it the
+  [ADR-0008](ADR-0008-detection-persistence-and-multitrack.md) /
+  [ADR-0009 §C](ADR-0009-failsafe-placement-and-degraded-modes.md) occlusion-hold guarantees. A weak (b)
+  inverts silent-miss into stale-ON ([doc 04 R12/R14](../04-risk-and-safety.md#1-risk-register)), so the
+  bench may not claim the persistence behaviour as *validated*, only as *designed*.
 - **Revisit when:** field data shows the camera alone meets targets at a given benign site (then a
   camera-only variant could be a documented cost-down), or thermal proves necessary at hard sites
   (promote Option C elements per-site).
@@ -122,7 +146,7 @@ claim, do not quietly rest it on synthetic data**.
 ## Action Items
 
 1. [ ] Select a specific **stopped-vehicle-capable** radar (imaging / HRR FMCW, 24/77 GHz, with clutter mapping) and camera (good WDR + IR) — not a generic presence module.
-2. [ ] **Validation gate (Phase 3):** demonstrate (a) reliable detection of a *stationary* vehicle in roadside clutter at the shoulder grazing geometry, day and night, **and** (b) azimuth/lane discrimination sufficient to attribute the return to the shoulder ROI vs. the adjacent through lane at the monitored range — before claiming adverse-condition robustness. Run an early, cheap feasibility spike in Phase 1 ([doc 03 §5](../03-roadmap-and-phasing.md#5-per-phase-risk-gates)) so a gate failure is found before the design leans its full weight on radar.
+2. [ ] **Validation gate (Phase 3):** demonstrate (a) reliable detection of a *stationary* vehicle in roadside clutter at the shoulder grazing geometry, day and night, **and** (b) azimuth/lane discrimination sufficient to attribute the return to the shoulder ROI vs. the adjacent through lane at the monitored range — before claiming adverse-condition robustness. Run an early, cheap feasibility spike in Phase 1 ([doc 03 §5](../03-roadmap-and-phasing.md#5-per-phase-risk-gates)) so a gate failure is found before the design leans its full weight on radar. **Venue split:** (a) is bench/Phase-3 at short range; **(b) needs lane separation at the monitored range** (test track or field) and is **field-deferred** — a bench pass of (a) alone does not discharge the gate. Record which criterion each result actually evidences.
 3. [ ] Define the fusion contract and the time-sync method (shared clock / PTP / timestamp align).
 4. [ ] Build the synthetic radar channel for the simulation harness — with a **documented, conservative** sensor model ([ADR-0007](ADR-0007-validation-and-data-strategy.md)).
 5. [ ] Add per-sensor health checks to the health monitor (feeds [ADR-0005](ADR-0005-fail-safe-and-system-safety.md)).

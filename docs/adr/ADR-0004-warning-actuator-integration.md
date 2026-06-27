@@ -103,6 +103,12 @@ LED panel while preserving a clean path to real VMS in the field pilot.
 4. [ ] Define the approved warning message set and its conformance review — **confirm QCVN 41 actually
        provides a conformant element** for "stopped vehicle on the shoulder ahead"; if it does not,
        pursue a regulated exception or a new pictogram with the road authority rather than assuming
-       conformance.
+       conformance. The review must cover **every message the state machine can want** — the primary
+       "stopped vehicle ahead", **any congestion caution / re-message**
+       ([doc 02 §4](../02-system-architecture.md#4-the-detectionwarning-state-machine)), and any
+       degraded-state indication — because the **congestion-suppression design assumes a _second_ legal
+       message exists**; if QCVN 41 offers only one usable element, re-messaging is unavailable and the
+       design falls back to **suppression-only, a stated coverage gap**
+       ([doc 04 §0](../04-risk-and-safety.md#0-limits-of-protection-residual-hazards)).
 5. [ ] Specify the **VMS-adapter latency + arbitration budget** and document the qualified NFR-01 and
        the latching-VMS fail-safe fallback ([ADR-0009](ADR-0009-failsafe-placement-and-degraded-modes.md)).

@@ -21,6 +21,13 @@ and the main control for over-reliance (R7). The ESW does **not**:
   moment; only a *confirmed-stopped* vehicle (≥ dwell) raises a warning;
 - protect **between** monitored zones — coverage is discrete high-value zones, not a whole corridor
   ([doc 02 §6](02-system-architecture.md#6-coverage-model));
+- **assert the shoulder warning during heavy congestion / stop-and-go** — when the through lane beside
+  the ROI is itself stationary, the warning is deliberately **suppressed or re-messaged** to avoid
+  false-triggering into a jam ([doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine),
+  R14). Note the sharpness: *high traffic density* is a **named** top-danger condition
+  ([doc 00 §1](00-context-and-glossary.md#1-problem-statement)), so the cry-wolf mitigation opens a
+  coverage gap **in exactly a high-risk condition** — carried to the operator concept and revisited with
+  real congestion data at the field pilot;
 - compel any driver to act — it is **advisory**; a driver who ignores the sign is unprotected;
 - warn during the **confirmation window** — for ~`T_dwell + T_activate` (≈ 7 s) after a vehicle first
   stops, no warning is shown yet (the *unwarned-exposure budget*,
@@ -43,6 +50,15 @@ When the unit fails it goes **blank** (no warning) — the right call against cr
 the sign is then **worse off than with no system at all** (they have stopped scanning *and* there is no
 warning). The control is to **fail loud to operators** (dispatch patrols / CCTV) and to never let trust
 outrun coverage (R7); the residual is behavioural and cannot be fully engineered out.
+
+**The cumulative envelope of actual protection (state it once, plainly).** Each limit above is disclosed
+separately, but their *product* is narrower than "detects stopped vehicles." The system actively protects
+against a vehicle **fully stopped for ≳ `T_dwell` + `T_activate` (~7 s)**, **in free-flow (non-congested)
+traffic**, **inside a monitored zone**, **in validated conditions** (day now; night/adverse only once the
+[ADR-0001](adr/ADR-0001-sensing-modality.md) radar gate passes), seen by a **healthy or camera-up** unit.
+Outside that envelope the system is **silent by design** — acceptable only because it is *stated* and the
+operator concept (patrols / CCTV) covers the rest. This consolidated sentence is the honest headline the
+per-item bullets add up to.
 
 ---
 
@@ -79,7 +95,7 @@ Likelihood (L) and Impact (I): 1 = low, 5 = high. Exposure = L × I.
 | R9 | **Privacy / legal** — PII capture (plates, faces) and retention | 3 | 3 | 9 | On-device inference; **no raw-video retention**; minimized event evidence; access control (§4). |
 | R10 | **Liability of reliance** — a deployed-but-fallible safety system may *raise* operator exposure vs. having none (reliance is created), plus ambiguity over who is responsible if a warning fails | 2 | 4 | 8 | Clear operating concept; audit log proving spec-conformant behaviour; explicit "advisory, driver-responsible" framing; **operator agreement that explicitly addresses the reliance question**; bounded-protection statement (§0). |
 | R11 | **Budget overrun / over-scope** — trying to field-deploy on a prototype grant | 4 | 3 | 12 | Scoped MVP and budget envelope ([doc 03](03-roadmap-and-phasing.md)); field pilot deferred to cấp sở. |
-| R12 | **Occlusion** — passing trucks hide the stopped vehicle | 3 | 3 | 9 | Hysteresis hold absorbs brief occlusion; radar (different geometry); sensor placement/height. |
+| R12 | **Occlusion** — passing trucks hide the stopped vehicle | 3 | 3 | 9 | Hysteresis hold absorbs brief occlusion; radar (different geometry); sensor placement/height. **Depends on radar lane-discrimination ([ADR-0001](adr/ADR-0001-sensing-modality.md) gate b); if weak, the occlusion hold can _invert_ to a false-hold (stale-ON) on the occluding truck — field-validated, not bench-closable.** |
 | R13 | **False object classes** — debris/shadows/animals trigger or confuse | 2 | 3 | 6 | Learned detector with classes; ROI gating; dwell; radar corroboration. |
 | R14 | **Congestion false-trigger** — stopped through-traffic beside the ROI reads as a shoulder stop; the "high density" condition is worst-case for ROI discrimination | 3 | 3 | 9 | Congestion detection (stationary tracks spanning through lanes) → suppress/re-message; ROI geometry + radar lane discrimination; explicit acceptance scenario ([doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine)). |
 | R15 | **Calibration error / drift** — bad homography or camera↔radar extrinsics, or drift from pole sway / vibration / thermal, silently shifts the ROI → systematic miss or false alarm | 3 | 4 | 12 | Per-site calibration procedure; periodic re-check; **drift monitor** in the health monitor; alert on out-of-tolerance ([doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine)). |
@@ -108,11 +124,19 @@ ADR-0005, doc 01 §4).
 | **Bad config push** (wrong ROI / out-of-range timer) | Safety function silently broken — misses or false alarms | **Unit-side bounds check**; staged rollout; post-change canary | Reject/clamp out-of-bounds config (FR-20); alert; keep last-good; signed rollback (R16) |
 | **OTA / restart while a warning is active** | A live warning dropped for the update window | Track-set non-empty at update time | **Defer** the update, or blank *loud to operators* for the window (FR-21) — never a silent drop |
 | **Calibration error / drift** (homography or cam↔radar extrinsics) | ROI shifts → systematic miss or false alarm, no obvious symptom | **Drift monitor** vs. reference landmarks; periodic re-check | Alert on out-of-tolerance; re-calibrate; treat as degraded until corrected (R15) |
+| **Operator force-off / mute during a real hazard** | Operator-induced silent miss | Override logged + **OVERRIDDEN** heartbeat posture; mandatory auto-expiry; TMC escalation | Bounded, fail-loud, time-limited; auto-resume on expiry ([ADR-0010](adr/ADR-0010-operator-override-and-manual-control.md)) |
+| **Operator force-on left latched / spoofed override** | Stale-ON or cry-wolf; unauthorized suppression-or-assertion | Edge-mediated **refreshed (non-latching)** force-on; authenticated override channel; status read-back | Dead-man's switch still blanks on box-kill / link-cut / expiry; reject unauthenticated / out-of-policy override (ADR-0010, NFR-09) |
 
 This FMEA list is also the **fault-injection test set** for acceptance (doc 01 §5 — target ≥95%
 detection coverage). **Caveat:** that target verifies the detectors you *built* against the faults you
 *enumerated*; it does not bound *unenumerated* faults. Treat 95% as coverage-of-known-modes and keep
-adding modes as they surface — the faults you did not think of are the ones that matter most.
+adding modes as they surface — the faults you did not think of are the ones that matter most. **Tier the
+list, too:** several modes here are **field-only** — calibration **drift** (R15, needs pole sway /
+thermal), **edge-box / link death at the ≥ DSD distance** (the over-distance link,
+[ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)), and **solar depletion** — so the
+bench cannot inject them. Report fault-coverage as a fraction of **bench-injectable** modes and carry the
+field-only ones to the pilot, or the 95% silently excludes exactly the modes that need the field to
+appear.
 
 ## 3. Fail-safe summary
 

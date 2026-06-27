@@ -58,6 +58,14 @@ The state machine operates over the **set of confirmed-stopped tracks inside the
    presence counts as corroboration, so a genuinely-present, camera-occluded vehicle does **not** trip
    the watchdog.
 
+**Scope: the persistence guarantees are vehicle-grade, not pedestrian-grade.** The occlusion hold and
+the radar-corroborated set semantics above all lean on the **radar presence channel**. A pedestrian has
+a negligible radar cross-section ([doc 04 H-C](../04-risk-and-safety.md#1-risk-register)), so a
+**pedestrian-only warrant** (a person in/beside the ROI with no associated vehicle) gets **no radar
+corroboration and therefore no occlusion hold** — it runs effectively camera-only and falls back to the
+brief `T_hold` hysteresis. This is a real, narrower guarantee for FR-08 and must be **stated, not assumed
+equal to the vehicle case** ([doc 01 FR-08](../01-requirements.md#2-functional-requirements)).
+
 The concrete timers and the enriched state diagram live in
 [doc 02 §4](../02-system-architecture.md#4-the-detectionwarning-state-machine); this ADR fixes the
 **policy** those timers implement.

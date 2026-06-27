@@ -31,6 +31,15 @@ positions the field pilot and commercialization as the *next* stage; this roadma
 and fundable. **The same logical architecture (doc 02) runs unchanged from bench rig to field unit** —
 only the sensor/sign/power *backends* change — so nothing built now is throwaway.
 
+> **Verify the grant's project _type_ against this scope — a governance check, not an engineering one.**
+> The proposal's declared type is **SXTN — *sản xuất thử nghiệm* (experimental / pilot production)**
+> ([doc 00 glossary](00-context-and-glossary.md#7-bilingual-glossary-en--vi)), which can carry an
+> expectation of a *trial-production unit*, not only a principle prototype — in tension with the
+> bench/simulation scope above (which is what the 20M VND envelope actually supports; a single
+> field-grade unit already exceeds the whole grant). Resolve it explicitly with the funder: confirm the
+> cấp-trường deliverable is a **principle prototype** (this roadmap), or — if an SXTN trial-production
+> unit is contractually expected — raise the scope/budget mismatch **now**, not at the final review.
+
 ### Indicative budget allocation (university scope)
 
 | Item | Indicative | Note |
@@ -70,7 +79,7 @@ cấp sở proposal is evidence-backed.
 | Phase | Proposal content (months) | Engineering deliverables (added) | Exit criteria |
 |------:|---------------------------|----------------------------------|---------------|
 | **1** | Survey & requirements (2) | Finalised [requirements](01-requirements.md); **per-site DSD placement** study (reconciled with TCVN 5729); **data-acquisition plan** ([ADR-0007](adr/ADR-0007-validation-and-data-strategy.md)); **early radar feasibility spike** to de-risk R5 *before* the design commits its weight to radar ([ADR-0001](adr/ADR-0001-sensing-modality.md)); scenario catalogue (day/night/rain/**brief+sustained occlusion**/transient/**congestion**/pedestrian/**multi-vehicle**/**boot-present**/faults). | Requirements + acceptance criteria signed off; data plan agreed; **radar spike go/no-go recorded**. |
-| **2** | Principle model & system design (2) | [Architecture](02-system-architecture.md) ratified; **all 9 ADRs accepted**; interface contracts; ROI + **exit-boundary** + state-machine spec (incl. occlusion/multi-track [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md); sign-controller fail-safe + degraded modes [ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)); sensor/compute/sign selection. | ADRs Accepted; interfaces frozen. |
+| **2** | Principle model & system design (2) | [Architecture](02-system-architecture.md) ratified; **all 10 ADRs accepted**; interface contracts; ROI + **exit-boundary** + state-machine spec (incl. occlusion/multi-track [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md); sign-controller fail-safe + degraded modes [ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.md); **operator-override policy** [ADR-0010](adr/ADR-0010-operator-override-and-manual-control.md)); sensor/compute/sign selection. | ADRs Accepted; interfaces frozen. |
 | **3** | Simulation, algorithm, interface (3) | **Simulation harness** (documented synthetic sensor model, [ADR-0007](adr/ADR-0007-validation-and-data-strategy.md)); perception + ROI gating + tracker; **state machine with dwell/hysteresis/occlusion-hold/multi-track/watchdog** ([ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md)); **radar stationary-detection gate** ([ADR-0001](adr/ADR-0001-sensing-modality.md)); warning UI content (QCVN-41-conformant). | Closed loop passes in simulation across the scenario catalogue; radar gate decided. |
 | **4** | Build/simulate test model (3) | **Bench rig**: camera (+radar) → edge → LED sign; actuator adapter with the **sign-controller dead-man's switch** (blank-on-heartbeat-loss); **health monitor + safe state + the three degraded modes** ([ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)); telemetry to a minimal TMC; **fault-injection harness** (kill the SM process, **kill the edge box, cut the sign link**, drop each sensor). | Closed loop + fail-safe demonstrated; **SM-kill, box-kill, and link-cut each blank the sign**; degraded modes escalate correctly. |
 | **5** | Evaluate & expert review (1) | Run the **acceptance suite** (doc 01 §5); collect metrics; **expert review** (traffic, electronics, AI, road safety) per the proposal's method. | Metrics meet prototype targets; review feedback captured. |

@@ -152,8 +152,10 @@ flowchart LR
     ~315 m @100 km/h)                  the ROI)     (vùng phát hiện)
 ```
 
-The sign is **upstream** of the detection zone by at least the Decision Sight Distance so that
-following drivers receive the warning before they reach the hazard. Figure 1 shows two signs (a
+The sign is **upstream** of the detection zone by at least the Decision Sight Distance — measured from
+the **upstream (near) edge of the ROI**, so a vehicle stopping anywhere in the zone (the ROI spans tens
+to low-hundreds of metres, §6) still receives at least the full DSD — so that following drivers receive
+the warning before they reach the hazard. Figure 1 shows two signs (a
 gantry VMS and a roadside board); both are valid instances of the same "warning actuator" — choose
 per site (ADR-0004).
 
@@ -291,7 +293,24 @@ exactly here. The decision logic must therefore detect **general congestion** (m
 tracks spanning the through lanes) and **suppress or re-message** the shoulder warning rather than
 assert "stopped vehicle ahead, change lane" into a jam where it is both wrong and counter-productive. It
 is an explicit acceptance scenario ([doc 01 §5](01-requirements.md#5-evaluation-metrics--acceptance-criteria))
-and a tracked risk ([doc 04 R14](04-risk-and-safety.md#1-risk-register)).
+and a tracked risk ([doc 04 R14](04-risk-and-safety.md#1-risk-register)). Two consequences must be stated,
+not buried: (1) suppressing the warning in a jam is a **deliberate coverage gap in a _named_ top-danger
+condition** ("high traffic density", [doc 00 §1](00-context-and-glossary.md#1-problem-statement)), so it
+is recorded as a **limit of protection** ([doc 04 §0](04-risk-and-safety.md#0-limits-of-protection-residual-hazards)),
+not merely a false-trigger control; (2) *re-messaging* presupposes a **second QCVN-41-conformant
+message** exists — if it does not, only suppression is available
+([ADR-0004](adr/ADR-0004-warning-actuator-integration.md)).
+
+**Warm reboot during an active warning — a re-exposure the cold boot-present rule does not cover.** The
+boot-present rule (treat a vehicle present at startup as a new track, run full dwell) is written for a
+*cold* start. An **unplanned reboot** (power blip, crash-restart) *while a warning is ON* is different:
+the dead-man's switch correctly blanks the sign during the downtime, but on restart the still-stopped
+vehicle must re-serve the full `T_dwell` before the warning returns — a **fresh unwarned-exposure window
+for a vehicle that was already protected**
+([doc 01 §4](01-requirements.md#4-warning-placement--the-math-the-proposal-omits)). Planned OTA/restarts
+are deferred while a warning is active (FR-21); unplanned ones are not, so this re-exposure is a stated
+residual. A persisted *warning-active-at-shutdown* flag may shorten re-confirmation for a vehicle still
+at the same ROI position on reboot — to be decided in detailed design.
 
 ## 5. Runtime data flow (happy path)
 
@@ -356,10 +375,24 @@ and report to the same TMC.
 |-----------|---------|--------------------|
 | Detection event | Perception → State machine | `{track_id, class, bbox/range, speed, in_roi, ts}` |
 | Sign command | State machine → Actuator | `SHOW(message_id) | CLEAR | STATUS?` returns `{state, lamp_ok, ts}` |
-| Heartbeat | Health monitor → TMC | `{site_id, fw_ver, subsystem_health[], state, ts}` at fixed cadence |
-| Activation/clear event | State machine → TMC/audit | `{site_id, type, evidence_ref?, ts}` (store-and-forward) |
+| Sign assertion (link) | Edge box → Sign controller | refreshed `SHOW(message_id)` every `T_assert_refresh` (authenticated); controller blanks on loss within `T_signhold`; **own reliability/latency/energy/auth budget** over the ≥ DSD link ([ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)) |
+| Heartbeat | Health monitor → TMC | `{site_id, fw_ver, cfg_ver, model_ver, calib_ver, subsystem_health[], state, ts}` at fixed cadence |
+| Activation/clear event | State machine → TMC/audit | `{site_id, type, evidence_ref?, cfg_ver, model_ver, calib_ver, ts}` (store-and-forward) |
 | Config | TMC → Roadside | `{roi_polygon, T_dwell, T_hold, speed_gate, message_set}` (signed) |
 | OTA | TMC → Roadside | signed image + version + rollback token |
+
+> **Every safety-relevant event carries the active-config fingerprint.** A liability-grade audit
+> ([doc 04 R10](04-risk-and-safety.md#1-risk-register)) must reconstruct *what the unit was running* at
+> event time — so each heartbeat and activation/clear/fault event carries the version hashes of the
+> **ROI/config (`cfg_ver`), model (`model_ver`), and calibration (`calib_ver`)** in force, bound
+> together. Without it, "the sign was ON at 02:14" cannot be tied to the ROI, timers, model, and
+> homography that produced it. Cheap to add now, expensive to retrofit.
+>
+> **The edge↔sign link is a first-class interface, not an internal cable.** Because the sign sits ≥ DSD
+> upstream ([§3](#3-physical--deployment-architecture)), the refreshed-`SHOW` heartbeat crosses a 300 m+
+> field link whose loss/latency/energy/auth budget governs both fail-safe timing and flap risk
+> ([ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)); validating it over distance is
+> **field-deferred**, since the bench runs it over a metre of cable.
 
 Concrete encodings (protobuf/JSON, MQTT/HTTPS for telemetry; the sign vendor's protocol or an
 NTCIP-style profile for VMS) are deferred to detailed design; the **abstraction boundaries above are

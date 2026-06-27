@@ -40,8 +40,19 @@ plan**:
 
 **Provability boundary (state it in the report).** Bench/sim may claim: logic correctness,
 timing/latency, fault handling, and false-trigger resistance to *modelled* nuisances. They may **not**
-claim: real-world recall in rain/glare/fog, the real false-alarm rate, or real radar clutter
-performance — these are **field-deferred** to the cấp sở pilot ([doc 05](../05-field-pilot-proposal.md)).
+claim: real-world recall in rain/glare/fog, the real false-alarm rate, real radar clutter performance,
+or the **real-world soundness of the radar-corroborated occlusion hold** — these are **field-deferred**
+to the cấp sở pilot ([doc 05](../05-field-pilot-proposal.md)).
+
+**The occlusion-hold caveat is sharper than "deferred recall."** Simulation validates the *policy* of
+[ADR-0008](ADR-0008-detection-persistence-and-multitrack.md) /
+[ADR-0009 §C](ADR-0009-failsafe-placement-and-degraded-modes.md) **given the correct sensor semantics it
+is fed** — but the policy's *safety* depends on real radar resolving the shoulder from the through lane
+at the monitored range (criterion (b) of the [ADR-0001](ADR-0001-sensing-modality.md) gate), which a
+few-metre bench **cannot reproduce** (it is an angular problem — see ADR-0001) and which is
+test-track/field-deferred. So the report may say the occlusion / `CAMERA_OCCLUDED_DEGRADED` logic is
+*correct as specified*, **not** that it is *sound in the field*; if (b) is weak the same logic inverts a
+silent miss into a **stale-ON** ([doc 04 R12/R14](../04-risk-and-safety.md#1-risk-register)).
 
 **Synthetic sensor channels** are permitted but must use a **documented, conservative sensor model**
 with stated assumptions; a synthetic radar that *assumes* perfect stationary-vehicle detection cannot
@@ -103,3 +114,4 @@ target rather than an assumption.
 2. [ ] Tag every doc-01 requirement and §5 metric as **bench / sim / field-deferred** (feeds the requirement-verifiability pass).
 3. [ ] Stand up the **data plan**: identify public datasets; open an operator-CCTV data-agreement conversation; define a consented local-capture protocol with retention/access limits as a fallback.
 4. [ ] Ensure the synthetic radar model's assumptions are **conservative** and that adverse-condition claims are gated on real-radar evidence ([ADR-0001](ADR-0001-sensing-modality.md)).
+5. [ ] Record the radar gate's **venue split** — (a) stationary-in-clutter is bench/Phase-3; (b) lane/azimuth discrimination at the monitored range is test-track/field — and label the occlusion-hold / `CAMERA_OCCLUDED_DEGRADED` guarantees **designed (logic-validated), not field-sound**, until (b) passes.
