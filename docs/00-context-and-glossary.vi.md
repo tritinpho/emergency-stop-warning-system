@@ -114,12 +114,16 @@ flowchart TB
 | Dwell time | (implicit) | Thời gian một phương tiện phải lưu lại để được "xác nhận đang dừng." |
 | Hysteresis | (implicit) | Các ngưỡng bật/tắt khác nhau để ngăn cảnh báo nhấp nháy. |
 | Stopping Sight Distance (SSD) | (added) | Cự ly để nhận biết và phanh dừng xe; là *cận dưới* cho việc bố trí, không phải yếu tố chi phối. |
-| Decision Sight Distance (DSD) | (cự ly tầm nhìn quyết định) | Cự ly để phát hiện, ra quyết định và hoàn thành thao tác **chuyển làn**; **chính cự ly này — chứ không phải SSD — chi phối việc bố trí bảng báo cảnh báo** ([tài liệu 01 §4](01-requirements.vi.md#4-warning-placement--the-math-the-proposal-omits)). |
+| Decision Sight Distance (DSD) | (cự ly tầm nhìn quyết định) | Cự ly để phát hiện, ra quyết định và hoàn thành thao tác **chuyển làn**; **chính cự ly này — chứ không phải SSD — chi phối việc bố trí bảng báo cảnh báo** ([tài liệu 01 §4](01-requirements.vi.md#4-bố-trí-cảnh-báo--phép-tính-mà-đề-xuất-bỏ-sót)). |
 | Traffic Management Center (TMC) | trung tâm quản lý điều hành giao thông | Trung tâm vận hành giám sát và kiểm tra hệ thống. |
 | Pilot / field trial | thử nghiệm ngoài hiện trường | Thử nghiệm trên đường (đề tài cấp sở tiếp nối). |
 | Provincial-level task | đề tài cấp sở | Đề tài tiếp nối lớn hơn sau mô hình thử nghiệm cấp trường. |
 | University-level task | nhiệm vụ cấp trường | Nhiệm vụ được cấp kinh phí này (phạm vi mô hình thử nghiệm/mô phỏng). |
 | Pilot production project | dự án sản xuất thử nghiệm | Loại hình dự án được nêu trong đề xuất (SXTN). |
 | Smart transportation / ITS | giao thông thông minh | Lĩnh vực Hệ thống giao thông thông minh (Intelligent Transportation Systems). |
+| Dead-man's switch | (cơ chế tự ngắt an toàn) | **Bộ điều khiển biển báo** tự động làm trống bảng khi nhịp tim `SHOW` được làm mới ngừng lại — nên một hộp biên bị chết hoặc một liên kết bị cắt không thể để một cảnh báo kẹt ở trạng thái bật ([ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)). |
+| Ground-plane homography / calibration | (phép đồng dạng mặt phẳng mặt đường / hiệu chuẩn) | Ánh xạ theo từng vị trí từ điểm ảnh sang tọa độ mặt đường, cần thiết cho diện tích phủ của ROI và hợp nhất camera↔radar; **có thể trôi lệch** do trụ lắc / rung động / nhiệt. |
+| Degraded mode — *initiate* vs *hold* | (chế độ suy giảm — khởi tạo vs. duy trì) | Những gì một thiết bị vẫn làm được khi một cảm biến bị hỏng: một thiết bị có camera bị chết có thể *duy trì* một cảnh báo đang có nhưng không thể *khởi tạo* một cảnh báo mới (**mù với sự cố mới**). |
+| Unwarned-exposure budget | (ngân sách phơi nhiễm chưa-cảnh-báo) | Số xe phía sau đi qua bảng báo trong khoảng cửa sổ ~`T_dwell + T_activate` sau khi một xe dừng, trước khi cảnh báo sáng lên ([tài liệu 01 §4](01-requirements.vi.md#4-bố-trí-cảnh-báo--phép-tính-mà-đề-xuất-bỏ-sót)). |
 
 > Xuyên suốt bộ tài liệu, lần sử dụng đầu tiên của một thuật ngữ chuyên ngành sẽ kèm theo tiếng Việt trong ngoặc đơn; sau đó thuật ngữ tiếng Anh được dùng cho ngắn gọn.

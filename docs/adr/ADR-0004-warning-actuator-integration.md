@@ -81,6 +81,17 @@ LED panel while preserving a clean path to real VMS in the field pilot.
 - **Harder:** two adapters to maintain; the VMS adapter requires operator-specific integration and an
   **arbitration policy** (what wins if the operator is already showing a message); message content
   must be QCVN-41-conformant in both backends.
+- **Backend-qualified latency & fail-safe.** The two backends do **not** offer the same guarantees, and
+  the docs must say so per site:
+  - *Dedicated LED sign* — a smart endpoint that honours the refreshed-SHOW heartbeat, so it meets
+    NFR-01 latency directly and gets the [ADR-0009](ADR-0009-failsafe-placement-and-degraded-modes.md)
+    sign-controller dead-man's switch (blank-on-link-loss).
+  - *Existing VMS* — reached over the operator's protocol with command/refresh cycles and message
+    arbitration that can **exceed the NFR-01 ≤2 s budget** and may **latch** (no heartbeat contract).
+    NFR-01 is therefore **qualified** for this backend, and fail-safe falls back to *watchdog + active
+    CLEAR + status read-back* with a residual stale-ON window equal to the operator command cycle
+    (ADR-0009 §A). Give the VMS adapter its own latency + arbitration-priority budget, and prefer a
+    refreshed-assertion / hardware-interlock mode where the operator offers one.
 - **Revisit when:** a standard ITS message protocol is mandated by the operator (collapse toward one
   adapter), or a V2X/in-vehicle warning channel is added (a *third* backend behind the same interface).
 
@@ -89,4 +100,9 @@ LED panel while preserving a clean path to real VMS in the field pilot.
 1. [ ] Specify the `SHOW/CLEAR/STATUS` actuator interface and status read-back semantics.
 2. [ ] Engage an expressway operator to learn their VMS protocol and message-arbitration rules.
 3. [ ] Select a QCVN-41-compliant solar LED sign for the dedicated backend / bench rig.
-4. [ ] Define the approved warning message set and its conformance review.
+4. [ ] Define the approved warning message set and its conformance review — **confirm QCVN 41 actually
+       provides a conformant element** for "stopped vehicle on the shoulder ahead"; if it does not,
+       pursue a regulated exception or a new pictogram with the road authority rather than assuming
+       conformance.
+5. [ ] Specify the **VMS-adapter latency + arbitration budget** and document the qualified NFR-01 and
+       the latching-VMS fail-safe fallback ([ADR-0009](ADR-0009-failsafe-placement-and-degraded-modes.md)).

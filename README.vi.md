@@ -37,7 +37,7 @@ phản quang do tài xế đặt) sang **cảnh báo chủ động, tự động
 | 03 | [docs/03-roadmap-and-phasing.vi.md](docs/03-roadmap-and-phasing.vi.md) | Lộ trình kỹ thuật ánh xạ lên 6 giai đoạn của thuyết minh, định nghĩa MVP, **rà soát thực tế ngân sách** |
 | 04 | [docs/04-risk-and-safety.vi.md](docs/04-risk-and-safety.vi.md) | Bảng đăng ký rủi ro, FMEA rút gọn, thiết kế an toàn khi sự cố (fail-safe), quyền riêng tư & tuân thủ pháp lý |
 | 05 | [docs/05-field-pilot-proposal.vi.md](docs/05-field-pilot-proposal.vi.md) | Đề xuất thử nghiệm hiện trường cấp sở — bản nháp (giai đoạn tiếp theo mà tài liệu 03–04 chuẩn bị) |
-| — | [docs/adr/README.vi.md](docs/adr/README.vi.md) | Mục lục các Bản ghi quyết định kiến trúc (ADR) (8 ADR bao quát các lựa chọn kỹ thuật trọng yếu) |
+| — | [docs/adr/README.vi.md](docs/adr/README.vi.md) | Mục lục các Bản ghi quyết định kiến trúc (ADR) (9 ADR bao quát các lựa chọn kỹ thuật trọng yếu) |
 
 Hình 1 từ thuyết minh (infographic khái niệm) được lưu tại
 [docs/assets/figure-1-concept-infographic.jpeg](docs/assets/figure-1-concept-infographic.jpeg) và được
@@ -98,10 +98,14 @@ chỉnh. Những điểm quan trọng nhất:
    một bộ giám sát (watchdog), và một trạng thái an toàn theo cơ chế an toàn tự kích hoạt khi mất tín
    hiệu (dead-man's switch)** — để một chiếc xe chỉ đơn thuần đi ngang qua không kích hoạt sai, một lần
    che khuất kéo dài bởi xe tải dài không làm rớt một cảnh báo đang hoạt động, và một bộ điều khiển bị
-   sập không thể để bảng cảnh báo kẹt ở trạng thái bật. Xem
+   sập không thể để bảng cảnh báo kẹt ở trạng thái bật. **Cơ chế tự ngắt an toàn (dead-man's switch)
+   nằm trong bộ điều khiển biển báo** (nên một hộp biên bị chết hoặc một liên kết bị cắt cũng làm trống
+   bảng), và **các chế độ suy giảm là trung thực** (một thiết bị có camera bị chết thì *mù với sự cố
+   mới*, chứ không phải "vẫn đang chạy"). Xem
    [tài liệu 02 §4](docs/02-system-architecture.vi.md#4-máy-trạng-thái-phát-hiệncảnh-báo),
-   [ADR-0008](docs/adr/ADR-0008-detection-persistence-and-multitrack.vi.md), và
-   [ADR-0005](docs/adr/ADR-0005-fail-safe-and-system-safety.vi.md).
+   [ADR-0008](docs/adr/ADR-0008-detection-persistence-and-multitrack.vi.md),
+   [ADR-0005](docs/adr/ADR-0005-fail-safe-and-system-safety.vi.md), và
+   [ADR-0009](docs/adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md).
 
 5. **Xử lý ưu tiên cục bộ.** Vòng lặp phát hiện→cảnh báo được tính toán trên một thiết bị biên đặt bên
    đường; đám mây là không trọng yếu. Một cảnh báo an toàn không được phép chờ một vòng truyền qua mạng
@@ -124,7 +128,7 @@ chỉnh. Những điểm quan trọng nhất:
 9. **Bổ sung quyền riêng tư, tối thiểu hóa dữ liệu, và tuân thủ tiêu chuẩn** (tuân thủ biển báo theo
    QCVN 41, suy luận trên thiết bị, không lưu giữ video thô). Xem [tài liệu 04](docs/04-risk-and-safety.vi.md).
 
-Một danh sách đầy đủ hơn nằm ở cuối [tài liệu 01](docs/01-requirements.vi.md#appendix-a--changes-and-corrections-vs-the-proposal).
+Một danh sách đầy đủ hơn nằm ở cuối [tài liệu 01](docs/01-requirements.vi.md#phụ-lục-a--các-thay-đổi-và-chỉnh-sửa-so-với-đề-xuất).
 
 ---
 

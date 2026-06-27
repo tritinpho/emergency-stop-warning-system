@@ -31,9 +31,20 @@ imaging is held as an optional add-on for sites with severe night/fog where budg
 > needs a **stopped-vehicle-capable radar** (e.g. an imaging / high-range-resolution FMCW unit with a
 > clutter map), **not** a generic "presence" module, and it must be **validated at the shoulder
 > grazing geometry** before the adverse-condition claim is evidence-backed (Phase-3 go/no-go,
-> [doc 03 §5](../03-roadmap-and-phasing.md#5-per-phase-risk-gates)). Because the whole night/rain/fog
-> robustness argument rests on this, it is also the system's **top risk exposure**
-> ([doc 04 R5](../04-risk-and-safety.md#1-risk-register)).
+> [doc 03 §5](../03-roadmap-and-phasing.md#5-per-phase-risk-gates)). The gate has **two** success
+> criteria, not one: (a) reliably pick a *stationary* vehicle out of roadside clutter, and (b)
+> **resolve the shoulder lane from the adjacent through lane** at the monitored range
+> (azimuth/lane discrimination) — without (b), a corroborating return cannot be attributed to the ROI,
+> which is what [ADR-0008](ADR-0008-detection-persistence-and-multitrack.md)'s occlusion hold relies on.
+> Because the whole night/rain/fog robustness argument rests on this, it is also the system's **top risk
+> exposure** ([doc 04 R5](../04-risk-and-safety.md#1-risk-register)).
+>
+> **Budget reality (reconciled in [doc 03 §1](../03-roadmap-and-phasing.md#1-scope--budget-reality-check-read-first)).**
+> An ADR-grade radar — an imaging/HRR FMCW *evaluation* module — costs well above the first-cut
+> 1.5–2.5M VND line; a module at that price is exactly the generic presence unit this ADR rules out.
+> Either fund a real mmWave eval module (recommended — it is the *only* on-bench mitigation of R5, the
+> top risk) and trim elsewhere, or accept a generic module and mark **this gate itself field-deferred**.
+> What is not acceptable is budgeting a generic module while *claiming* the gate is run on the bench.
 
 ## Options Considered
 
@@ -111,7 +122,7 @@ claim, do not quietly rest it on synthetic data**.
 ## Action Items
 
 1. [ ] Select a specific **stopped-vehicle-capable** radar (imaging / HRR FMCW, 24/77 GHz, with clutter mapping) and camera (good WDR + IR) — not a generic presence module.
-2. [ ] **Validation gate (Phase 3):** demonstrate reliable detection of a *stationary* vehicle in roadside clutter at the shoulder grazing geometry, day and night, before claiming adverse-condition robustness.
+2. [ ] **Validation gate (Phase 3):** demonstrate (a) reliable detection of a *stationary* vehicle in roadside clutter at the shoulder grazing geometry, day and night, **and** (b) azimuth/lane discrimination sufficient to attribute the return to the shoulder ROI vs. the adjacent through lane at the monitored range — before claiming adverse-condition robustness. Run an early, cheap feasibility spike in Phase 1 ([doc 03 §5](../03-roadmap-and-phasing.md#5-per-phase-risk-gates)) so a gate failure is found before the design leans its full weight on radar.
 3. [ ] Define the fusion contract and the time-sync method (shared clock / PTP / timestamp align).
 4. [ ] Build the synthetic radar channel for the simulation harness — with a **documented, conservative** sensor model ([ADR-0007](ADR-0007-validation-and-data-strategy.md)).
 5. [ ] Add per-sensor health checks to the health monitor (feeds [ADR-0005](ADR-0005-fail-safe-and-system-safety.md)).

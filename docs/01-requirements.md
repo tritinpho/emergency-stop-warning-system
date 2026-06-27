@@ -67,6 +67,8 @@ Priority uses MoSCoW: **M**ust / **S**hould / **C**ould / **W**on't-now.
 | FR-17 | Integrate with an existing operator-controlled VMS where one is present, instead of adding a sign. | S |
 | FR-18 | Detect generic obstacles (debris, animals) / wrong-way vehicles. | W (future) |
 | FR-19 | Notify emergency services / incident management automatically. | W (future) |
+| FR-20 | Enforce **safety-parameter bounds at the unit**: reject or clamp any pushed config (ROI, dwell, hold, speed gate, message set) that falls outside its declared safe range, and stage/validate a config change like an update. Signing prevents *tampering*, not operator *error* — a bad ROI or `T_dwell=900 s` silently breaks the safety function and won't trip a model canary. | M |
+| FR-21 | Defer **OTA updates and non-critical restarts while a warning is active** (the track set is non-empty), or take the sign to a known blank state *loud to operators* for the update window — never silently drop a live warning for a software update (see boot-present handling, [doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine)). | S |
 
 ### Detection-to-warning behaviour (canonical loop)
 
@@ -87,7 +89,7 @@ The full state machine, with timers and edge cases, is specified in
 
 | ID | Category | Requirement |
 |----|----------|-------------|
-| NFR-01 | **Latency** | Stop-confirmed → warning ON ≤ 2 s after dwell elapses (so total stop→warn ≈ dwell + ≤2 s). |
+| NFR-01 | **Latency** | Stop-confirmed → warning ON ≤ 2 s after dwell elapses (so total stop→warn ≈ dwell + ≤2 s). **Backend-qualified:** met directly by the dedicated LED sign; for an existing operator **VMS** the operator's command/refresh and message-arbitration cycle may exceed 2 s, so NFR-01 carries the VMS adapter's own latency budget ([ADR-0004](adr/ADR-0004-warning-actuator-integration.md), [ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)). |
 | NFR-02 | **Latency** | Vehicle-gone → warning OFF within hold + ≤ 2 s. |
 | NFR-03 | **Availability** | **Functional** availability ≥ 99% per monitored site over the pilot period — the fraction of time the unit can actually *detect-and-warn to spec*, not merely "powered and reporting"; time spent in a degraded/safe state counts as **unavailable**. Excludes scheduled maintenance. Field-measured (see §3a). |
 | NFR-04 | **Reliability** | No single software fault may leave a **stale ON** warning indefinitely — a watchdog must time-bound any activation and re-confirm. |
@@ -154,7 +156,10 @@ SSD = 0.278 · V · t  +  0.039 · V² / a       (V in km/h, SSD in m)
 | 120 km/h | ≈ 250 m | ≈ 360 m |
 
 \* DSD manoeuvre C = "speed/path/direction change on a rural/high-speed road" (AASHTO). It is the
-appropriate basis because the safe response here is a **lane change**, not an emergency stop.
+appropriate basis because the safe response here is a **lane change**, not an emergency stop. The
+DSD-C column is read from AASHTO's published table — a constant-speed manoeuvre distance of the form
+`d = 0.278 · V · t_C` — and is **not** computed from the SSD formula above (it has no braking term), so
+don't expect that expression to reproduce 315 m at 100 km/h.
 
 **Why DSD-C and not just "SSD + a lane change"?** SSD assumes the driver *stops*; the safe response to
 a shoulder obstacle is usually to *hold speed and change lane* — a decision-and-manoeuvre task — so DSD
@@ -187,6 +192,26 @@ afterthought.
   required distance, use a **second repeater sign** or relocate; if neither fits, the site is
   unsuitable for a single-unit deployment — record this as a siting constraint (assumption A4).
 
+**Unwarned-exposure budget (what `T_dwell` costs).** Confirmation is not free. For the window
+`τ = T_dwell + T_activate` (nominal 5 + ≤2 ≈ **7 s**) after a vehicle first stops, no warning is yet
+shown. Because the sign is fixed upstream, this does **not** shorten the lead of drivers who pass the
+sign *after* it lights — they still get the full DSD; the exposure is the **following vehicles that
+pass the sign's location during `τ`**, who get a reduced or zero lead. Approximate it as:
+
+```
+N_unwarned ≈ τ / h        (h = mean following headway, s/veh, per lane)
+L_unwarned ≈ τ · V        (distance a follower covers during τ; 7 s @ 100 km/h ≈ 194 m)
+```
+
+At a 2 s headway, `τ ≈ 7 s` exposes ~3–4 following vehicles per lane before the warning appears. This
+is the quantitative form of the residual hazard in
+[doc 04 §0](04-risk-and-safety.md#0-limits-of-protection-residual-hazards), and it bounds `T_dwell`
+**from above**: a longer dwell buys fewer false alarms (good) but enlarges `N_unwarned` and leaves the
+just-stopped vehicle unprotected longer (bad). Size `T_dwell` so `N_unwarned` stays within an
+operator-agreed ceiling at the site's headway, and keep `T_activate` small (NFR-01). **This is the
+budget** [doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine) refers to when it
+says to tune the dwell against unwarned exposure.
+
 > This makes warning placement a **derived, defensible number per site**, not a guess. It is one of
 > the most valuable additions over the original proposal.
 
@@ -210,13 +235,26 @@ because they are validated very differently.
 | **Fault-detection coverage** | injected faults the self-monitor catches & escalates | ≥ 95% of the FMEA fault list ([doc 04 §2](04-risk-and-safety.md#2-fmea-lite-failure-mode--effect--detection--response)) — **caveat:** this measures detection of *enumerated* faults, not unknown ones | ≥ 95% |
 | **MTBF / MTTR** | mean time between failures / to repair | characterise on rig | MTBF target set at pilot |
 
+**Statistical sufficiency (so a target is actually testable).** A bare "≥ 95%" is not a pass/fail bar
+without a sample size and a confidence level: 19/20 events is 95%, but its lower 95% confidence bound is
+~75%. Each **rate** metric therefore carries a **minimum event count and a confidence statement** —
+e.g. *recall ≥ 95% with a lower 95% (Wilson) bound ≥ 90% over ≥ 200 staged events*, and false-activation
+reported with its exposure denominator and a confidence interval. Simulation can generate the volume
+cheaply — a concrete reason to use it — while the bench rig reports the N it actually achieved. Fix the
+exact N and bound per metric in the simulation methodology
+([ADR-0007](adr/ADR-0007-validation-and-data-strategy.md) AI#1); a "≥ 95%" claimed off a handful of
+runs is not a measured result.
+
 **Acceptance for the university task** = demonstrate, on the bench rig and/or simulation, the full
-closed loop (detect → confirm → warn → track → clear) meeting the prototype-column targets across a
-defined scenario set (day, night, rain, transient pass-through, **brief and sustained occlusion with
-and without radar corroboration**, **multiple simultaneous vehicles arriving and leaving**, pedestrian,
-**a vehicle already present at boot**, and **injected sensor/compute/sign faults — including killing
-the state-machine process to prove the dead-man's switch blanks the sign**), plus the feasibility
-report and the field-pilot development proposal the grant calls for.
+closed loop (detect → confirm → warn → track → clear) meeting the prototype-column targets (at the
+sample sizes above) across a defined scenario set (day, night, rain, transient pass-through,
+**through-lane congestion / stop-and-go stationary beside the ROI — must _not_ false-trigger**,
+**brief and sustained occlusion with and without radar corroboration**, **multiple simultaneous
+vehicles arriving and leaving**, pedestrian, **a vehicle already present at boot**, and **injected
+sensor/compute/sign faults — including killing the state-machine process, killing the edge box, and
+cutting the sign link to prove the sign-controller dead-man's switch blanks the sign in every case**
+([ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.md))), plus the feasibility report and
+the field-pilot development proposal the grant calls for.
 
 **Provability boundary (state it in the report).** Bench/sim results substantiate *logic, timing,
 fault handling, and false-trigger resistance to modelled nuisances*; they do **not** substantiate

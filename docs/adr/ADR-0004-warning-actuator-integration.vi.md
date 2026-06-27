@@ -10,7 +10,7 @@
 
 Cảnh báo đến người lái là đầu ra duy nhất của hệ thống, nên *cách thức* hiển thị cảnh báo và *việc chúng ta tự xây dựng hay tái sử dụng* bảng cảnh báo có ý nghĩa quan trọng về mặt kiến trúc. Hình 1 cho thấy cả một **bảng thông báo điện tử (VMS) gắn trên giá long môn (gantry)** lẫn một **bảng LED bên đường**. Các tuyến đường cao tốc hiện đại thường đã có sẵn các giá long môn VMS do đơn vị vận hành điều khiển cùng một hạ tầng xương sống ITS; các đoạn khác (và bất kỳ mô hình thử nghiệm trên bàn (bench) nào) thì không có gì. Việc bổ sung biển báo dư thừa vừa tốn kém, vừa chậm cấp phép, vừa làm rối mặt đường.
 
-Các yếu tố tác động: chi phí đầu tư, công sức lắp đặt/cấp phép, độ phức tạp tích hợp với hệ thống ITS của bên thứ ba, hình học bố trí bảng báo (phải đặt cách ≥ DSD về phía trước theo hướng xe tới — [tài liệu 01 §4](../01-requirements.vi.md#4-warning-placement--the-math-the-proposal-omits)), sự phù hợp với QCVN 41, và mức độ chấp nhận/quyền điều khiển của đơn vị vận hành.
+Các yếu tố tác động: chi phí đầu tư, công sức lắp đặt/cấp phép, độ phức tạp tích hợp với hệ thống ITS của bên thứ ba, hình học bố trí bảng báo (phải đặt cách ≥ DSD về phía trước theo hướng xe tới — [tài liệu 01 §4](../01-requirements.vi.md#4-bố-trí-cảnh-báo--phép-tính-mà-đề-xuất-bỏ-sót)), sự phù hợp với QCVN 41, và mức độ chấp nhận/quyền điều khiển của đơn vị vận hành.
 
 ## Quyết định
 
@@ -64,6 +64,9 @@ Cam kết theo một chiến lược bảng báo vật lý duy nhất (A hoặc 
 
 - **Dễ hơn:** tối ưu chi phí theo từng vị trí; kiểm thử trên bàn ngay hôm nay; tái sử dụng VMS hiện trường về sau; phần lõi ổn định.
 - **Khó hơn:** hai adapter phải bảo trì; adapter VMS đòi hỏi tích hợp riêng theo từng đơn vị vận hành và một **chính sách phân xử** (cái gì thắng nếu đơn vị vận hành đang hiển thị sẵn một thông báo); nội dung thông báo phải tuân thủ QCVN 41 ở cả hai backend.
+- **Độ trễ & fail-safe có điều kiện theo backend.** Hai backend **không** đưa ra cùng những bảo đảm như nhau, và tài liệu phải nêu rõ điều này theo từng vị trí:
+  - *Bảng LED chuyên dụng* — một điểm cuối thông minh tuân theo nhịp khẳng định (heartbeat) tín hiệu SHOW làm mới liên tục, nên nó đáp ứng trực tiếp độ trễ NFR-01 và được trang bị cơ chế tự ngắt an toàn của bộ điều khiển biển báo theo [ADR-0009](ADR-0009-failsafe-placement-and-degraded-modes.vi.md) (xóa bảng khi mất kết nối).
+  - *VMS sẵn có* — được tiếp cận qua giao thức của đơn vị vận hành với các chu kỳ lệnh/làm mới và cơ chế phân xử thông báo có thể **vượt quá ngân sách ≤2 s của NFR-01** và có thể **chốt trạng thái (latch)** (không có cam kết heartbeat). Do đó NFR-01 là **có điều kiện** đối với backend này, và fail-safe quay về cơ chế *watchdog + chủ động CLEAR + đọc lại trạng thái* với một cửa sổ kẹt-BẬT (stale-ON) tồn dư bằng đúng chu kỳ lệnh của đơn vị vận hành (ADR-0009 §A). Hãy cấp cho adapter VMS ngân sách độ trễ + ưu tiên phân xử riêng của nó, và ưu tiên chế độ khẳng định-làm-mới / khóa liên động phần cứng (hardware interlock) ở nơi đơn vị vận hành có cung cấp.
 - **Xem xét lại khi:** một giao thức thông báo ITS tiêu chuẩn được đơn vị vận hành bắt buộc áp dụng (thu gọn về một adapter), hoặc khi bổ sung một kênh cảnh báo V2X/trên xe (một backend *thứ ba* nằm sau cùng giao diện đó).
 
 ## Hạng mục hành động
@@ -71,4 +74,5 @@ Cam kết theo một chiến lược bảng báo vật lý duy nhất (A hoặc 
 1. [ ] Đặc tả giao diện cơ cấu chấp hành `SHOW/CLEAR/STATUS` và ngữ nghĩa đọc lại trạng thái (status read-back).
 2. [ ] Làm việc với một đơn vị vận hành đường cao tốc để tìm hiểu giao thức VMS và các quy tắc phân xử thông báo của họ.
 3. [ ] Chọn một bảng LED năng lượng mặt trời tuân thủ QCVN 41 cho backend chuyên dụng / mô hình thử nghiệm trên bàn (bench).
-4. [ ] Định nghĩa tập thông báo cảnh báo được phê duyệt và quy trình rà soát sự phù hợp của tập đó.
+4. [ ] Định nghĩa tập thông báo cảnh báo được phê duyệt và quy trình rà soát sự phù hợp của tập đó — **xác nhận rằng QCVN 41 thực sự cung cấp một phần tử tuân thủ** cho tình huống "có xe dừng trên lề đường phía trước"; nếu không có, hãy theo đuổi một ngoại lệ được quản lý hoặc một biểu tượng (pictogram) mới với cơ quan quản lý đường bộ thay vì mặc nhiên cho rằng đã tuân thủ.
+5. [ ] Đặc tả **ngân sách độ trễ + ưu tiên phân xử của adapter VMS** và ghi nhận NFR-01 có điều kiện cùng phương án fail-safe dự phòng cho VMS chốt trạng thái (latching) ([ADR-0009](ADR-0009-failsafe-placement-and-degraded-modes.vi.md)).

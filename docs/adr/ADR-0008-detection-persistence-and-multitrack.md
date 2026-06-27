@@ -43,8 +43,12 @@ The state machine operates over the **set of confirmed-stopped tracks inside the
 3. **Lost track (hold, don't clear).** A confirmed-stopped track whose detections stop *without an
    observed exit* is retained as **presumed-present (occluded)**:
    - while the **radar presence channel still substantiates a return** at that range/position, the
-     track is retained for up to `T_occlusion` (default 60 s) and the warning persists — an
-     occluded-but-present vehicle keeps warning;
+     track is retained and the warning persists — an occluded-but-present vehicle keeps warning.
+     `T_occlusion` (default 60 s) bounds only **un-renewed** corroboration: a live corroborating return
+     **renews** the hold, and if occlusion persists past `T_occlusion` *while radar still corroborates*,
+     the unit enters **CAMERA-OCCLUDED-DEGRADED** (warning stays ON **+ operator alert**) rather than
+     clearing — a long camera outage is never silently turned into a clear
+     ([ADR-0009](ADR-0009-failsafe-placement-and-degraded-modes.md) §C);
    - with **no corroboration from any sensor**, the track is retained only for the brief `T_hold`
      hysteresis (default 10 s) and then moved to clearing — but clearing a *possibly-still-present*
      hazard is logged and escalated as a **low-confidence clear** event, never a silent one.
@@ -110,10 +114,12 @@ strengthening the ADR-0001 case and giving ADR-0007 a concrete thing to validate
 - **Easier:** correct behaviour under occlusion and multiple vehicles; fast clear on genuine
   departure; no silent clears.
 - **Harder:** a track-set lifecycle and a defined ROI exit boundary to implement and test; a hard
-  dependency on real radar corroboration (if radar is cut to a synthetic channel, the occlusion-hold
-  guarantee is only as good as the synthetic model — [ADR-0007](ADR-0007-validation-and-data-strategy.md));
-  more scenarios in the acceptance suite (sustained occlusion with/without radar, multi-vehicle
-  enter/leave interleavings).
+  dependency on real radar corroboration — including radar **azimuth/lane discrimination** good enough
+  to attribute a return to the *shoulder* ROI rather than the adjacent through lane at the monitored
+  range, not merely detect presence (folded into the [ADR-0001](ADR-0001-sensing-modality.md) gate). If
+  radar is cut to a synthetic channel, the occlusion-hold guarantee is only as good as the synthetic
+  model ([ADR-0007](ADR-0007-validation-and-data-strategy.md)); more scenarios in the acceptance suite
+  (sustained occlusion with/without radar, multi-vehicle enter/leave interleavings).
 - **Revisit when:** field data shows occlusion is rarer/shorter than assumed (simplify `T_occlusion`),
   or a richer tracker makes exit detection reliable enough to shorten `T_hold`.
 

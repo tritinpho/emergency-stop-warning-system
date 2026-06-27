@@ -37,19 +37,21 @@ chỉ có *backend* cảm biến/bảng cảnh báo/nguồn điện thay đổi 
 |------|-----------:|------|
 | Tính toán tại biên (ví dụ Raspberry Pi 5 + bộ tăng tốc, hoặc Jetson Nano đã qua sử dụng) | ~3–4M | Chạy nhận diện + máy trạng thái. |
 | Camera (IP, WDR, IR) | ~1.5–2.5M | Cảm biến chính. |
-| Radar **có khả năng phát hiện xe đứng yên** / mô-đun phát hiện hiện diện | ~1.5–2.5M | **Ưu tiên ngân sách** — kiểm chứng trên bàn duy nhất cho tuyên bố về điều kiện ban đêm/bất lợi (cổng [ADR-0001](adr/ADR-0001-sensing-modality.vi.md)). Cắt giảm xuống kênh tổng hợp làm tuyên bố đó bị hoãn sang giai đoạn hiện trường. |
+| Mô-đun đánh giá radar mmWave **có khả năng phát hiện xe đứng yên** (tạo ảnh / HRR FMCW) | ~6–8M | **Ưu tiên ngân sách & sự đánh đổi khó khăn.** Một mô-đun thực sự có thể vượt qua cổng [ADR-0001](adr/ADR-0001-sensing-modality.vi.md) (đứng yên giữa nhiễu nền **+** phân biệt lề đường so với làn xuyên qua) là một bộ kit đánh giá mmWave — **không phải** mô-đun *phát hiện hiện diện* loại thường ~1.5–2.5M mà bản phác đầu giả định, và đắt hơn gấp nhiều lần. Đây là kiểm chứng trên bàn *duy nhất* để giảm thiểu R5 (rủi ro cao nhất), nên nó được tài trợ trước và các dòng bên dưới hấp thụ phần chênh lệch. |
 | Bảng LED (thay thế bảng cảnh báo) + bộ điều khiển bảng | ~1–2M | Trình diễn giao diện cơ cấu cảnh báo. |
 | Giá đỡ, cáp, nguồn cấp, linh tinh | ~1–2M | Lắp ráp mô hình trên bàn. |
 | Phổ biến kết quả (báo cáo, poster, infographic) | ~1M | Theo các sản phẩm của đề xuất. |
 | Dự phòng | phần còn lại | — |
 
 > Các con số là ước tính lập kế hoạch để cho thấy giới hạn ngân sách là *khả thi cho một nguyên mẫu trên bàn*, không phải
-> một báo giá mua sắm. Radar có thể được hoãn lại thành một kênh tổng hợp trong mô phỏng nếu ngân sách phần cứng
-> eo hẹp, mà không thay đổi kiến trúc — **nhưng làm như vậy khiến tuyên bố về độ nhạy phát hiện (recall) trong điều kiện
-> ban đêm/bất lợi bị hoãn sang giai đoạn hiện trường** (không thể được chứng minh bằng dữ liệu radar tổng hợp;
-> [ADR-0001](adr/ADR-0001-sensing-modality.vi.md), [doc 01 §5](01-requirements.vi.md#5-evaluation-metrics--acceptance-criteria)).
-> Nên ưu tiên tài trợ một mô-đun chi phí thấp thực sự để cổng [ADR-0001](adr/ADR-0001-sensing-modality.vi.md) thực sự
-> có thể được chạy — điều này giảm thiểu rủi ro cao nhất (R5).
+> một báo giá mua sắm. **Tài trợ radar đạt chuẩn cổng làm định hình lại ngân sách**: ở mức ~6–8M nó tiêu thụ phần lớn
+> khoản dự phòng và đẩy các dòng biên/camera xuống mức thấp hơn, *đã qua sử dụng/chi phí thấp* (ví dụ một Jetson Nano
+> cũ) — sự đánh đổi có chủ đích để giữ cho kiểm chứng trên bàn duy nhất của R5 là thực. Phương án thay thế là hoãn radar
+> sang một **kênh tổng hợp** trong mô phỏng (kiến trúc không đổi) — **nhưng làm như vậy khiến tuyên bố về độ nhạy phát
+> hiện (recall) trong điều kiện ban đêm/bất lợi bị hoãn sang giai đoạn hiện trường**, vì nó không thể được chứng minh
+> bằng dữ liệu radar tổng hợp ([ADR-0001](adr/ADR-0001-sensing-modality.vi.md),
+> [doc 01 §5](01-requirements.vi.md#5-chỉ-số-đánh-giá--tiêu-chí-nghiệm-thu)). Hãy quyết định điều này một cách tường
+> minh tại **thử nghiệm khả thi radar sớm ở Giai đoạn 1** (§3/§5), chứ không phải bằng mặc định ngầm.
 
 ## 2. Định nghĩa MVP
 
@@ -67,10 +69,10 @@ Nếu điều đó được chứng minh đối chiếu với các mục tiêu n
 
 | Giai đoạn | Nội dung đề xuất (tháng) | Sản phẩm kỹ thuật (bổ sung) | Tiêu chí kết thúc |
 |------:|---------------------------|----------------------------------|---------------|
-| **1** | Khảo sát & yêu cầu (2) | Hoàn thiện [yêu cầu](01-requirements.vi.md); nghiên cứu **bố trí DSD theo từng vị trí** (đối chiếu với TCVN 5729); **kế hoạch thu thập dữ liệu** ([ADR-0007](adr/ADR-0007-validation-and-data-strategy.vi.md)); danh mục kịch bản (ngày/đêm/mưa/**che khuất ngắn+kéo dài**/thoáng qua/người đi bộ/**đa phương tiện**/**xe đã hiện diện lúc khởi động**/sự cố). | Yêu cầu + tiêu chí nghiệm thu được phê duyệt; kế hoạch dữ liệu được thống nhất. |
-| **2** | Mô hình nguyên lý & thiết kế hệ thống (2) | [Kiến trúc](02-system-architecture.vi.md) được phê chuẩn; **cả 8 ADR được chấp nhận**; hợp đồng giao diện; đặc tả ROI + **biên thoát** + máy trạng thái (gồm che khuất/đa vết, [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md)); lựa chọn cảm biến/tính toán/bảng cảnh báo. | Các ADR được Chấp nhận; giao diện được đóng băng. |
+| **1** | Khảo sát & yêu cầu (2) | Hoàn thiện [yêu cầu](01-requirements.vi.md); nghiên cứu **bố trí DSD theo từng vị trí** (đối chiếu với TCVN 5729); **kế hoạch thu thập dữ liệu** ([ADR-0007](adr/ADR-0007-validation-and-data-strategy.vi.md)); **thử nghiệm khả thi radar sớm** để giảm thiểu R5 *trước khi* thiết kế dồn trọng tâm vào radar ([ADR-0001](adr/ADR-0001-sensing-modality.vi.md)); danh mục kịch bản (ngày/đêm/mưa/**che khuất ngắn+kéo dài**/thoáng qua/**ùn tắc**/người đi bộ/**đa phương tiện**/**xe đã hiện diện lúc khởi động**/sự cố). | Yêu cầu + tiêu chí nghiệm thu được phê duyệt; kế hoạch dữ liệu được thống nhất; **ghi nhận quyết định go/no-go của thử nghiệm radar**. |
+| **2** | Mô hình nguyên lý & thiết kế hệ thống (2) | [Kiến trúc](02-system-architecture.vi.md) được phê chuẩn; **cả 9 ADR được chấp nhận**; hợp đồng giao diện; đặc tả ROI + **biên thoát** + máy trạng thái (gồm che khuất/đa vết [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md); bộ điều khiển biển báo an toàn khi sự cố + chế độ suy giảm [ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)); lựa chọn cảm biến/tính toán/bảng cảnh báo. | Các ADR được Chấp nhận; giao diện được đóng băng. |
 | **3** | Mô phỏng, thuật toán, giao diện (3) | **Khung mô phỏng** (mô hình cảm biến tổng hợp có tài liệu, [ADR-0007](adr/ADR-0007-validation-and-data-strategy.vi.md)); nhận diện + cổng lọc ROI + bộ theo dõi; **máy trạng thái với dwell/hysteresis/giữ-khi-che-khuất/đa vết/watchdog** ([ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md)); **cổng phát hiện xe đứng yên bằng radar** ([ADR-0001](adr/ADR-0001-sensing-modality.vi.md)); nội dung giao diện cảnh báo (tuân thủ QCVN-41). | Vòng kín vượt qua trong mô phỏng trên toàn bộ danh mục kịch bản; cổng radar được quyết định. |
-| **4** | Xây dựng/mô phỏng mô hình thử nghiệm (3) | **Mô hình trên bàn**: camera (+radar) → biên → bảng LED; bộ chuyển đổi cơ cấu cảnh báo với **cơ chế an toàn tự kích hoạt khi mất tín hiệu (dead-man's switch)**; **bộ giám sát tình trạng + trạng thái an toàn**; telemetry tới một TMC tối thiểu; **khung tiêm lỗi** (gồm cả việc giết tiến trình máy trạng thái). | Vòng kín + an toàn khi sự cố được trình diễn trên mô hình; **giết tiến trình máy trạng thái làm bảng cảnh báo trống**. |
+| **4** | Xây dựng/mô phỏng mô hình thử nghiệm (3) | **Mô hình trên bàn**: camera (+radar) → biên → bảng LED; bộ chuyển đổi cơ cấu cảnh báo với **cơ chế tự ngắt an toàn của bộ điều khiển biển báo** (làm trống khi mất nhịp tim); **bộ giám sát tình trạng + trạng thái an toàn + ba chế độ suy giảm** ([ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)); telemetry tới một TMC tối thiểu; **khung tiêm lỗi** (giết tiến trình SM, **giết hộp biên, cắt liên kết biển báo**, ngắt từng cảm biến). | Vòng kín + an toàn khi sự cố được trình diễn trên mô hình; **giết-SM, giết-hộp, và cắt-liên-kết mỗi cái đều làm bảng cảnh báo trống**; các chế độ suy giảm leo thang đúng cách. |
 | **5** | Đánh giá & phản biện chuyên gia (1) | Chạy **bộ nghiệm thu** (doc 01 §5); thu thập số liệu; **phản biện chuyên gia** (giao thông, điện tử, AI, an toàn đường bộ) theo phương pháp của đề xuất. | Số liệu đạt mục tiêu nguyên mẫu; ghi nhận phản hồi phản biện. |
 | **6** | Báo cáo cuối & các bước tiếp theo (1) | **Báo cáo khả thi**; infographic cập nhật; **đề xuất thử nghiệm hiện trường cấp sở** (chọn vị trí, BoM, nguồn/kết nối, hồ sơ an toàn, ngân sách). | Sản phẩm được nộp; đề xuất tiếp theo sẵn sàng. |
 
@@ -96,16 +98,25 @@ gantt
 
 Mỗi điểm kết thúc giai đoạn cũng là một **cổng go/no-go**:
 
+- **Sau P1 (thử nghiệm radar)** — một kiểm tra khả thi sớm, rẻ trên một mô-đun mmWave có thể mua được. Nếu nó
+  không thể *tiệm cận* được việc đứng yên giữa nhiễu nền **+** phân biệt lề đường/làn xuyên qua, hãy quyết định **ngay
+  bây giờ** — trước khi kiến trúc dồn trọng tâm vào radar — liệu có tài trợ một mô-đun đạt chuẩn cổng (định hình lại
+  ngân sách) hay coi tuyên bố về điều kiện ban đêm/bất lợi là hoãn sang giai đoạn hiện trường và radar trên bàn chỉ là
+  hệ-thống-ống-dẫn hợp nhất ([ADR-0001](adr/ADR-0001-sensing-modality.vi.md)). Bắt được điều này ở tháng 1–2 thay vì
+  tháng 9 chính là toàn bộ mục đích.
 - **Sau P2** — nếu không thể thỏa mãn bố trí DSD tại bất kỳ vị trí ứng viên thực tế nào, hãy xem xét lại chiến lược
   chọn vị trí hoặc bảng lặp lại (PL-04) trước khi xây dựng.
 - **Sau P3** — nếu máy trạng thái không đạt được mục tiêu báo động giả/bỏ sót trong mô phỏng, hãy tinh chỉnh lại dwell/
   hysteresis/hợp nhất trước khi đầu tư công sức vào phần cứng.
-- **Sau P3 (cổng radar)** — nếu một radar thực không thể phát hiện một cách tin cậy một phương tiện *đứng yên* giữa nhiễu
-  nền ven đường ở hình học lề đường, thì tuyên bố về điều kiện ban đêm/bất lợi **không** có bằng chứng hậu thuẫn: hoặc
-  tài trợ một radar tốt hơn hoặc **giảm phạm vi mục tiêu điều kiện bất lợi xuống mức hoãn sang giai đoạn hiện trường** —
-  đừng đặt nó dựa trên dữ liệu tổng hợp ([ADR-0001](adr/ADR-0001-sensing-modality.vi.md)).
-- **Sau P4** — nếu độ phủ tiêm lỗi dưới mục tiêu, thiết kế an toàn khi sự cố (ADR-0005)
-  chưa sẵn sàng để nghiệm thu; hãy khắc phục trước khi đánh giá.
+- **Sau P3 (cổng radar)** — xác nhận thử nghiệm Giai đoạn 1 trên phần cứng *cuối cùng*, nay bao gồm cả **phân biệt
+  làn**: nếu một radar thực không thể tin cậy chọn ra một phương tiện *đứng yên* giữa nhiễu nền ven đường **và** đặt nó
+  vào ROI lề đường, thì tuyên bố về điều kiện ban đêm/bất lợi **không** có bằng chứng hậu thuẫn — hoặc tài trợ một radar
+  tốt hơn hoặc **giảm phạm vi mục tiêu điều kiện bất lợi xuống mức hoãn sang giai đoạn hiện trường**; đừng đặt nó dựa
+  trên dữ liệu tổng hợp ([ADR-0001](adr/ADR-0001-sensing-modality.vi.md)).
+- **Sau P4** — nếu độ phủ tiêm lỗi dưới mục tiêu, thiết kế an toàn khi sự cố
+  ([ADR-0005](adr/ADR-0005-fail-safe-and-system-safety.vi.md)/[ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md))
+  chưa sẵn sàng để nghiệm thu; cụ thể là **giết-SM, giết-hộp-biên, và cắt-liên-kết mỗi cái đều phải làm bảng cảnh báo
+  trống**, và các chế độ suy giảm phải leo thang đúng cách, trước khi đánh giá.
 
 ## 6. "Hoàn thành" bàn giao gì cho giai đoạn tiếp theo (cấp sở)
 

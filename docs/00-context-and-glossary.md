@@ -134,6 +134,10 @@ flowchart TB
 | University-level task | nhiệm vụ cấp trường | This funded task (the prototype/simulation scope). |
 | Pilot production project | dự án sản xuất thử nghiệm | The proposal's declared project type (SXTN). |
 | Smart transportation / ITS | giao thông thông minh | Intelligent Transportation Systems domain. |
+| Dead-man's switch | (cơ chế tự ngắt an toàn) | The **sign controller** blanks the sign automatically when the refreshed `SHOW` heartbeat stops — so a dead edge box or a cut link cannot leave a warning stuck on ([ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)). |
+| Ground-plane homography / calibration | (hiệu chuẩn mặt phẳng mặt đường) | Per-site mapping from image pixels to road coordinates, required for ROI footprint and camera↔radar fusion; **can drift** with pole sway / vibration / heat. |
+| Degraded mode — *initiate* vs *hold* | (chế độ suy giảm) | What a unit can still do with one sensor down: a camera-dead unit can *hold* an existing warning but cannot *initiate* a new one (**blind to new hazards**). |
+| Unwarned-exposure budget | (added) | The following vehicles that pass the sign during the ~`T_dwell + T_activate` window after a stop, before the warning lights ([doc 01 §4](01-requirements.md#4-warning-placement--the-math-the-proposal-omits)). |
 
 > Throughout the docs, the first use of a domain term gives the Vietnamese in parentheses; thereafter
 > the English term is used for brevity.
