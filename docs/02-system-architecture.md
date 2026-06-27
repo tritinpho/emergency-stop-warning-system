@@ -51,12 +51,14 @@ flowchart TB
 
         CAM --> PERC
         RAD --> FUSE
-        PERC --> FUSE --> SM --> ACT
+        PERC --> FUSE --> SM
+        SM -- "assert SHOW / CLEAR" --> ACT
         SM --> BUF
         HM -. watches .- SENSE
         HM -. watches .- PERC
         HM -. watches .- ACT
         HM --> SM
+        HM -. "force safe-state<br/>(independent of SM)" .-> ACT
     end
 
     ACT --> SIGN["Warning actuator<br/>LED sign / existing VMS"]
@@ -91,9 +93,9 @@ flowchart TB
 | **Camera / radar drivers** | Acquire timestamped frames and radar returns. | Time sync between sensors matters for fusion. |
 | **Perception** | Detect vehicles/persons; keep only detections whose footprint falls inside the ROI polygon. | Lightweight detector + ROI gating ([ADR-0003](adr/ADR-0003-detection-algorithm.md)). |
 | **Fusion & tracking** | Associate camera detections with radar returns; produce stable tracks with position + speed + dwell. | Radar resolves "present & stationary" in the dark / rain. |
-| **Decision state machine** | The brain. Applies dwell, hysteresis, watchdog; decides SHOW/CLEAR. | The only component that may command the sign. §4. |
-| **Actuator abstraction** | Translate SHOW/CLEAR into the concrete sign protocol; read back sign status. | Swappable: own LED sign or existing VMS. |
-| **Health monitor** | Self-test every subsystem; emit heartbeat; drive safe state on fault. | Independent watchdog path; see ADR-0005. |
+| **Decision state machine** | The brain. Applies dwell, hysteresis, occlusion/multi-track policy, watchdog; decides SHOW/CLEAR. | The only component that may **assert** a warning; **absence** of a live assertion is fail-safe by construction (see actuator). §4, [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md). |
+| **Actuator abstraction** | Translate SHOW/CLEAR into the concrete sign protocol; read back sign status. | Swappable: own LED sign or existing VMS. **Defaults to the safe (blank) state on loss of a fresh assertion heartbeat from the state machine — a dead-man's switch, so a crashed/wedged SM cannot leave a warning stuck on.** See [ADR-0005](adr/ADR-0005-fail-safe-and-system-safety.md). |
+| **Health monitor** | Self-test every subsystem; emit heartbeat; drive safe state on fault. | Independent of the perception/decision path; can **force the actuator to safe state directly**, without routing through the (possibly wedged) state machine. See [ADR-0005](adr/ADR-0005-fail-safe-and-system-safety.md). |
 | **Local store** | Hold config, the event-evidence buffer, and a durable outbox for telemetry. | Survives reboots; bounded retention (privacy). |
 | **Comms gateway** | Store-and-forward telemetry; receive config/OTA. | Loss-tolerant; never in the safety path. |
 | **TMC services** | Monitor, alert, audit, configure, update, override. | Off the critical path — can be offline without unsafe behaviour. |
@@ -127,7 +129,7 @@ flowchart LR
     style CLOUD fill:#f0fdf4,stroke:#22c55e
 ```
 
-**Placement geometry (critical — see [doc 01 §4](01-requirements.md#4--warning-placement--the-math-the-proposal-omits)):**
+**Placement geometry (critical — see [doc 01 §4](01-requirements.md#4-warning-placement--the-math-the-proposal-omits)):**
 
 ```
      traffic ──────────────────────────────────────────────►
@@ -151,56 +153,94 @@ per site (ADR-0004).
 ## 4. The detection→warning state machine
 
 This is where the proposal's "chu trình khép kín" (closed loop) becomes precise. It is the single
-authority over the sign and the place where false-trigger, flapping, and stale-ON risks are
-controlled.
+authority over the sign and the place where false-trigger, flapping, stale-ON, **occlusion**, and
+**multi-vehicle** risks are controlled. The persistence policy it implements is decided in
+[ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md).
 
-![Detection-to-warning state machine: the idle → tracking → confirmed → warn-on → warn-hold → clearing cycle, with a watchdog self-loop on warn-on and a central safe state reachable from any state on a critical fault, returning to idle after a self-test passes.](assets/state-machine-diagram.svg)
+**The machine operates over the _set_ of confirmed-stopped in-ROI tracks, not a single object.** The
+warning is ON while that set is non-empty; it clears only when the set empties under the rules below.
+This is what lets several vehicles stop, depart, and arrive independently without the warning
+flapping or clearing early.
+
+![Detection-to-warning state machine over the set of in-ROI tracks: idle → tracking → confirmed → warn-on, with warn-hold distinguishing an observed exit (fast clear) from a lost-without-exit track that is held while radar corroborates presence; a watchdog that clears-and-faults when no channel can confirm, and a safe state reachable from any state and driven independently by the health monitor.](assets/state-machine-diagram.svg)
 
 *Tiếng Việt: [sơ đồ máy trạng thái](assets/state-machine-diagram-vi.svg).*
 
 *Blue = normal monitoring, amber = warning shown, red = fault safe state. Dwell (default 5 s) gates
-false triggers; the warn-on ⇄ warn-hold pair with a 10 s hold absorbs occlusion; the watchdog
-re-confirms so no warning can stick on; the safe state is reachable from any state. The editable
-Mermaid source follows.*
+false triggers; **a lost track is held while radar still corroborates presence (occlusion), but a
+confirmed exit clears fast**; the watchdog clears **and raises a fault** if no channel can confirm, so
+no warning can stick on silently; the safe state is reachable from any state and can be forced by the
+independent health monitor. The editable Mermaid source follows.*
 
 ```mermaid
 stateDiagram-v2
     [*] --> IDLE
-    IDLE --> TRACKING : object enters ROI
-    TRACKING --> IDLE : object leaves before dwell
-    TRACKING --> CONFIRMED : stationary ≥ T_dwell (default 5s)
-    CONFIRMED --> WARN_ON : command SHOW (≤2s)
-    WARN_ON --> WARN_HOLD : object no longer detected
-    WARN_HOLD --> WARN_ON : object re-detected (occlusion recovered)
-    WARN_HOLD --> CLEARING : absent ≥ T_hold (default 10s)
-    CLEARING --> IDLE : command CLEAR + sign status = off
-    WARN_ON --> WARN_ON : watchdog re-confirm (bounded refresh)
+    note right of IDLE
+      All states act over the SET of confirmed-stopped in-ROI tracks.
+      WARN is ON while the set is non-empty.
+      A vehicle already present at boot is treated as a new track
+      (dwell runs normally — no special-casing).
+    end note
 
+    IDLE --> TRACKING : a track enters ROI
+    TRACKING --> IDLE : track leaves / lost before dwell
+    TRACKING --> CONFIRMED : stationary ≥ T_dwell (default 5s)
+    CONFIRMED --> WARN_ON : assert SHOW (≤2s)
+
+    WARN_ON --> WARN_ON : set still non-empty (assertion refreshed)
+    WARN_ON --> WARN_HOLD : a track lost WITHOUT an observed exit (occlusion?)
+    WARN_HOLD --> WARN_ON : re-detected, OR radar still corroborates presence
+    WARN_HOLD --> CLEARING : confirmed exit, OR absent ≥ T_hold with NO corroboration (low-confidence clear → logged)
+    WARN_ON --> CLEARING : confirmed exit of the last track (fast clear)
+    CLEARING --> IDLE : CLEAR + sign status = off
+
+    WARN_ON --> SAFE_STATE : T_watchdog, no confirm/corroboration → clear + FAULT
+    WARN_HOLD --> SAFE_STATE : critical fault
     IDLE --> SAFE_STATE : critical fault
     TRACKING --> SAFE_STATE : critical fault
     CONFIRMED --> SAFE_STATE : critical fault
-    WARN_ON --> SAFE_STATE : critical fault
     SAFE_STATE --> IDLE : fault cleared + self-test pass
 ```
 
-**Timers & guards**
+**Timers & guards.** Defaults are **starting points to be tuned empirically in Phase 3**
+([doc 03 §5](03-roadmap-and-phasing.md#5-per-phase-risk-gates)), not derived constants; the
+safety-relevant ones are the dwell, the two holds, and the watchdog.
 
 | Symbol | Default | Purpose | Trade-off |
 |--------|---------|---------|-----------|
-| `T_dwell` | 5 s (3–10) | Stationary time before "stopped" is declared. | Too low → false alarms from slow/transient vehicles; too high → late warning. |
-| `T_hold` | 10 s (5–15) | Keep warning after last detection (hysteresis). | Absorbs brief occlusion; too high → stale warning after a real departure. |
-| `T_activate` | ≤ 2 s | Confirmed → sign actually ON. | Bounded by NFR-01. |
-| `T_watchdog` | ≤ 30 s | Max time a warning may stay ON without a fresh confirmation or watchdog refresh. | Prevents an indefinite stale-ON if logic wedges (NFR-04). |
-| speed gate | ~ <3 km/h | Threshold below which a track counts as "stationary." | Separates "stopped" from "creeping along shoulder." |
+| `T_dwell` | 5 s (3–10) | Stationary time before a track is declared "stopped". | Too low → false alarms from slow/transient vehicles; too high → late warning. Size it against the **unwarned-exposure budget** ([doc 01 §4](01-requirements.md#4-warning-placement--the-math-the-proposal-omits)). |
+| `T_hold` | 10 s (5–15) | **Brief hysteresis**: hold through a short detection dropout **when no other channel corroborates**. | Absorbs flicker; too high → stale warning after a real departure not seen as an exit. |
+| `T_occlusion` | up to 60 s | Hold a lost track as **presumed-present** *while radar (or another channel) still corroborates a return* — sustained truck occlusion. | Keeps an occluded-but-present vehicle warning **without** stale-ON risk, because the hold extends only while some channel corroborates presence. |
+| `T_activate` | ≤ 2 s | Confirmed → sign actually asserted ON. | Bounded by NFR-01. |
+| `T_watchdog` | ≤ 30 s | Max time a warning may stay ON with **no** fresh confirmation or corroboration from any channel. | On expiry: **clear + raise a fault** (logic may be wedged). Prevents indefinite stale-ON (NFR-04). |
+| speed gate | < 3 km/h | Threshold below which a track counts as "stationary". | Separates "stopped" from "creeping along the shoulder". |
+
+**ROI semantics.** A detection counts as in-ROI by **fractional footprint overlap** with the ROI
+polygon (default ≥ 50 % of the track's ground footprint inside), not a single point — so a vehicle
+**straddling** the shoulder/through-lane boundary (a common breakdown pose) is handled
+deterministically instead of flickering at the edge. The ROI carries a defined **downstream exit
+boundary** used to recognise a *confirmed exit*
+([ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md)).
 
 **Why each guard exists (mapped to a real failure):**
 
 - *Dwell* → a vehicle that drifts through or briefly touches the shoulder does **not** trigger.
-- *Hysteresis (hold)* → a truck passing in the through-lane that momentarily **occludes** the stopped
-  car does not cause the warning to blink off/on.
-- *Watchdog re-confirm* → if the decision logic ever wedges with the sign ON, the watchdog forces a
-  re-evaluation; unconfirmed → CLEAR. **No warning can be "stuck on" forever.**
-- *Safe state* → on any critical fault the machine leaves normal operation and escalates (ADR-0005).
+- *Brief hysteresis (`T_hold`)* → momentary detector flicker does not blink the warning off/on.
+- *Occlusion hold (`T_occlusion`) + radar corroboration* → a through-lane truck that hides the stopped
+  car for many seconds does **not** drop a live warning, because radar still sees the return; the hold
+  extends only while *some* channel corroborates presence. This closes the occlusion-induced
+  silent-miss gap that a single absence-timeout would open (ADR-0008).
+- *Confirmed exit vs. lost track* → a vehicle **seen leaving** (speed up + crossing the exit boundary)
+  clears fast; a track **lost in place** is held, not cleared. Departure carries evidence; occlusion
+  does not.
+- *Set semantics* → the warning reflects whether **any** confirmed-stopped vehicle remains, so several
+  vehicles arriving/leaving independently are handled without an early clear.
+- *Watchdog* → if the logic wedges, or every channel genuinely loses the target with no exit seen, the
+  watchdog **clears and raises a fault** — a *loud*, logged, low-confidence clear, never a silent
+  stuck-ON. **No warning can be stuck on forever.**
+- *Safe state* → on any critical fault the machine leaves normal operation and escalates; the sign can
+  be forced safe by the **independent health monitor** even if the state machine is wedged (dead-man's
+  switch, [ADR-0005](adr/ADR-0005-fail-safe-and-system-safety.md)).
 
 ## 5. Runtime data flow (happy path)
 

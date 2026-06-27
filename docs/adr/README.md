@@ -10,8 +10,10 @@ accepts them.
 | [ADR-0002](ADR-0002-edge-vs-cloud-processing.md) | Run the safety loop at the edge; cloud is monitoring-only | Proposed |
 | [ADR-0003](ADR-0003-detection-algorithm.md) | Lightweight detector + ROI gating + dwell logic (not heavy end-to-end DL, not pure background subtraction) | Proposed |
 | [ADR-0004](ADR-0004-warning-actuator-integration.md) | Pluggable actuator — reuse existing VMS where present, dedicated solar LED sign otherwise | Proposed |
-| [ADR-0005](ADR-0005-fail-safe-and-system-safety.md) | Fail-safe posture, safe state, and health escalation | Proposed |
+| [ADR-0005](ADR-0005-fail-safe-and-system-safety.md) | Fail-safe posture, safe state, health escalation, and the dead-man's-switch safe-state path | Proposed |
 | [ADR-0006](ADR-0006-connectivity-and-power.md) | Connectivity & power — solar+battery option, store-and-forward telemetry | Proposed |
+| [ADR-0007](ADR-0007-validation-and-data-strategy.md) | Validation & data strategy — what bench/sim proves vs. field-deferred; the data-acquisition plan | Proposed |
+| [ADR-0008](ADR-0008-detection-persistence-and-multitrack.md) | Detection persistence — occlusion vs. departure, radar-corroborated hold, multi-track set semantics | Proposed |
 
 **Scope note (in lieu of a separate ADR):** the deployment **coverage model is discrete monitored
 zones at high-value locations**, not continuous coverage, and the funded scope is **one pilot zone /

@@ -126,7 +126,8 @@ flowchart TB
 | Multi-sensor fusion | kết hợp đa cảm biến | Combining camera + radar (+ optional thermal) for robustness. |
 | Dwell time | (implicit) | How long a vehicle must remain to be "confirmed stopped." |
 | Hysteresis | (implicit) | Different on/off thresholds to prevent the warning flapping. |
-| Stopping Sight Distance (SSD) | (added) | Distance needed to perceive and stop — drives sign placement. |
+| Stopping Sight Distance (SSD) | (added) | Distance to perceive and brake to a stop; a *lower bound* for placement, not the governing one. |
+| Decision Sight Distance (DSD) | (cự ly tầm nhìn quyết định) | Distance to detect, decide, and complete a **lane-change** manoeuvre; **this — not SSD — governs warning-sign placement** ([doc 01 §4](01-requirements.md#4-warning-placement--the-math-the-proposal-omits)). |
 | Traffic Management Center (TMC) | trung tâm quản lý điều hành giao thông | Operations center that monitors and audits the system. |
 | Pilot / field trial | thử nghiệm ngoài hiện trường | On-road test (the follow-on provincial project). |
 | Provincial-level task | đề tài cấp sở | The larger follow-on grant after the university prototype. |

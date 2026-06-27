@@ -25,12 +25,23 @@ Adopt **fail-safe + fail-loud**:
 1. A **health monitor independent of the perception path** continuously self-tests sensors, compute,
    the decision process, the link to the sign, and the sign's own status read-back; it emits a
    **heartbeat** to the TMC.
-2. On any **critical fault**, the state machine enters a defined **SAFE STATE**: the sign is commanded
-   to a **known, non-deceptive condition** (default: **CLEAR/blank** — never a *specific* "vehicle
-   ahead" message it cannot substantiate), and the fault is **escalated to operators immediately**.
-3. A **watchdog** bounds every activation: no warning may remain ON without fresh confirmation or a
-   watchdog refresh (`T_watchdog`, NFR-04), eliminating indefinite stale-ON.
-4. The unit **never reports healthy when it is degraded**; "blind" is an alarm condition, not silence.
+2. On any **critical fault**, the system enters a defined **SAFE STATE**: the sign is driven to a
+   **known, non-deceptive condition** (default: **CLEAR/blank** — never a *specific* "vehicle ahead"
+   message it cannot substantiate), and the fault is **escalated to operators immediately**.
+3. **Independent safe-state actuation (dead-man's switch).** The actuator **defaults to the safe
+   (blank) state on loss of a fresh "assertion" heartbeat** from the state machine, and the health
+   monitor holds a **direct path to force the actuator safe that does not route through the state
+   machine**. A crashed or wedged SM therefore **cannot** leave a warning asserted — the sign falls
+   blank on its own. This reconciles the [doc 02](../02-system-architecture.md) invariant ("only the
+   state machine may *assert* a warning") with fail-safe: the SM is the only component that may
+   *assert*, but it is **not required in order to clear**. Without this, the component that detects a
+   wedged SM would have to command the safe state *through* the very SM that is wedged — a watchdog
+   that depends on its subject.
+4. A **watchdog** bounds every activation: no warning may remain ON without fresh confirmation or
+   corroboration (`T_watchdog`, NFR-04), eliminating indefinite stale-ON. Its interaction with the
+   occlusion hold is specified in [ADR-0008](ADR-0008-detection-persistence-and-multitrack.md) — the
+   watchdog clears **and raises a fault**, so a clear under uncertainty is never silent.
+5. The unit **never reports healthy when it is degraded**; "blind" is an alarm condition, not silence.
 
 > Why blank-on-fault rather than a persistent generic caution? A sign that is *always* cautioning
 > becomes wallpaper and erodes trust in the real, specific warning (the cry-wolf failure). The honest
@@ -79,6 +90,9 @@ is the product (guiding principle 3), so B wins.
 1. [ ] Enumerate the **fault taxonomy** (sensor dead, frame freeze, model crash, link down, sign
        unresponsive, power low, clock skew) and the response for each.
 2. [ ] Implement the watchdog and the SAFE-STATE transition in the state machine.
-3. [ ] Implement sign **status read-back** so "commanded ON" is verified against "actually ON."
-4. [ ] Define TMC alert severities and acknowledgement flow.
-5. [ ] Add **fault-injection tests** to the acceptance suite (target ≥95% fault-detection coverage).
+3. [ ] Implement the **dead-man's switch**: actuator defaults to blank on loss of the SM assertion
+       heartbeat, plus an independent health-monitor → actuator force-safe path (verify by killing the
+       SM process in a fault-injection test and confirming the sign blanks).
+4. [ ] Implement sign **status read-back** so "commanded ON" is verified against "actually ON."
+5. [ ] Define TMC alert severities and acknowledgement flow.
+6. [ ] Add **fault-injection tests** to the acceptance suite (target ≥95% fault-detection coverage).

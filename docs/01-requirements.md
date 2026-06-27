@@ -31,6 +31,11 @@ Design consequences (carried through every other document):
 - **Trust calibration.** Warning content and behaviour must stay credible; no flapping, no stale
   warnings. Hysteresis and dwell logic exist for this reason ([doc 02](02-system-architecture.md)).
 - **The system advises; it never controls** other vehicles. Final responsibility stays with drivers.
+- **Bounded protection (stated, not implied).** The system warns about a *confirmed-stopped* vehicle in
+  a *monitored zone*; it does **not** warn about a vehicle still *decelerating onto* the shoulder (the
+  most dynamic moment), one stopped *between* monitored zones, or a driver who ignores the sign. These
+  residual hazards are enumerated in [doc 04 §0](04-risk-and-safety.md#0-limits-of-protection-residual-hazards)
+  and bound what the system can promise — which is also how R7 (over-reliance) is managed.
 
 This is not "do ISO 26262 / SIL certification now" — that is for a productized field system. It is:
 *adopt the fail-safe mindset from day one so the prototype is honest about what it can and cannot do.*
@@ -50,7 +55,7 @@ Priority uses MoSCoW: **M**ust / **S**hould / **C**ould / **W**on't-now.
 | FR-05 | On confirmation, automatically activate the upstream warning sign(s) showing "STOPPED VEHICLE AHEAD" (*PHÍA TRƯỚC CÓ XE DỪNG KHẨN CẤP*). | M |
 | FR-06 | Continue to track the stopped vehicle while the warning is active. | M |
 | FR-07 | Automatically clear the warning after the vehicle has left the ROI, applying a **hold/hysteresis** delay (default 10 s) so brief occlusion does not drop a live warning. | M |
-| FR-08 | Detect a **pedestrian** in or immediately beside the ROI (stranded occupant) and treat as a warrant for warning. | S |
+| FR-08 | Detect a **pedestrian** in or immediately beside the ROI (stranded occupant) and treat as a warrant for warning. *(Harder sensing profile than vehicles — small radar cross-section + camera weakest at night; §5 sets a separate, realistic pedestrian target rather than folding it into vehicle recall.)* | S |
 | FR-09 | Operate across day, night, rain, and fog (degraded but functional). | M |
 | FR-10 | Continuously self-monitor sensor, compute, link, and sign health; emit a heartbeat. | M |
 | FR-11 | Enter a defined **safe state** and alert operators on any critical fault (see ADR-0005). | M |
@@ -84,9 +89,9 @@ The full state machine, with timers and edge cases, is specified in
 |----|----------|-------------|
 | NFR-01 | **Latency** | Stop-confirmed → warning ON ≤ 2 s after dwell elapses (so total stop→warn ≈ dwell + ≤2 s). |
 | NFR-02 | **Latency** | Vehicle-gone → warning OFF within hold + ≤ 2 s. |
-| NFR-03 | **Availability** | ≥ 99% per monitored site over the pilot period, excluding scheduled maintenance. |
+| NFR-03 | **Availability** | **Functional** availability ≥ 99% per monitored site over the pilot period — the fraction of time the unit can actually *detect-and-warn to spec*, not merely "powered and reporting"; time spent in a degraded/safe state counts as **unavailable**. Excludes scheduled maintenance. Field-measured (see §3a). |
 | NFR-04 | **Reliability** | No single software fault may leave a **stale ON** warning indefinitely — a watchdog must time-bound any activation and re-confirm. |
-| NFR-05 | **Robustness** | Maintain target detection in rain and at night via multi-sensor sensing ([ADR-0001](adr/ADR-0001-sensing-modality.md)). |
+| NFR-05 | **Robustness** | Maintain target detection in rain and at night via multi-sensor sensing ([ADR-0001](adr/ADR-0001-sensing-modality.md)) — **contingent on the radar stationary-detection validation gate**; field-validated, not claimable from a synthetic-radar bench (§3a, §5). |
 | NFR-06 | **Edge autonomy** | The detect→warn loop must function with the WAN/cloud fully offline ([ADR-0002](adr/ADR-0002-edge-vs-cloud-processing.md)). |
 | NFR-07 | **Power** | Run on mains, or solar+battery with ≥ 72 h autonomy without sun ([ADR-0006](adr/ADR-0006-connectivity-and-power.md)). |
 | NFR-08 | **Maintainability** | Remote health, remote config, OTA update; modular sensor/compute/sign units. |
@@ -96,6 +101,31 @@ The full state machine, with timers and edge cases, is specified in
 | NFR-12 | **Cost** | Per-site bill of materials targeted for a credible field-pilot unit (tracked in [doc 03](03-roadmap-and-phasing.md)); the university build stays inside the 20M VND envelope (prototype/sim). |
 | NFR-13 | **Environment** | Field units rated for outdoor temperature, humidity, dust, vibration (IP65+ enclosures). |
 | NFR-14 | **Extensibility** | Architecture must allow adding sensor types and new event classes (FR-18/19) without redesign. |
+
+---
+
+## 3a. Verification scope — what the funded (bench/sim) phase can actually show
+
+Not every requirement above can be *validated* on a lab bench inside the 20M VND scope; several are
+**designed now but proven only in the field** (cấp sở). Stating this up front keeps the final report
+honest — a "Must" with no funded acceptance evidence is flagged *here*, not discovered at review. Tags:
+**B** = bench rig · **S** = simulation · **F** = field-deferred · **D** = design/review only. The
+methodology behind this split is [ADR-0007](adr/ADR-0007-validation-and-data-strategy.md).
+
+| Requirement | Funded-scope verification | Why |
+|-------------|---------------------------|-----|
+| FR-09 (day/night/rain/fog) | **S (approx) + F** | A bench cannot make real rain/glare/fog; simulation only approximates. Real-condition recall is field-deferred. |
+| FR-17 (reuse existing VMS) | **F** | Needs a real operator VMS; the bench uses an LED stand-in. |
+| NFR-03 (functional availability) | **F** | An operational metric; the bench can only characterise software-loop MTBF under fault injection. |
+| NFR-05 (rain/night robustness) | **F** | Contingent on the [ADR-0001](adr/ADR-0001-sensing-modality.md) radar gate; not claimable from a synthetic-radar bench. |
+| NFR-07 (solar ≥ 72 h autonomy) | **F** | Design-only at bench scope (lab mains). |
+| NFR-11 / NFR-14 (standards, extensibility) | **D** | Conformance review and architectural argument, not a runtime test. |
+| NFR-13 (IP65 environment) | **F** | No field-grade enclosure is built at bench scope. |
+| All other FR/NFR | **B + S** | Logic, latency, fault handling, privacy, edge autonomy, override, config, and events are exercisable on the rig/sim. |
+
+Everything tagged **F** carries forward to field-pilot acceptance
+([doc 05 §11](05-field-pilot-proposal.md#11-acceptance-kpis-field)); **nothing tagged F may be reported
+as a measured prototype result.**
 
 ---
 
@@ -126,6 +156,21 @@ SSD = 0.278 · V · t  +  0.039 · V² / a       (V in km/h, SSD in m)
 \* DSD manoeuvre C = "speed/path/direction change on a rural/high-speed road" (AASHTO). It is the
 appropriate basis because the safe response here is a **lane change**, not an emergency stop.
 
+**Why DSD-C and not just "SSD + a lane change"?** SSD assumes the driver *stops*; the safe response to
+a shoulder obstacle is usually to *hold speed and change lane* — a decision-and-manoeuvre task — so DSD
+(manoeuvre C) is the defensible basis. It is deliberately **conservative**: DSD-C exceeds SSD by
+~130 m at 100 km/h, which buys margin but also **raises the bar a site must clear** (PL-04). An
+over-long required distance can mark otherwise-viable sites "unsuitable", so treat the table as a
+**design floor** and, per site, also compute "SSD + a comfortable lane-change distance" as a lower
+bound; use engineering judgement (and operator agreement) where the two diverge.
+
+**Reconcile with the Vietnamese standard.** The numbers above are AASHTO. For approvals, the
+sight-distance basis must be expressed against the **governing Vietnamese standard — TCVN 5729
+(expressway geometric design), alongside QCVN 41 for the signage itself**. Map the DSD-C argument onto
+TCVN 5729's sight-distance provisions, or justify AASHTO DSD as a supplementary safety basis where
+TCVN is silent. This is a **methodology task for the siting study** (Phase 1), not a per-site
+afterthought.
+
 **Requirement PL (placement):**
 
 - **PL-01 (M):** The warning sign must be displayed **at least DSD (manoeuvre C) upstream of the
@@ -155,20 +200,29 @@ because they are validated very differently.
 
 | Metric | Definition | Prototype target (bench/sim) | Field-pilot target |
 |--------|-----------|------------------------------|--------------------|
-| **Detection rate / recall** | genuine stopped-vehicle events detected ÷ all such events | ≥ 95% day · ≥ 90% night/adverse | ≥ 98% / ≥ 95% |
-| **False activation rate** | warnings raised with no real hazard | ≤ 1 per 100 test scenarios | ≤ 1 per site per week |
+| **Recall — vehicles** | genuine stopped-vehicle events detected ÷ all such events | ≥ 95% day (bench/sim). **Night/adverse is gated** — claimable only if the [ADR-0001](adr/ADR-0001-sensing-modality.md) radar gate passes on real hardware; otherwise **field-deferred**, never asserted from synthetic radar | ≥ 98% day · ≥ 95% night/adverse |
+| **Recall — pedestrians** | stranded-occupant events detected ÷ all such (FR-08) | tracked **separately**, best-effort (small RCS + camera weakest at night); target set after Phase-3 data, **not** assumed equal to vehicles | ≥ 90% day · best-effort night |
+| **False activation rate** | false warnings ÷ **exposure** — report **both** per-100-staged-scenarios *and* per-operating-hour (raw counts across different scenario mixes are not comparable) | ≤ 1 per 100 staged scenarios *and* a reported per-hour rate | **provisional** ≤ 1 / site / week, **pending operator trust-calibration** ([doc 04 §5](04-risk-and-safety.md#5-open-safety-questions-for-the-team)) |
 | **Detection latency** | vehicle becomes stationary → warning ON | ≤ dwell + 2 s | same |
-| **Clear latency** | vehicle leaves ROI → warning OFF | ≤ hold + 2 s | same |
+| **Clear latency** | vehicle leaves ROI → warning OFF | ≤ hold + 2 s **on a confirmed exit** (a held occlusion is not a clear-latency failure — [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md)) | same |
 | **Effective warning lead distance** | upstream distance at which the active warning is visible/legible | ≥ DSD for the modelled speed | ≥ DSD on-site, surveyed |
-| **Availability** | uptime ÷ total time | ≥ 99% (rig) | ≥ 99% |
-| **Fault-detection coverage** | injected faults that the self-monitor catches & escalates | ≥ 95% of the FMEA fault list ([doc 04](04-risk-and-safety.md)) | ≥ 95% |
+| **Functional availability** | time able to *detect-and-warn to spec* ÷ total time (degraded/safe-state time counts as down — NFR-03) | software-loop MTBF under fault injection (availability itself is **field-deferred**) | ≥ 99% |
+| **Fault-detection coverage** | injected faults the self-monitor catches & escalates | ≥ 95% of the FMEA fault list ([doc 04 §2](04-risk-and-safety.md#2-fmea-lite-failure-mode--effect--detection--response)) — **caveat:** this measures detection of *enumerated* faults, not unknown ones | ≥ 95% |
 | **MTBF / MTTR** | mean time between failures / to repair | characterise on rig | MTBF target set at pilot |
 
 **Acceptance for the university task** = demonstrate, on the bench rig and/or simulation, the full
 closed loop (detect → confirm → warn → track → clear) meeting the prototype-column targets across a
-defined scenario set (day, night, rain, transient pass-through, occlusion, multiple vehicles,
-pedestrian, and **injected sensor/compute/sign faults**), plus the feasibility report and the
-field-pilot development proposal the grant calls for.
+defined scenario set (day, night, rain, transient pass-through, **brief and sustained occlusion with
+and without radar corroboration**, **multiple simultaneous vehicles arriving and leaving**, pedestrian,
+**a vehicle already present at boot**, and **injected sensor/compute/sign faults — including killing
+the state-machine process to prove the dead-man's switch blanks the sign**), plus the feasibility
+report and the field-pilot development proposal the grant calls for.
+
+**Provability boundary (state it in the report).** Bench/sim results substantiate *logic, timing,
+fault handling, and false-trigger resistance to modelled nuisances*; they do **not** substantiate
+real-world recall in rain/glare/fog, the real false-alarm rate, or real radar clutter performance —
+those are field-deferred ([ADR-0007](adr/ADR-0007-validation-and-data-strategy.md)). Report every
+result with its tier (§3a) so no claim outruns its evidence.
 
 ---
 

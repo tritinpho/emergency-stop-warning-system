@@ -113,7 +113,8 @@ flowchart TB
 | Multi-sensor fusion | kết hợp đa cảm biến | Kết hợp camera + radar (+ nhiệt tùy chọn) để tăng độ bền vững. |
 | Dwell time | (implicit) | Thời gian một phương tiện phải lưu lại để được "xác nhận đang dừng." |
 | Hysteresis | (implicit) | Các ngưỡng bật/tắt khác nhau để ngăn cảnh báo nhấp nháy. |
-| Stopping Sight Distance (SSD) | (added) | Cự ly cần để nhận biết và dừng xe — chi phối việc đặt bảng báo. |
+| Stopping Sight Distance (SSD) | (added) | Cự ly để nhận biết và phanh dừng xe; là *cận dưới* cho việc bố trí, không phải yếu tố chi phối. |
+| Decision Sight Distance (DSD) | (cự ly tầm nhìn quyết định) | Cự ly để phát hiện, ra quyết định và hoàn thành thao tác **chuyển làn**; **chính cự ly này — chứ không phải SSD — chi phối việc bố trí bảng báo cảnh báo** ([tài liệu 01 §4](01-requirements.vi.md#4-warning-placement--the-math-the-proposal-omits)). |
 | Traffic Management Center (TMC) | trung tâm quản lý điều hành giao thông | Trung tâm vận hành giám sát và kiểm tra hệ thống. |
 | Pilot / field trial | thử nghiệm ngoài hiện trường | Thử nghiệm trên đường (đề tài cấp sở tiếp nối). |
 | Provincial-level task | đề tài cấp sở | Đề tài tiếp nối lớn hơn sau mô hình thử nghiệm cấp trường. |

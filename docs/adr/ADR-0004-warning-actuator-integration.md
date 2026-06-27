@@ -13,7 +13,7 @@ VMS gantries and an ITS backbone; other segments (and any bench rig) have nothin
 signage is costly, slow to permit, and clutters the roadway.
 
 Forces: capital cost, installation/permitting effort, integration complexity with third-party ITS,
-sign-placement geometry (must sit ≥ DSD upstream — [doc 01 §4](../01-requirements.md#4--warning-placement--the-math-the-proposal-omits)),
+sign-placement geometry (must sit ≥ DSD upstream — [doc 01 §4](../01-requirements.md#4-warning-placement--the-math-the-proposal-omits)),
 QCVN 41 conformance, and operator acceptance/control.
 
 ## Decision

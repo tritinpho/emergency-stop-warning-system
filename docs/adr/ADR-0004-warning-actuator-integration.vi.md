@@ -10,7 +10,7 @@
 
 Cảnh báo đến người lái là đầu ra duy nhất của hệ thống, nên *cách thức* hiển thị cảnh báo và *việc chúng ta tự xây dựng hay tái sử dụng* bảng cảnh báo có ý nghĩa quan trọng về mặt kiến trúc. Hình 1 cho thấy cả một **bảng thông báo điện tử (VMS) gắn trên giá long môn (gantry)** lẫn một **bảng LED bên đường**. Các tuyến đường cao tốc hiện đại thường đã có sẵn các giá long môn VMS do đơn vị vận hành điều khiển cùng một hạ tầng xương sống ITS; các đoạn khác (và bất kỳ mô hình thử nghiệm trên bàn (bench) nào) thì không có gì. Việc bổ sung biển báo dư thừa vừa tốn kém, vừa chậm cấp phép, vừa làm rối mặt đường.
 
-Các yếu tố tác động: chi phí đầu tư, công sức lắp đặt/cấp phép, độ phức tạp tích hợp với hệ thống ITS của bên thứ ba, hình học bố trí bảng báo (phải đặt cách ≥ DSD về phía trước theo hướng xe tới — [tài liệu 01 §4](../01-requirements.vi.md#4--warning-placement--the-math-the-proposal-omits)), sự phù hợp với QCVN 41, và mức độ chấp nhận/quyền điều khiển của đơn vị vận hành.
+Các yếu tố tác động: chi phí đầu tư, công sức lắp đặt/cấp phép, độ phức tạp tích hợp với hệ thống ITS của bên thứ ba, hình học bố trí bảng báo (phải đặt cách ≥ DSD về phía trước theo hướng xe tới — [tài liệu 01 §4](../01-requirements.vi.md#4-warning-placement--the-math-the-proposal-omits)), sự phù hợp với QCVN 41, và mức độ chấp nhận/quyền điều khiển của đơn vị vận hành.
 
 ## Quyết định
 

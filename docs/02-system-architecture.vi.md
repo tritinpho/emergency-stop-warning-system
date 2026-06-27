@@ -52,12 +52,14 @@ flowchart TB
 
         CAM --> PERC
         RAD --> FUSE
-        PERC --> FUSE --> SM --> ACT
+        PERC --> FUSE --> SM
+        SM -- "assert SHOW / CLEAR" --> ACT
         SM --> BUF
         HM -. watches .- SENSE
         HM -. watches .- PERC
         HM -. watches .- ACT
         HM --> SM
+        HM -. "force safe-state<br/>(independent of SM)" .-> ACT
     end
 
     ACT --> SIGN["Warning actuator<br/>LED sign / existing VMS"]
@@ -92,9 +94,9 @@ flowchart TB
 | **Driver camera / radar** | Thu nhận khung hình có gắn nhãn thời gian và tín hiệu phản hồi radar. | Đồng bộ thời gian giữa các cảm biến rất quan trọng cho việc hợp nhất. |
 | **Nhận diện** | Phát hiện xe/người; chỉ giữ lại các phát hiện có vùng tiếp xúc nằm bên trong đa giác ROI. | Bộ phát hiện nhẹ + cổng chặn ROI ([ADR-0003](adr/ADR-0003-detection-algorithm.vi.md)). |
 | **Hợp nhất & theo dõi** | Liên kết các phát hiện của camera với tín hiệu phản hồi radar; tạo ra các vết bám ổn định kèm vị trí + tốc độ + dwell. | Radar xác định "có mặt & đứng yên" trong điều kiện tối / mưa. |
-| **Máy trạng thái quyết định** | Bộ não. Áp dụng dwell, hysteresis, watchdog; quyết định SHOW/CLEAR. | Là thành phần duy nhất được phép ra lệnh cho bảng. §4. |
-| **Trừu tượng hóa cơ cấu cảnh báo** | Chuyển SHOW/CLEAR thành giao thức bảng cụ thể; đọc ngược lại trạng thái bảng. | Hoán đổi được: bảng LED riêng hoặc VMS hiện có. |
-| **Bộ giám sát tình trạng** | Tự kiểm tra mọi hệ thống con; phát nhịp tín hiệu (heartbeat); đưa về trạng thái an toàn khi có lỗi. | Đường watchdog độc lập; xem ADR-0005. |
+| **Máy trạng thái quyết định** | Bộ não. Áp dụng dwell, hysteresis, chính sách che khuất/đa vết, watchdog; quyết định SHOW/CLEAR. | Là thành phần duy nhất được phép **khẳng định** một cảnh báo; **sự vắng mặt** của một khẳng định đang hoạt động tự thân đã là an toàn khi sự cố (xem cơ cấu chấp hành). §4, [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md). |
+| **Trừu tượng hóa cơ cấu cảnh báo** | Chuyển SHOW/CLEAR thành giao thức bảng cụ thể; đọc ngược lại trạng thái bảng. | Hoán đổi được: bảng LED riêng hoặc VMS hiện có. **Mặc định về trạng thái an toàn (trống) khi mất nhịp khẳng định mới từ máy trạng thái — một cơ chế an toàn tự kích hoạt khi mất tín hiệu (dead-man's switch), nên một máy trạng thái bị treo/kẹt cứng không thể để cảnh báo kẹt BẬT.** Xem [ADR-0005](adr/ADR-0005-fail-safe-and-system-safety.vi.md). |
+| **Bộ giám sát tình trạng** | Tự kiểm tra mọi hệ thống con; phát nhịp tín hiệu (heartbeat); đưa về trạng thái an toàn khi có lỗi. | Độc lập với đường nhận diện/quyết định; có thể **buộc trực tiếp cơ cấu chấp hành về trạng thái an toàn**, không phải đi qua máy trạng thái (có thể đang bị kẹt cứng). Xem [ADR-0005](adr/ADR-0005-fail-safe-and-system-safety.vi.md). |
 | **Kho lưu cục bộ** | Giữ cấu hình, vùng đệm bằng chứng-sự kiện, và một outbox bền bỉ cho dữ liệu đo lường từ xa. | Sống sót qua khởi động lại; thời gian lưu giữ có giới hạn (quyền riêng tư). |
 | **Cổng truyền thông** | Lưu và chuyển dữ liệu đo lường từ xa; nhận cấu hình/OTA. | Chịu được mất mát; không bao giờ nằm trong đường an toàn. |
 | **Các dịch vụ TMC** | Giám sát, cảnh báo, kiểm toán, cấu hình, cập nhật, can thiệp. | Nằm ngoài đường trọng yếu — có thể ngoại tuyến mà không gây hành vi mất an toàn. |
@@ -126,7 +128,7 @@ flowchart LR
     style CLOUD fill:#f0fdf4,stroke:#22c55e
 ```
 
-**Hình học vị trí đặt (trọng yếu — xem [tài liệu 01 §4](01-requirements.vi.md#4--warning-placement--the-math-the-proposal-omits)):**
+**Hình học vị trí đặt (trọng yếu — xem [tài liệu 01 §4](01-requirements.vi.md#4-warning-placement--the-math-the-proposal-omits)):**
 
 ```
      traffic ──────────────────────────────────────────────►
@@ -150,55 +152,96 @@ giá long môn và một bảng bên đường); cả hai đều là các thể 
 ## 4. Máy trạng thái phát hiện→cảnh báo
 
 Đây là nơi "chu trình khép kín" (closed loop) của đề xuất trở nên chính xác. Đây là cơ quan duy nhất
-có quyền với bảng và là nơi kiểm soát các rủi ro kích hoạt sai, dao động, và kẹt-BẬT.
+có quyền với bảng và là nơi kiểm soát các rủi ro kích hoạt sai, dao động, kẹt-BẬT, **che khuất**, và
+**đa phương tiện**. Chính sách duy trì mà nó hiện thực được quyết định trong
+[ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md).
 
-![Máy trạng thái phát hiện-tới-cảnh báo: chu trình idle → tracking → confirmed → warn-on → warn-hold → clearing, với một vòng lặp watchdog tự thân trên warn-on và một trạng thái an toàn trung tâm có thể đạt được từ bất kỳ trạng thái nào khi có lỗi trọng yếu, trở về idle sau khi vượt qua một lần tự kiểm tra.](assets/state-machine-diagram-vi.svg)
+**Máy trạng thái vận hành trên _tập hợp_ các vết (track) đã xác nhận đang dừng trong ROI, không phải một
+đối tượng đơn lẻ.** Cảnh báo ở trạng thái BẬT khi tập hợp đó không rỗng; nó chỉ xóa khi tập hợp trở nên
+rỗng theo các quy tắc bên dưới. Đây chính là điều cho phép nhiều xe dừng, rời đi, và tới một cách độc
+lập mà cảnh báo không dao động hay xóa sớm.
 
-*Xanh dương = giám sát bình thường, hổ phách = đang hiển thị cảnh báo, đỏ = trạng thái an toàn khi
-lỗi. Dwell (mặc định 5 s) chặn các kích hoạt sai; cặp warn-on ⇄ warn-hold với thời gian giữ 10 s hấp
-thụ tình trạng che khuất; watchdog xác nhận lại để không cảnh báo nào có thể kẹt BẬT; trạng thái an
-toàn có thể đạt được từ bất kỳ trạng thái nào. Mã nguồn Mermaid có thể chỉnh sửa được trình bày tiếp
-theo.*
+![Máy trạng thái phát hiện-tới-cảnh báo trên tập hợp các vết trong ROI: idle → tracking → confirmed → warn-on, với warn-hold phân biệt một sự thoát ra đã quan sát được (xóa nhanh) với một vết bị mất mà không thoát ra được giữ lại trong khi radar đối chứng sự hiện diện; một watchdog xóa-và-báo-lỗi khi không kênh nào có thể xác nhận, và một trạng thái an toàn có thể đạt được từ bất kỳ trạng thái nào và được điều khiển độc lập bởi bộ giám sát tình trạng.](assets/state-machine-diagram-vi.svg)
+
+*Xanh dương = giám sát bình thường, hổ phách = đang hiển thị cảnh báo, đỏ = trạng thái an toàn khi lỗi.
+Dwell (mặc định 5 s) chặn các kích hoạt sai; **một vết bị mất được giữ lại trong khi radar vẫn còn đối
+chứng sự hiện diện (che khuất), nhưng một thoát ra đã xác nhận thì xóa nhanh**; watchdog xóa **và phát
+ra một lỗi** nếu không kênh nào có thể xác nhận, nên không cảnh báo nào có thể kẹt BẬT một cách âm thầm;
+trạng thái an toàn có thể đạt được từ bất kỳ trạng thái nào và có thể bị buộc kích hoạt bởi bộ giám sát
+tình trạng độc lập. Mã nguồn Mermaid có thể chỉnh sửa được trình bày tiếp theo.*
 
 ```mermaid
 stateDiagram-v2
     [*] --> IDLE
-    IDLE --> TRACKING : object enters ROI
-    TRACKING --> IDLE : object leaves before dwell
-    TRACKING --> CONFIRMED : stationary ≥ T_dwell (default 5s)
-    CONFIRMED --> WARN_ON : command SHOW (≤2s)
-    WARN_ON --> WARN_HOLD : object no longer detected
-    WARN_HOLD --> WARN_ON : object re-detected (occlusion recovered)
-    WARN_HOLD --> CLEARING : absent ≥ T_hold (default 10s)
-    CLEARING --> IDLE : command CLEAR + sign status = off
-    WARN_ON --> WARN_ON : watchdog re-confirm (bounded refresh)
+    note right of IDLE
+      All states act over the SET of confirmed-stopped in-ROI tracks.
+      WARN is ON while the set is non-empty.
+      A vehicle already present at boot is treated as a new track
+      (dwell runs normally — no special-casing).
+    end note
 
+    IDLE --> TRACKING : a track enters ROI
+    TRACKING --> IDLE : track leaves / lost before dwell
+    TRACKING --> CONFIRMED : stationary ≥ T_dwell (default 5s)
+    CONFIRMED --> WARN_ON : assert SHOW (≤2s)
+
+    WARN_ON --> WARN_ON : set still non-empty (assertion refreshed)
+    WARN_ON --> WARN_HOLD : a track lost WITHOUT an observed exit (occlusion?)
+    WARN_HOLD --> WARN_ON : re-detected, OR radar still corroborates presence
+    WARN_HOLD --> CLEARING : confirmed exit, OR absent ≥ T_hold with NO corroboration (low-confidence clear → logged)
+    WARN_ON --> CLEARING : confirmed exit of the last track (fast clear)
+    CLEARING --> IDLE : CLEAR + sign status = off
+
+    WARN_ON --> SAFE_STATE : T_watchdog, no confirm/corroboration → clear + FAULT
+    WARN_HOLD --> SAFE_STATE : critical fault
     IDLE --> SAFE_STATE : critical fault
     TRACKING --> SAFE_STATE : critical fault
     CONFIRMED --> SAFE_STATE : critical fault
-    WARN_ON --> SAFE_STATE : critical fault
     SAFE_STATE --> IDLE : fault cleared + self-test pass
 ```
 
-**Bộ định thời & điều kiện bảo vệ**
+**Bộ định thời & điều kiện bảo vệ.** Các giá trị mặc định là **các điểm khởi đầu cần được tinh chỉnh bằng
+thực nghiệm ở Giai đoạn 3** ([tài liệu 03 §5](03-roadmap-and-phasing.vi.md#5-per-phase-risk-gates)), không
+phải các hằng số được suy ra; những giá trị liên quan đến an toàn là dwell, hai loại giữ (hold), và
+watchdog.
 
 | Ký hiệu | Mặc định | Mục đích | Đánh đổi |
 |--------|---------|---------|-----------|
-| `T_dwell` | 5 s (3–10) | Thời gian đứng yên trước khi tuyên bố "đang dừng". | Quá thấp → báo động giả từ xe chạy chậm/thoáng qua; quá cao → cảnh báo muộn. |
-| `T_hold` | 10 s (5–15) | Giữ cảnh báo sau lần phát hiện cuối (hysteresis). | Hấp thụ che khuất ngắn; quá cao → cảnh báo cũ sau khi xe đã thực sự rời đi. |
-| `T_activate` | ≤ 2 s | Từ confirmed → bảng thực sự BẬT. | Bị giới hạn bởi NFR-01. |
-| `T_watchdog` | ≤ 30 s | Thời gian tối đa một cảnh báo có thể duy trì BẬT mà không có xác nhận mới hoặc làm mới của watchdog. | Ngăn tình trạng kẹt-BẬT vô thời hạn nếu logic bị kẹt cứng (NFR-04). |
-| cổng tốc độ | ~ <3 km/h | Ngưỡng mà dưới đó một vết bám được tính là "đứng yên". | Phân biệt "đang dừng" với "bò chậm dọc lề đường". |
+| `T_dwell` | 5 s (3–10) | Thời gian đứng yên trước khi một vết được tuyên bố là "đang dừng". | Quá thấp → báo động giả từ xe chạy chậm/thoáng qua; quá cao → cảnh báo muộn. Cân chỉnh nó theo **ngân sách phơi nhiễm không-được-cảnh-báo** ([tài liệu 01 §4](01-requirements.vi.md#4-warning-placement--the-math-the-proposal-omits)). |
+| `T_hold` | 10 s (5–15) | **Hysteresis ngắn**: giữ qua một lần rớt phát hiện ngắn **khi không có kênh nào khác đối chứng**. | Hấp thụ nhấp nháy; quá cao → cảnh báo cũ sau một lần rời đi thực sự nhưng không được nhận là một thoát ra. |
+| `T_occlusion` | tối đa 60 s | Giữ một vết bị mất ở trạng thái **giả định-còn-hiện-diện** *trong khi radar (hoặc một kênh khác) vẫn còn đối chứng một tín hiệu phản hồi* — che khuất kéo dài bởi xe tải. | Giữ cảnh báo cho một xe bị che khuất-nhưng-còn-hiện-diện **mà không** có rủi ro kẹt-BẬT, vì thời gian giữ chỉ kéo dài chừng nào còn một kênh đối chứng sự hiện diện. |
+| `T_activate` | ≤ 2 s | Từ confirmed → bảng thực sự được khẳng định BẬT. | Bị giới hạn bởi NFR-01. |
+| `T_watchdog` | ≤ 30 s | Thời gian tối đa một cảnh báo có thể duy trì BẬT mà **không** có xác nhận hoặc đối chứng mới từ bất kỳ kênh nào. | Khi hết hạn: **xóa + phát ra một lỗi** (logic có thể đang bị kẹt cứng). Ngăn tình trạng kẹt-BẬT vô thời hạn (NFR-04). |
+| cổng tốc độ | < 3 km/h | Ngưỡng mà dưới đó một vết được tính là "đứng yên". | Phân biệt "đang dừng" với "bò chậm dọc lề đường". |
+
+**Ngữ nghĩa ROI.** Một phát hiện được tính là trong-ROI bằng **mức chồng lấn vùng tiếp xúc theo tỷ lệ**
+với đa giác ROI (mặc định ≥ 50 % vùng tiếp xúc mặt đất của vết nằm bên trong), chứ không phải một điểm
+đơn lẻ — nhờ vậy một xe **nằm vắt ngang** ranh giới lề đường/làn thông xe (một tư thế hỏng hóc thường gặp)
+được xử lý một cách tất định thay vì nhấp nháy ở biên. ROI mang theo một **biên thoát ra phía hạ lưu** đã
+được xác định, dùng để nhận biết một *thoát ra đã xác nhận*
+([ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md)).
 
 **Vì sao mỗi điều kiện bảo vệ tồn tại (ánh xạ tới một lỗi thực tế):**
 
 - *Dwell* → một xe trôi qua hoặc chạm vào lề đường trong chốc lát **không** kích hoạt.
-- *Hysteresis (giữ)* → một xe tải đi qua ở làn thông xe và che khuất tạm thời chiếc xe đang dừng
-  không làm cảnh báo nhấp nháy tắt/bật.
-- *Watchdog xác nhận lại* → nếu logic quyết định có lúc bị kẹt cứng trong khi bảng đang BẬT, watchdog
-  buộc phải đánh giá lại; chưa xác nhận → CLEAR. **Không cảnh báo nào có thể "kẹt BẬT" mãi mãi.**
-- *Trạng thái an toàn* → khi có bất kỳ lỗi trọng yếu nào, máy rời khỏi vận hành bình thường và leo
-  thang xử lý (ADR-0005).
+- *Hysteresis ngắn (`T_hold`)* → nhấp nháy phát hiện trong chốc lát không làm cảnh báo chớp tắt/bật.
+- *Giữ khi che khuất (`T_occlusion`) + đối chứng bằng radar* → một xe tải ở làn thông xe che khuất chiếc
+  xe đang dừng trong nhiều giây **không** làm rớt một cảnh báo đang hoạt động, vì radar vẫn còn thấy tín
+  hiệu phản hồi; thời gian giữ chỉ kéo dài chừng nào *một* kênh còn đối chứng sự hiện diện. Điều này khép
+  lại khoảng trống bỏ-sót-âm-thầm do che khuất gây ra mà một bộ định-thời-vắng-mặt đơn thuần sẽ để hở
+  (ADR-0008).
+- *Thoát ra đã xác nhận vs. mất vết* → một xe **được thấy rời đi** (tăng tốc + vượt qua biên thoát ra)
+  thì xóa nhanh; một vết **bị mất tại chỗ** thì được giữ lại, không xóa. Sự rời đi mang theo bằng chứng;
+  che khuất thì không.
+- *Ngữ nghĩa tập hợp* → cảnh báo phản ánh việc liệu **còn bất kỳ** xe đã xác nhận đang dừng nào hay không,
+  nên nhiều xe tới/rời một cách độc lập được xử lý mà không bị xóa sớm.
+- *Watchdog* → nếu logic bị kẹt cứng, hoặc mọi kênh thực sự mất mục tiêu mà không thấy thoát ra, watchdog
+  **xóa và phát ra một lỗi** — một lần xóa độ-tin-cậy-thấp *rõ ràng*, có ghi nhật ký, không bao giờ là một
+  lần kẹt-BẬT âm thầm. **Không cảnh báo nào có thể kẹt BẬT mãi mãi.**
+- *Trạng thái an toàn* → khi có bất kỳ lỗi trọng yếu nào, máy rời khỏi vận hành bình thường và leo thang
+  xử lý; bảng có thể bị buộc về trạng thái an toàn bởi **bộ giám sát tình trạng độc lập** ngay cả khi máy
+  trạng thái bị kẹt cứng (cơ chế an toàn tự kích hoạt khi mất tín hiệu (dead-man's switch),
+  [ADR-0005](adr/ADR-0005-fail-safe-and-system-safety.vi.md)).
 
 ## 5. Luồng dữ liệu lúc chạy (đường thuận lợi)
 

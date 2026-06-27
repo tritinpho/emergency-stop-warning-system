@@ -24,6 +24,17 @@ classification and ROI geometry; the radar provides **range, presence, and speed
 darkness, rain, and fog**, and confirms "present and stationary" independently of pixels. Thermal
 imaging is held as an optional add-on for sites with severe night/fog where budget allows.
 
+> **Caveat — this is the load-bearing assumption, so it is a validation gate, not a given.** Detecting
+> a **stationary** vehicle in roadside clutter is the *hard* case for radar: a parked car has near-zero
+> Doppler and competes with static returns from guardrails, signs, and the road surface, and a
+> roadside radar looking along the shoulder is itself partially occluded by through-lane trucks. This
+> needs a **stopped-vehicle-capable radar** (e.g. an imaging / high-range-resolution FMCW unit with a
+> clutter map), **not** a generic "presence" module, and it must be **validated at the shoulder
+> grazing geometry** before the adverse-condition claim is evidence-backed (Phase-3 go/no-go,
+> [doc 03 §5](../03-roadmap-and-phasing.md#5-per-phase-risk-gates)). Because the whole night/rain/fog
+> robustness argument rests on this, it is also the system's **top risk exposure**
+> ([doc 04 R5](../04-risk-and-safety.md#1-risk-register)).
+
 ## Options Considered
 
 ### Option A: Camera only
@@ -75,21 +86,32 @@ yields an independent "stationary" signal that also **cuts false alarms** — se
 requirements at once.
 
 For the simulation/bench scope, radar can be represented by a synthetic presence/speed channel, so
-choosing B now costs little and keeps the field path open.
+choosing B now costs little and keeps the field path open. **But a synthetic radar that assumes
+perfect stationary detection cannot be used to _evidence_ the adverse-condition recall target** — that
+claim is field-deferred unless a real stopped-vehicle-capable radar is on the bench and passes the
+validation gate above ([ADR-0007](ADR-0007-validation-and-data-strategy.md),
+[doc 01 §5](../01-requirements.md#5-evaluation-metrics--acceptance-criteria)). Keep the radar a budget
+priority for exactly this reason; if hardware budget forces it out, **down-scope the night/adverse
+claim, do not quietly rest it on synthetic data**.
 
 ## Consequences
 
-- **Easier:** dependable night/weather detection; cleaner stationary detection; graceful degradation;
-  lower false-alarm rate.
+- **Easier (if the gate passes):** dependable night/weather detection; cleaner stationary detection;
+  graceful degradation; lower false-alarm rate.
 - **Harder:** camera-radar **time synchronisation and extrinsic calibration**; a fusion module to
-  design and test; slightly higher per-site cost and power.
+  design and test; slightly higher per-site cost and power; **and the stationary-in-clutter radar
+  capability must be validated, not assumed** (the gate above).
+- **Conditional:** the entire adverse-condition benefit is **contingent on the radar gate**. Until it
+  passes on real hardware, treat night/rain/fog robustness as a *designed hypothesis*, not a measured
+  result ([ADR-0007](ADR-0007-validation-and-data-strategy.md)).
 - **Revisit when:** field data shows the camera alone meets targets at a given benign site (then a
   camera-only variant could be a documented cost-down), or thermal proves necessary at hard sites
   (promote Option C elements per-site).
 
 ## Action Items
 
-1. [ ] Select a specific radar (24/77 GHz presence+range) and camera (good WDR + IR).
-2. [ ] Define the fusion contract and the time-sync method (shared clock / PTP / timestamp align).
-3. [ ] Build the synthetic radar channel for the simulation harness.
-4. [ ] Add per-sensor health checks to the health monitor (feeds [ADR-0005](ADR-0005-fail-safe-and-system-safety.md)).
+1. [ ] Select a specific **stopped-vehicle-capable** radar (imaging / HRR FMCW, 24/77 GHz, with clutter mapping) and camera (good WDR + IR) — not a generic presence module.
+2. [ ] **Validation gate (Phase 3):** demonstrate reliable detection of a *stationary* vehicle in roadside clutter at the shoulder grazing geometry, day and night, before claiming adverse-condition robustness.
+3. [ ] Define the fusion contract and the time-sync method (shared clock / PTP / timestamp align).
+4. [ ] Build the synthetic radar channel for the simulation harness — with a **documented, conservative** sensor model ([ADR-0007](ADR-0007-validation-and-data-strategy.md)).
+5. [ ] Add per-sensor health checks to the health monitor (feeds [ADR-0005](ADR-0005-fail-safe-and-system-safety.md)).

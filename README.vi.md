@@ -37,7 +37,7 @@ phản quang do tài xế đặt) sang **cảnh báo chủ động, tự động
 | 03 | [docs/03-roadmap-and-phasing.vi.md](docs/03-roadmap-and-phasing.vi.md) | Lộ trình kỹ thuật ánh xạ lên 6 giai đoạn của thuyết minh, định nghĩa MVP, **rà soát thực tế ngân sách** |
 | 04 | [docs/04-risk-and-safety.vi.md](docs/04-risk-and-safety.vi.md) | Bảng đăng ký rủi ro, FMEA rút gọn, thiết kế an toàn khi sự cố (fail-safe), quyền riêng tư & tuân thủ pháp lý |
 | 05 | [docs/05-field-pilot-proposal.vi.md](docs/05-field-pilot-proposal.vi.md) | Đề xuất thử nghiệm hiện trường cấp sở — bản nháp (giai đoạn tiếp theo mà tài liệu 03–04 chuẩn bị) |
-| — | [docs/adr/README.vi.md](docs/adr/README.vi.md) | Mục lục các Bản ghi quyết định kiến trúc (ADR) (6 ADR bao quát các lựa chọn kỹ thuật trọng yếu) |
+| — | [docs/adr/README.vi.md](docs/adr/README.vi.md) | Mục lục các Bản ghi quyết định kiến trúc (ADR) (8 ADR bao quát các lựa chọn kỹ thuật trọng yếu) |
 
 Hình 1 từ thuyết minh (infographic khái niệm) được lưu tại
 [docs/assets/figure-1-concept-infographic.jpeg](docs/assets/figure-1-concept-infographic.jpeg) và được
@@ -93,9 +93,15 @@ chỉnh. Những điểm quan trọng nhất:
    thấy được khoảng cách và sự hiện diện trong bóng tối và xuyên qua mưa/sương mù).
    Xem [ADR-0001](docs/adr/ADR-0001-sensing-modality.vi.md).
 
-4. **Cụ thể hóa vòng kín** thành một máy trạng thái với **xác nhận theo thời gian chờ (dwell) và trễ
-   (hysteresis)**, để một chiếc xe chỉ đơn thuần đi ngang qua làn dừng không kích hoạt sai, và một lần
-   che khuất ngắn không làm rớt một cảnh báo đang hoạt động. Xem [tài liệu 02](docs/02-system-architecture.vi.md).
+4. **Cụ thể hóa vòng kín** thành một máy trạng thái với **xác nhận theo thời gian chờ (dwell), trễ
+   (hysteresis), giữ trạng thái khi che khuất có radar chứng thực, ngữ nghĩa tập hợp đa phương tiện,
+   một bộ giám sát (watchdog), và một trạng thái an toàn theo cơ chế an toàn tự kích hoạt khi mất tín
+   hiệu (dead-man's switch)** — để một chiếc xe chỉ đơn thuần đi ngang qua không kích hoạt sai, một lần
+   che khuất kéo dài bởi xe tải dài không làm rớt một cảnh báo đang hoạt động, và một bộ điều khiển bị
+   sập không thể để bảng cảnh báo kẹt ở trạng thái bật. Xem
+   [tài liệu 02 §4](docs/02-system-architecture.vi.md#4-máy-trạng-thái-phát-hiệncảnh-báo),
+   [ADR-0008](docs/adr/ADR-0008-detection-persistence-and-multitrack.vi.md), và
+   [ADR-0005](docs/adr/ADR-0005-fail-safe-and-system-safety.vi.md).
 
 5. **Xử lý ưu tiên cục bộ.** Vòng lặp phát hiện→cảnh báo được tính toán trên một thiết bị biên đặt bên
    đường; đám mây là không trọng yếu. Một cảnh báo an toàn không được phép chờ một vòng truyền qua mạng

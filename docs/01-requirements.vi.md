@@ -27,6 +27,7 @@ Các hệ quả thiết kế (xuyên suốt mọi tài liệu khác):
 - **Cả hai tỉ lệ lỗi đều là yêu cầu hạng nhất** với các chỉ tiêu bằng số (§5), không phải là thứ được nghĩ đến sau cùng.
 - **Hiệu chỉnh niềm tin.** Nội dung và hành vi cảnh báo phải giữ được độ tin cậy; không chập chờn, không có cảnh báo cũ kỹ. Logic trễ (hysteresis) và thời gian chờ (dwell) tồn tại vì lý do này ([tài liệu 02](02-system-architecture.vi.md)).
 - **Hệ thống đưa ra khuyến cáo; nó không bao giờ điều khiển** các phương tiện khác. Trách nhiệm cuối cùng vẫn thuộc về người lái xe.
+- **Phạm vi bảo vệ có giới hạn (nêu rõ, không ngầm định).** Hệ thống cảnh báo về một phương tiện *đã được xác nhận đang dừng* trong một *vùng được giám sát*; nó **không** cảnh báo về một phương tiện vẫn *đang giảm tốc để tấp vào* làn dừng (thời điểm động nhất), một phương tiện dừng *giữa* các vùng được giám sát, hay một người lái xe phớt lờ biển báo. Những nguy cơ còn lại này được liệt kê trong [tài liệu 04 §0](04-risk-and-safety.vi.md#0-limits-of-protection-residual-hazards) và giới hạn những gì hệ thống có thể cam kết — đó cũng là cách quản lý R7 (phụ thuộc quá mức).
 
 Đây không phải là "thực hiện chứng nhận ISO 26262 / SIL ngay bây giờ" — điều đó dành cho một hệ thống hiện trường đã được sản phẩm hóa. Đây là: *tiếp nhận tư duy an toàn khi sự cố ngay từ ngày đầu để mô hình thử nghiệm trung thực về những gì nó có thể và không thể làm.*
 
@@ -45,7 +46,7 @@ Mức ưu tiên dùng MoSCoW: **M**ust (Phải) / **S**hould (Nên) / **C**ould 
 | FR-05 | Khi được xác nhận, tự động kích hoạt (các) bảng cảnh báo phía trước (theo hướng xe tới) hiển thị "STOPPED VEHICLE AHEAD" (*PHÍA TRƯỚC CÓ XE DỪNG KHẨN CẤP*). | M |
 | FR-06 | Tiếp tục theo dõi (bám vết) phương tiện đang dừng trong khi cảnh báo đang hoạt động. | M |
 | FR-07 | Tự động xóa cảnh báo sau khi phương tiện đã rời khỏi ROI, áp dụng một độ trễ **giữ/trễ (hold/hysteresis)** (mặc định 10 s) để hiện tượng che khuất ngắn không làm rớt một cảnh báo đang hoạt động. | M |
-| FR-08 | Phát hiện một **người đi bộ** ở trong hoặc ngay sát ROI (người mắc kẹt trên xe) và coi đó là căn cứ để cảnh báo. | S |
+| FR-08 | Phát hiện một **người đi bộ** ở trong hoặc ngay sát ROI (người mắc kẹt trên xe) và coi đó là căn cứ để cảnh báo. *(Hồ sơ cảm biến khó hơn so với phương tiện — diện tích phản xạ radar nhỏ + camera yếu nhất vào ban đêm; §5 đặt một chỉ tiêu riêng, thực tế cho người đi bộ thay vì gộp vào recall của phương tiện.)* | S |
 | FR-09 | Hoạt động qua ban ngày, ban đêm, mưa và sương mù (suy giảm nhưng vẫn vận hành được). | M |
 | FR-10 | Liên tục tự giám sát tình trạng của cảm biến, khối tính toán, đường truyền và bảng cảnh báo; phát ra một nhịp tín hiệu (heartbeat). | M |
 | FR-11 | Chuyển vào một **trạng thái an toàn** đã định nghĩa và cảnh báo người vận hành khi có bất kỳ lỗi trọng yếu nào (xem ADR-0005). | M |
@@ -79,9 +80,9 @@ Máy trạng thái (state machine) đầy đủ, kèm các bộ định thời v
 |----|----------|-------------|
 | NFR-01 | **Độ trễ** | Xác nhận đang dừng → cảnh báo BẬT ≤ 2 s sau khi thời gian chờ trôi qua (nên tổng thời gian từ dừng→cảnh báo ≈ dwell + ≤2 s). |
 | NFR-02 | **Độ trễ** | Xe đã rời đi → cảnh báo TẮT trong vòng hold + ≤ 2 s. |
-| NFR-03 | **Độ sẵn sàng** | ≥ 99% trên mỗi điểm giám sát trong suốt giai đoạn thử nghiệm, không tính bảo trì theo lịch. |
+| NFR-03 | **Độ sẵn sàng** | Độ sẵn sàng **chức năng** ≥ 99% trên mỗi điểm giám sát trong suốt giai đoạn thử nghiệm — tỉ lệ thời gian mà thiết bị thực sự có thể *phát hiện-và-cảnh báo đúng đặc tả*, không chỉ là "có điện và đang báo cáo"; thời gian ở trạng thái suy giảm/an toàn được tính là **không sẵn sàng**. Không tính bảo trì theo lịch. Đo tại hiện trường (xem §3a). |
 | NFR-04 | **Độ tin cậy** | Không một lỗi phần mềm đơn lẻ nào được phép để một cảnh báo **BẬT cũ kỹ (stale ON)** kéo dài vô thời hạn — một watchdog (bộ canh chừng) phải giới hạn thời gian của mọi lần kích hoạt và xác nhận lại. |
-| NFR-05 | **Độ bền vững** | Duy trì mức phát hiện mục tiêu trong mưa và vào ban đêm thông qua cảm biến đa cảm biến ([ADR-0001](adr/ADR-0001-sensing-modality.vi.md)). |
+| NFR-05 | **Độ bền vững** | Duy trì mức phát hiện mục tiêu trong mưa và vào ban đêm thông qua cảm biến đa cảm biến ([ADR-0001](adr/ADR-0001-sensing-modality.vi.md)) — **phụ thuộc vào cổng kiểm chứng phát hiện vật đứng yên bằng radar**; được kiểm chứng tại hiện trường, không thể tuyên bố từ một bàn thử radar tổng hợp (§3a, §5). |
 | NFR-06 | **Tự chủ tại biên** | Vòng lặp phát hiện→cảnh báo phải hoạt động được khi WAN/đám mây hoàn toàn mất kết nối ([ADR-0002](adr/ADR-0002-edge-vs-cloud-processing.vi.md)). |
 | NFR-07 | **Năng lượng** | Chạy bằng điện lưới, hoặc pin mặt trời + ắc quy với khả năng tự chủ ≥ 72 h khi không có nắng ([ADR-0006](adr/ADR-0006-connectivity-and-power.vi.md)). |
 | NFR-08 | **Khả năng bảo trì** | Giám sát tình trạng từ xa, cấu hình từ xa, cập nhật OTA; các khối cảm biến/tính toán/bảng cảnh báo dạng mô-đun. |
@@ -91,6 +92,27 @@ Máy trạng thái (state machine) đầy đủ, kèm các bộ định thời v
 | NFR-12 | **Chi phí** | Bảng kê vật tư trên mỗi điểm hướng tới một thiết bị thử nghiệm hiện trường có tính khả thi (được theo dõi trong [tài liệu 03](03-roadmap-and-phasing.vi.md)); bản dựng cấp trường giữ trong mức ngân sách 20M VND (mô hình thử nghiệm/mô phỏng). |
 | NFR-13 | **Môi trường** | Các thiết bị hiện trường được định mức cho nhiệt độ, độ ẩm, bụi, rung động ngoài trời (vỏ bảo vệ IP65+). |
 | NFR-14 | **Khả năng mở rộng** | Kiến trúc phải cho phép bổ sung các loại cảm biến và các lớp sự kiện mới (FR-18/19) mà không cần thiết kế lại. |
+
+---
+
+## 3a. Phạm vi kiểm chứng — giai đoạn được tài trợ (bàn thử/mô phỏng) thực sự có thể chứng minh điều gì
+
+Không phải mọi yêu cầu ở trên đều có thể được *kiểm chứng* trên một bàn thử trong phòng thí nghiệm trong phạm vi 20M VND; một số được **thiết kế ngay bây giờ nhưng chỉ chứng minh được tại hiện trường** (cấp sở). Nêu rõ điều này ngay từ đầu giúp báo cáo cuối cùng được trung thực — một yêu cầu "Phải" mà không có bằng chứng nghiệm thu trong phạm vi tài trợ được đánh dấu *ở đây*, không phải bị phát hiện lúc rà soát. Các nhãn: **B** = bàn thử · **S** = mô phỏng · **F** = hoãn sang giai đoạn hiện trường · **D** = chỉ thiết kế/rà soát. Phương pháp luận đằng sau cách phân tách này là [ADR-0007](adr/ADR-0007-validation-and-data-strategy.vi.md).
+
+| Yêu cầu | Kiểm chứng trong phạm vi tài trợ | Vì sao |
+|-------------|---------------------------|-----|
+| FR-09 (ngày/đêm/mưa/sương mù) | **S (xấp xỉ) + F** | Một bàn thử không thể tạo ra mưa/lóa/sương mù thật; mô phỏng chỉ xấp xỉ. Recall trong điều kiện thực được hoãn sang giai đoạn hiện trường. |
+| FR-17 (tái sử dụng VMS hiện có) | **F** | Cần một VMS thật do người vận hành điều khiển; bàn thử dùng một LED thay thế. |
+| NFR-03 (độ sẵn sàng chức năng) | **F** | Một chỉ số vận hành; bàn thử chỉ có thể đặc trưng hóa MTBF của vòng lặp phần mềm dưới điều kiện tiêm lỗi. |
+| NFR-05 (độ bền vững mưa/đêm) | **F** | Phụ thuộc vào cổng radar của [ADR-0001](adr/ADR-0001-sensing-modality.vi.md); không thể tuyên bố từ một bàn thử radar tổng hợp. |
+| NFR-07 (pin mặt trời tự chủ ≥ 72 h) | **F** | Chỉ thiết kế ở phạm vi bàn thử (điện lưới phòng thí nghiệm). |
+| NFR-11 / NFR-14 (tiêu chuẩn, khả năng mở rộng) | **D** | Rà soát mức độ tuân thủ và lập luận kiến trúc, không phải một phép kiểm thử lúc chạy. |
+| NFR-13 (môi trường IP65) | **F** | Không có vỏ bảo vệ cấp hiện trường nào được chế tạo ở phạm vi bàn thử. |
+| Tất cả FR/NFR còn lại | **B + S** | Logic, độ trễ, xử lý lỗi, quyền riêng tư, tự chủ tại biên, can thiệp thủ công, cấu hình và các sự kiện đều có thể thực thi được trên bàn thử/mô phỏng. |
+
+Mọi thứ được gắn nhãn **F** đều được chuyển tiếp sang nghiệm thu thử nghiệm hiện trường
+([tài liệu 05 §11](05-field-pilot-proposal.vi.md#11-acceptance-kpis-field)); **không thứ gì gắn nhãn F được phép báo cáo
+như một kết quả đo lường của mô hình thử nghiệm.**
 
 ---
 
@@ -114,6 +136,10 @@ SSD = 0.278 · V · t  +  0.039 · V² / a       (V in km/h, SSD in m)
 
 \* Thao tác DSD C = "đổi tốc độ/đổi đường đi/đổi hướng trên đường nông thôn/tốc độ cao" (AASHTO). Đây là cơ sở phù hợp vì phản ứng an toàn ở đây là một **lần chuyển làn**, không phải một lần dừng khẩn cấp.
 
+**Vì sao dùng DSD-C chứ không chỉ "SSD + một lần chuyển làn"?** SSD giả định rằng người lái xe *dừng lại*; phản ứng an toàn trước một chướng ngại vật ở làn dừng thường là *giữ tốc độ và chuyển làn* — một nhiệm vụ quyết định-và-điều khiển — nên DSD (thao tác C) mới là cơ sở có thể bảo vệ được. Nó được chọn một cách **bảo thủ** có chủ ý: DSD-C vượt SSD khoảng ~130 m ở 100 km/h, điều này tạo ra biên dự phòng nhưng đồng thời cũng **nâng cao ngưỡng mà một điểm phải đạt** (PL-04). Một khoảng cách yêu cầu quá dài có thể đánh dấu những điểm vốn khả thi là "không phù hợp", vì vậy hãy coi bảng trên là một **mức sàn thiết kế** và, theo từng điểm, cũng tính "SSD + một khoảng cách chuyển làn thoải mái" như một cận dưới; hãy dùng phán đoán kỹ thuật (và sự đồng thuận của người vận hành) ở nơi hai giá trị này phân kỳ.
+
+**Đối chiếu với tiêu chuẩn Việt Nam.** Các con số ở trên là theo AASHTO. Để được phê duyệt, cơ sở cự ly tầm nhìn phải được diễn đạt theo **tiêu chuẩn Việt Nam chi phối — TCVN 5729 (thiết kế hình học đường cao tốc), cùng với QCVN 41 cho bản thân biển báo**. Hãy ánh xạ lập luận DSD-C lên các quy định về cự ly tầm nhìn của TCVN 5729, hoặc biện giải DSD theo AASHTO như một cơ sở an toàn bổ sung ở nơi TCVN không đề cập. Đây là một **nhiệm vụ phương pháp luận cho nghiên cứu chọn vị trí** (Giai đoạn 1), không phải một việc nghĩ đến sau cho từng điểm.
+
 **Yêu cầu PL (bố trí):**
 
 - **PL-01 (M):** Bảng cảnh báo phải được hiển thị **cách vùng phát hiện ít nhất một khoảng DSD (thao tác C) về phía trước (theo hướng xe tới)** ứng với tốc độ thiết kế của tuyến (bảng trên là mức sàn thiết kế; cần đối chiếu với tiêu chuẩn Việt Nam chi phối cho từng điểm).
@@ -131,16 +157,19 @@ SSD = 0.278 · V · t  +  0.039 · V² / a       (V in km/h, SSD in m)
 
 | Chỉ số | Định nghĩa | Chỉ tiêu mô hình thử nghiệm (bench/sim) | Chỉ tiêu thử nghiệm hiện trường |
 |--------|-----------|------------------------------|--------------------|
-| **Tỉ lệ phát hiện (recall / độ nhạy)** | số sự kiện xe dừng thực được phát hiện ÷ tất cả sự kiện như vậy | ≥ 95% ban ngày · ≥ 90% ban đêm/điều kiện bất lợi | ≥ 98% / ≥ 95% |
-| **Tỉ lệ kích hoạt sai** | các cảnh báo phát ra mà không có nguy hiểm thực sự | ≤ 1 trên mỗi 100 kịch bản thử | ≤ 1 trên mỗi điểm mỗi tuần |
+| **Recall — phương tiện** | số sự kiện xe dừng thực được phát hiện ÷ tất cả sự kiện như vậy | ≥ 95% ban ngày (bench/sim). **Ban đêm/điều kiện bất lợi bị khóa (gated)** — chỉ có thể tuyên bố nếu cổng radar của [ADR-0001](adr/ADR-0001-sensing-modality.vi.md) vượt qua trên phần cứng thật; nếu không thì **hoãn sang giai đoạn hiện trường**, không bao giờ khẳng định từ radar tổng hợp | ≥ 98% ban ngày · ≥ 95% ban đêm/điều kiện bất lợi |
+| **Recall — người đi bộ** | số sự kiện người mắc kẹt trên xe được phát hiện ÷ tất cả sự kiện như vậy (FR-08) | theo dõi **riêng biệt**, nỗ lực tối đa (RCS nhỏ + camera yếu nhất vào ban đêm); chỉ tiêu được đặt sau khi có dữ liệu Giai đoạn 3, **không** giả định bằng với phương tiện | ≥ 90% ban ngày · nỗ lực tối đa vào ban đêm |
+| **Tỉ lệ kích hoạt sai** | các cảnh báo sai ÷ **mức phơi nhiễm (exposure)** — báo cáo **cả hai** trên mỗi 100 kịch bản dàn dựng *và* trên mỗi giờ vận hành (số đếm thô qua các tổ hợp kịch bản khác nhau không thể so sánh được) | ≤ 1 trên mỗi 100 kịch bản dàn dựng *và* một tỉ lệ trên mỗi giờ được báo cáo | **tạm thời** ≤ 1 / điểm / tuần, **chờ hiệu chỉnh niềm tin của người vận hành** ([tài liệu 04 §5](04-risk-and-safety.vi.md#5-open-safety-questions-for-the-team)) |
 | **Độ trễ phát hiện** | phương tiện trở nên đứng yên → cảnh báo BẬT | ≤ dwell + 2 s | như nhau |
-| **Độ trễ xóa** | phương tiện rời ROI → cảnh báo TẮT | ≤ hold + 2 s | như nhau |
+| **Độ trễ xóa** | phương tiện rời ROI → cảnh báo TẮT | ≤ hold + 2 s **khi có thoát ra đã xác nhận** (một lần che khuất được giữ không phải là lỗi độ trễ xóa — [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md)) | như nhau |
 | **Cự ly cảnh báo hiệu dụng phía trước** | khoảng cách phía trước mà tại đó cảnh báo đang hoạt động nhìn thấy/đọc được | ≥ DSD ứng với tốc độ được mô hình hóa | ≥ DSD tại hiện trường, đã khảo sát |
-| **Độ sẵn sàng** | thời gian hoạt động ÷ tổng thời gian | ≥ 99% (mô hình) | ≥ 99% |
-| **Phạm vi phát hiện lỗi** | các lỗi được tiêm vào mà bộ tự giám sát bắt được & báo leo thang | ≥ 95% danh sách lỗi FMEA ([tài liệu 04](04-risk-and-safety.vi.md)) | ≥ 95% |
+| **Độ sẵn sàng chức năng** | thời gian có thể *phát hiện-và-cảnh báo đúng đặc tả* ÷ tổng thời gian (thời gian ở trạng thái suy giảm/an toàn được tính là không hoạt động — NFR-03) | MTBF của vòng lặp phần mềm dưới điều kiện tiêm lỗi (bản thân độ sẵn sàng được **hoãn sang giai đoạn hiện trường**) | ≥ 99% |
+| **Phạm vi phát hiện lỗi** | các lỗi được tiêm vào mà bộ tự giám sát bắt được & báo leo thang | ≥ 95% danh sách lỗi FMEA ([tài liệu 04 §2](04-risk-and-safety.vi.md#2-fmea-lite-failure-mode--effect--detection--response)) — **lưu ý:** chỉ số này đo việc phát hiện các lỗi *đã liệt kê*, không phải các lỗi chưa biết | ≥ 95% |
 | **MTBF / MTTR** | thời gian trung bình giữa các lần lỗi / để sửa chữa | đặc trưng hóa trên mô hình | chỉ tiêu MTBF đặt ở giai đoạn thử nghiệm |
 
-**Nghiệm thu cho nhiệm vụ cấp trường** = trình diễn, trên mô hình thử nghiệm trên bàn (bench) và/hoặc mô phỏng, toàn bộ vòng kín (chu trình khép kín) (phát hiện → xác nhận → cảnh báo → theo dõi → xóa) đạt các chỉ tiêu ở cột mô hình thử nghiệm trên một tập kịch bản đã định nghĩa (ban ngày, ban đêm, mưa, đi qua thoáng qua, che khuất, nhiều phương tiện, người đi bộ, và **các lỗi cảm biến/khối tính toán/bảng cảnh báo được tiêm vào**), cùng với báo cáo khả thi và đề xuất phát triển thử nghiệm hiện trường mà đề tài tài trợ yêu cầu.
+**Nghiệm thu cho nhiệm vụ cấp trường** = trình diễn, trên mô hình thử nghiệm trên bàn (bench) và/hoặc mô phỏng, toàn bộ vòng kín (chu trình khép kín) (phát hiện → xác nhận → cảnh báo → theo dõi → xóa) đạt các chỉ tiêu ở cột mô hình thử nghiệm trên một tập kịch bản đã định nghĩa (ban ngày, ban đêm, mưa, đi qua thoáng qua, **che khuất ngắn và kéo dài có và không có sự chứng thực của radar**, **nhiều phương tiện đồng thời đi đến và rời đi**, người đi bộ, **một phương tiện đã hiện diện sẵn lúc khởi động (boot)**, và **các lỗi cảm biến/khối tính toán/bảng cảnh báo được tiêm vào — bao gồm cả việc giết tiến trình máy trạng thái để chứng minh cơ chế an toàn tự kích hoạt khi mất tín hiệu (dead-man's switch) làm trống biển báo**), cùng với báo cáo khả thi và đề xuất phát triển thử nghiệm hiện trường mà đề tài tài trợ yêu cầu.
+
+**Ranh giới chứng minh được (nêu rõ trong báo cáo).** Các kết quả bench/sim chứng thực *logic, thời gian định thời, xử lý lỗi, và khả năng kháng kích hoạt sai trước các nhiễu đã được mô hình hóa*; chúng **không** chứng thực recall trong điều kiện thực khi mưa/lóa/sương mù, tỉ lệ báo động giả thực, hay hiệu năng trước nhiễu lộn xộn (clutter) thực của radar — những điều này được hoãn sang giai đoạn hiện trường ([ADR-0007](adr/ADR-0007-validation-and-data-strategy.vi.md)). Hãy báo cáo mọi kết quả kèm theo cấp độ của nó (§3a) để không tuyên bố nào vượt quá bằng chứng của nó.
 
 ---
 

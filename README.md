@@ -5,7 +5,7 @@
 > *"Nghiên cứu giải pháp cảnh báo tự động cho làn dừng xe khẩn cấp để giảm thiểu tai nạn giao thông"*
 > — Trường Đại học Quản lý và Công nghệ TP.HCM, Khoa Công nghệ. Chủ nhiệm: ThS. Phó Trí Tín.
 
-> 🇻🇳 **Phiên bản tiếng Việt (bản dịch đầy đủ):** [README.vi.md](README.vi.md) — toàn bộ tài liệu 00–04 và các ADR đều có bản `.vi.md` song song.
+> 🇻🇳 **Phiên bản tiếng Việt (bản dịch đầy đủ):** [README.vi.md](README.vi.md) — toàn bộ tài liệu 00–05 và các ADR đều có bản `.vi.md` song song.
 
 ---
 
@@ -37,7 +37,7 @@ triangles) to **active, automatic warning** — the central thesis of the propos
 | 03 | [docs/03-roadmap-and-phasing.md](docs/03-roadmap-and-phasing.md) | Engineering roadmap mapped onto the proposal's 6 phases, MVP definition, **budget reality check** |
 | 04 | [docs/04-risk-and-safety.md](docs/04-risk-and-safety.md) | Risk register, FMEA-lite, fail-safe design, privacy & legal compliance |
 | 05 | [docs/05-field-pilot-proposal.md](docs/05-field-pilot-proposal.md) | Provincial (cấp sở) field-pilot proposal — draft (the follow-on docs 03–04 set up) |
-| — | [docs/adr/README.md](docs/adr/README.md) | Architecture Decision Records index (6 ADRs covering the load-bearing technical choices) |
+| — | [docs/adr/README.md](docs/adr/README.md) | Architecture Decision Records index (8 ADRs covering the load-bearing technical choices) |
 
 Figure 1 from the proposal (the concept infographic) is preserved at
 [docs/assets/figure-1-concept-infographic.jpeg](docs/assets/figure-1-concept-infographic.jpeg) and is
@@ -92,9 +92,13 @@ add the engineering rigor a build needs, and propose a few corrections. The most
    where a camera-only system is weakest. We recommend **camera + radar fusion** (radar sees range
    and presence in the dark and through rain/fog). See [ADR-0001](docs/adr/ADR-0001-sensing-modality.md).
 
-4. **Made the closed loop concrete** as a state machine with **dwell-time confirmation and
-   hysteresis**, so a car merely passing along the shoulder doesn't false-trigger, and a brief
-   occlusion doesn't drop a live warning. See [doc 02](docs/02-system-architecture.md).
+4. **Made the closed loop concrete** as a state machine with **dwell confirmation, hysteresis,
+   radar-corroborated occlusion hold, multi-vehicle set semantics, a watchdog, and a
+   dead-man's-switch safe state** — so a passing car doesn't false-trigger, a long truck occlusion
+   doesn't drop a live warning, and a crashed controller can't leave the sign stuck on. See
+   [doc 02 §4](docs/02-system-architecture.md#4-the-detectionwarning-state-machine),
+   [ADR-0008](docs/adr/ADR-0008-detection-persistence-and-multitrack.md), and
+   [ADR-0005](docs/adr/ADR-0005-fail-safe-and-system-safety.md).
 
 5. **Local-first processing.** The detect→warn loop is computed on an edge device at the roadside;
    the cloud is non-critical. A safety warning must not wait on a cellular round-trip.

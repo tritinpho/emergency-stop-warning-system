@@ -176,11 +176,12 @@ thử nghiệm:
 
 | KPI | Mục tiêu |
 |-----|--------|
-| Tỉ lệ phát hiện (recall / độ nhạy) (ban ngày · ban đêm/bất lợi) | ≥ 98% · ≥ 95% |
-| Tỉ lệ kích hoạt sai | ≤ 1 lần mỗi điểm mỗi tuần (ngưỡng đã thống nhất với đơn vị vận hành) |
-| Độ trễ phát hiện / xóa cảnh báo | ≤ dwell + 2 s · ≤ hold + 2 s |
+| Tỉ lệ phát hiện (recall) — xe (ban ngày · ban đêm/bất lợi) | ≥ 98% · ≥ 95% |
+| Tỉ lệ phát hiện (recall) — người đi bộ (ban ngày · ban đêm) | ≥ 90% · nỗ lực tối đa |
+| Tỉ lệ kích hoạt sai | tạm thời ≤ 1 lần mỗi điểm mỗi tuần, **hiệu chỉnh theo đơn vị vận hành** theo ngưỡng tin cậy ([tài liệu 04 §5](04-risk-and-safety.vi.md#5-open-safety-questions-for-the-team)) |
+| Độ trễ phát hiện / xóa cảnh báo | ≤ dwell + 2 s · ≤ hold + 2 s (khi thoát ra đã xác nhận) |
 | Cự ly cảnh báo trước hiệu quả | ≥ DSD tại hiện trường (đã khảo sát) |
-| Độ sẵn sàng | ≥ 99% |
+| Độ sẵn sàng **chức năng** | ≥ 99% |
 | Độ phủ phát hiện lỗi | ≥ 95% danh mục FMEA |
 | **Chỉ số an toàn trước/sau** | giảm đo được về xung đột / suýt va chạm liên quan đến sự cố làn dừng tại các điểm được lắp đặt thiết bị đo đạc (với dữ liệu của đơn vị vận hành) |
 

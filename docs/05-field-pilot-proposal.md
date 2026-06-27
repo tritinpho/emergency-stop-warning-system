@@ -154,11 +154,12 @@ From [doc 01 §5](01-requirements.md) (field column), plus pilot-specific safety
 
 | KPI | Target |
 |-----|--------|
-| Detection rate / recall (day · night/adverse) | ≥ 98% · ≥ 95% |
-| False activation rate | ≤ 1 per site per week (operator-agreed threshold) |
-| Detection / clear latency | ≤ dwell + 2 s · ≤ hold + 2 s |
+| Detection rate / recall — vehicles (day · night/adverse) | ≥ 98% · ≥ 95% |
+| Detection rate / recall — pedestrians (day · night) | ≥ 90% · best-effort |
+| False activation rate | provisional ≤ 1 per site per week, **operator-calibrated** to the trust threshold ([doc 04 §5](04-risk-and-safety.md#5-open-safety-questions-for-the-team)) |
+| Detection / clear latency | ≤ dwell + 2 s · ≤ hold + 2 s (on a confirmed exit) |
 | Effective warning lead distance | ≥ DSD on-site (surveyed) |
-| Availability | ≥ 99% |
+| **Functional** availability | ≥ 99% |
 | Fault-detection coverage | ≥ 95% of the FMEA list |
 | **Before/after safety indicator** | measurable reduction in shoulder-incident conflicts / near-misses at instrumented sites (with operator data) |
 
