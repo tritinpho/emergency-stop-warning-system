@@ -1,0 +1,59 @@
+# ADR-0005: Tư thế an toàn khi sự cố (fail-safe), trạng thái an toàn, và leo thang theo tình trạng
+
+> 🇬🇧 Bản gốc tiếng Anh: [ADR-0005-fail-safe-and-system-safety.md](ADR-0005-fail-safe-and-system-safety.md)
+
+**Trạng thái:** Đề xuất
+**Ngày:** 2026-06-26
+**Người quyết định:** Chủ nhiệm đề tài (PI), trưởng nhóm kỹ thuật, cố vấn an toàn giao thông đường bộ
+
+## Bối cảnh
+
+Đây là quyết định phi chức năng quan trọng nhất. Hệ thống tác động đến dòng xe di chuyển nhanh ở gần một chướng ngại vật đứng yên, nên **hành vi của nó khi có sự cố** quan trọng ngang với hành vi khi nó hoạt động bình thường. Hai kiểu lỗi kéo hệ thống về hai hướng ngược nhau ([tài liệu 01 §1](../01-requirements.vi.md#1-the-safety-reframe-read-this-first)):
+
+- một **trường hợp bỏ sót thầm lặng (silent miss)** (cảm biến bị mù, tiến trình bị treo) — cảnh báo đáng lẽ phải xuất hiện thì lại không bao giờ xuất hiện, nhưng thiết bị trông vẫn "ổn";
+- một **trạng thái BẬT cũ/sai (stale / false ON)** — một cảnh báo được hiển thị mà không có nguy hiểm, làm cho người lái quen với việc phớt lờ nó ("báo động giả lặp lại" — hiệu ứng cừu giả).
+
+Một hệ thống ngây thơ thì không có khả năng tự nhận biết lẫn một hành vi được định nghĩa cho cả hai trường hợp. Chúng ta phải quyết định tư thế an toàn khi sự cố (fail-safe) một cách tường minh.
+
+## Quyết định
+
+Áp dụng **an toàn khi sự cố (fail-safe) + báo lỗi rõ ràng (fail-loud)**:
+
+1. Một **bộ giám sát tình trạng độc lập với đường nhận diện (perception path)** liên tục tự kiểm tra các cảm biến, khối tính toán, tiến trình ra quyết định, đường liên kết tới bảng báo, và phần đọc lại trạng thái của chính bảng báo; nó phát ra một **nhịp tín hiệu (heartbeat)** tới TMC.
+2. Khi xảy ra bất kỳ **lỗi trọng yếu (critical fault)** nào, máy trạng thái chuyển vào một **TRẠNG THÁI AN TOÀN** đã được định nghĩa: bảng báo được lệnh đưa về một **điều kiện đã biết, không gây nhầm lẫn** (mặc định: **CLEAR/để trống** — không bao giờ là một thông báo *cụ thể* kiểu "có xe phía trước" mà nó không thể chứng thực), và lỗi được **leo thang đến đơn vị vận hành ngay lập tức**.
+3. Một **watchdog (bộ canh chừng)** giới hạn thời gian cho mọi lần kích hoạt: không cảnh báo nào được phép giữ ở trạng thái BẬT mà không có xác nhận mới hoặc một lần làm mới của watchdog (`T_watchdog`, NFR-04), qua đó loại bỏ tình trạng BẬT-cũ kéo dài vô thời hạn.
+4. Thiết bị **không bao giờ báo cáo là khỏe mạnh khi nó đang suy giảm**; "bị mù" là một điều kiện cảnh báo, không phải sự im lặng.
+
+> Tại sao để trống khi có sự cố thay vì một cảnh báo chung chung kéo dài? Một bảng báo *luôn luôn* cảnh báo sẽ trở thành thứ "giấy dán tường" và làm xói mòn niềm tin vào cảnh báo thực, cụ thể (lỗi báo động giả lặp lại). Hành vi suy giảm trung thực là: ngừng khẳng định một mối nguy mà bạn không còn phát hiện được nữa, và **làm cho sự cố trở nên rõ ràng (loud) với những người có thể khắc phục hoặc bù đắp cho nó** (TMC, đội tuần tra) — chứ không phải với người lái thông qua một bảng báo đứng yên mơ hồ. Những vị trí thực sự cần một cách xử lý kiểu "khu vực phát hiện sự cố" đứng yên có thể cấu hình theo từng vị trí, nhưng đó không phải là mặc định.
+
+## Các phương án đã xét
+
+### Phương án A: Không có an toàn khi sự cố tường minh (nỗ lực tốt nhất - best-effort)
+**Ưu điểm:** ít công sức nhất.
+**Nhược điểm:** bỏ sót thầm lặng; có thể kẹt ở trạng thái BẬT; không có khả năng quan sát cho đơn vị vận hành. Không thể chấp nhận đối với một chức năng an toàn.
+
+### Phương án B: An toàn khi sự cố về trạng thái **để trống** + leo thang theo tình trạng + watchdog *(được chọn)*
+**Ưu điểm:** không có đầu ra gây nhầm lẫn; không có BẬT-cũ; sự cố là quan sát được và có thể hành động; bảo vệ niềm tin.
+**Nhược điểm:** đòi hỏi một bộ giám sát tình trạng độc lập, một watchdog, phần đọc lại trạng thái bảng báo, và cảnh báo tới TMC — đây là công việc kỹ thuật thực sự, nhưng là cốt lõi của một hệ thống đáng tin cậy.
+
+### Phương án C: An toàn khi sự cố về một bảng báo **cảnh báo chung chung kéo dài**
+**Ưu điểm:** "luôn có thứ gì đó đang cảnh báo" tạo cảm giác thận trọng.
+**Nhược điểm:** kiểu báo động giả lặp lại điển hình — các cảnh báo mơ hồ đứng yên bị phớt lờ, làm mất giá trị của cảnh báo cụ thể; bản thân nó có thể gây phanh không cần thiết. Bị loại làm mặc định; chỉ cho phép như một tùy chọn theo từng vị trí.
+
+## Phân tích đánh đổi
+
+Phương án A tối ưu hóa công sức nhưng đánh đổi bằng chính lý do tồn tại của hệ thống. Quyết định thực sự là giữa B và C — *một bảng báo bị lỗi sẽ hiển thị gì?* C đánh đổi một cảm giác an toàn để lấy sự xói mòn niềm tin mà rốt cuộc làm cho cảnh báo **đang hoạt động** kém hiệu quả hơn. B giữ cho kênh cảnh báo **đáng tin cậy**: bảng báo chỉ khẳng định một mối nguy mà nó có thể chứng thực, và các sự cố được định tuyến đến những người có thể hành động. Niềm tin chính là sản phẩm (nguyên tắc định hướng 3), nên B thắng.
+
+## Hệ quả
+
+- **Dễ hơn:** suy giảm trung thực; không kẹt BẬT; đơn vị vận hành thấy được sự cố và có thể điều động đội tuần tra; kênh cảnh báo vẫn đáng tin cậy.
+- **Khó hơn:** phải xây dựng bộ giám sát tình trạng độc lập, watchdog, phần đọc lại trạng thái bảng báo, hệ phân loại lỗi (fault taxonomy), và cảnh báo tới TMC; phải định nghĩa và kiểm thử quá trình chuyển sang TRẠNG THÁI AN TOÀN (tiêm lỗi là một phần của nghiệm thu, [tài liệu 01 §5](../01-requirements.vi.md#5-evaluation-metrics--acceptance-criteria)).
+- **Xem xét lại khi:** một hệ thống hiện trường được sản phẩm hóa theo đuổi cách xử lý an toàn chức năng (functional-safety) chính thức (ví dụ: một phân tích mối nguy / mục tiêu SIL) — ADR này là nền tảng mà nỗ lực đó sẽ xây dựng trên đó.
+
+## Hạng mục hành động
+
+1. [ ] Liệt kê đầy đủ **hệ phân loại lỗi (fault taxonomy)** (cảm biến chết, đóng băng khung hình, sập mô hình, mất liên kết, bảng báo không phản hồi, nguồn yếu, lệch đồng hồ) và phản ứng cho từng trường hợp.
+2. [ ] Hiện thực watchdog và quá trình chuyển sang TRẠNG THÁI AN TOÀN trong máy trạng thái.
+3. [ ] Hiện thực phần **đọc lại trạng thái (status read-back)** của bảng báo để "đã ra lệnh BẬT" được kiểm chứng đối chiếu với "thực sự đang BẬT".
+4. [ ] Định nghĩa các mức nghiêm trọng của cảnh báo TMC và luồng xác nhận (acknowledgement).
+5. [ ] Bổ sung **các bài kiểm thử tiêm lỗi (fault-injection)** vào bộ nghiệm thu (mục tiêu phạm vi phát hiện lỗi ≥95%).
