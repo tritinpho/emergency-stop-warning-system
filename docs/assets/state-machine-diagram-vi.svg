@@ -1,10 +1,10 @@
-<svg width="100%" viewBox="0 0 760 360" role="img" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+<svg width="100%" viewBox="0 0 760 392" role="img" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
 <title>Máy trạng thái phát hiện — cảnh báo (theo tập hợp vết, có giữ khi che khuất và an toàn khi sự cố)</title>
 <desc>Máy trạng thái vận hành trên tập hợp các vết đang dừng đã xác nhận trong ROI. Chờ dẫn tới theo dõi, rồi xác nhận, rồi bật cảnh báo. Từ trạng thái bật cảnh báo, một lần thoát ra đã xác nhận sẽ tắt bảng nhanh, trong khi một vết bị mất mà không thấy thoát ra sẽ chuyển sang giữ cảnh báo và được giữ chừng nào radar còn đối chứng sự hiện diện, rồi mới hủy khi thực sự thoát ra hoặc hết thời gian chờ mà không có đối chứng. Bộ giám sát (watchdog) hủy cảnh báo và phát lỗi khi không kênh nào xác nhận được. Trạng thái an toàn làm trống bảng và báo trực ban, có thể đến từ mọi trạng thái khi có lỗi nghiêm trọng và được bộ giám sát tình trạng độc lập buộc kích hoạt; trở về chờ sau khi tự kiểm đạt. Xanh dương là giám sát thường, hổ phách là đang cảnh báo, đỏ là trạng thái an toàn khi lỗi.</desc>
 <defs>
 <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
 </defs>
-<rect x="0" y="0" width="760" height="360" fill="#FBFBF9"/>
+<rect x="0" y="0" width="760" height="392" fill="#FBFBF9"/>
 
 <rect x="20" y="8" width="720" height="36" rx="6" fill="#F2F1EC" stroke="#D9D8D2" stroke-width="0.8"/>
 <text x="380" y="25" font-size="11" fill="#5F5E5A" text-anchor="middle">Vận hành trên TẬP HỢP các vết đang dừng đã xác nhận trong ROI — cảnh báo vẫn BẬT khi tập hợp chưa rỗng.</text>
@@ -27,7 +27,7 @@
 <text x="490" y="266" font-size="12" fill="#5F5E5A" text-anchor="middle">thấy lại · radar giữ</text>
 
 <line x1="298" y1="243" x2="162" y2="243" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-<text x="230" y="237" font-size="12" fill="#5F5E5A" text-anchor="middle">thoát · hoặc vắng 10 s</text>
+<text x="230" y="237" font-size="12" fill="#5F5E5A" text-anchor="middle">thoát · hoặc hủy 10 s khi vắng radar</text>
 
 <line x1="100" y1="220" x2="100" y2="126" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
 <text x="92" y="176" font-size="12" fill="#5F5E5A" text-anchor="end">hủy + tắt bảng</text>
@@ -82,4 +82,7 @@
 <rect x="340" y="332" width="13" height="13" rx="3" fill="#FCEBEB" stroke="#A32D2D" stroke-width="0.8"/>
 <text x="360" y="342" font-size="12" fill="#5F5E5A">lỗi / an toàn</text>
 <text x="500" y="342" font-size="12" fill="#A32D2D">– – – lỗi · mọi trạng thái</text>
+<line x1="20" y1="358" x2="740" y2="358" stroke="#E2E1DB" stroke-width="1"/>
+<text x="20" y="374" font-size="10.5" fill="#5F5E5A">Bị che &gt; T_occlusion nhưng radar vẫn xác nhận → cảnh báo vẫn BẬT + báo trực (suy giảm) — không bao giờ hủy âm thầm.</text>
+<text x="20" y="387" font-size="10.5" fill="#5F5E5A">Cơ chế tự ngắt an toàn nằm ở bộ điều khiển biển báo, nên hộp biên chết hay đứt liên kết cũng làm trống bảng.</text>
 </svg>

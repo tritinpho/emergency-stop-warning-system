@@ -36,7 +36,13 @@ Adopt **fail-safe + fail-loud**:
    state machine may *assert* a warning") with fail-safe: the SM is the only component that may
    *assert*, but it is **not required in order to clear**. Without this, the component that detects a
    wedged SM would have to command the safe state *through* the very SM that is wedged — a watchdog
-   that depends on its subject.
+   that depends on its subject. **The safe-state actuation must physically live in the _sign
+   controller_, downstream of the local link — not in the edge box** — or a dead edge box, a wedged OS,
+   or a cut/jammed link strands a latched sign in its last (possibly ON) state. The placement, the
+   refreshed-assertion protocol, its `T_signhold` timing trade-off, and the latching-VMS caveat are
+   specified in [ADR-0009](ADR-0009-failsafe-placement-and-degraded-modes.md), which also fixes the
+   asymmetric **degraded-mode** semantics (a camera-dead unit is *blind to new hazards*, not "degraded
+   but running").
 4. A **watchdog** bounds every activation: no warning may remain ON without fresh confirmation or
    corroboration (`T_watchdog`, NFR-04), eliminating indefinite stale-ON. Its interaction with the
    occlusion hold is specified in [ADR-0008](ADR-0008-detection-persistence-and-multitrack.md) — the
@@ -90,9 +96,11 @@ is the product (guiding principle 3), so B wins.
 1. [ ] Enumerate the **fault taxonomy** (sensor dead, frame freeze, model crash, link down, sign
        unresponsive, power low, clock skew) and the response for each.
 2. [ ] Implement the watchdog and the SAFE-STATE transition in the state machine.
-3. [ ] Implement the **dead-man's switch**: actuator defaults to blank on loss of the SM assertion
-       heartbeat, plus an independent health-monitor → actuator force-safe path (verify by killing the
-       SM process in a fault-injection test and confirming the sign blanks).
+3. [ ] Implement the **dead-man's switch** in the **sign controller** (downstream of the link), plus an
+       independent health-monitor → actuator force-safe path, per
+       [ADR-0009](ADR-0009-failsafe-placement-and-degraded-modes.md) (verify by killing the SM process,
+       **killing the edge box, and cutting the link** in fault-injection tests and confirming the sign
+       blanks within `T_signhold` in every case).
 4. [ ] Implement sign **status read-back** so "commanded ON" is verified against "actually ON."
 5. [ ] Define TMC alert severities and acknowledgement flow.
 6. [ ] Add **fault-injection tests** to the acceptance suite (target ≥95% fault-detection coverage).

@@ -94,7 +94,7 @@ flowchart TB
 | **Perception** | Detect vehicles/persons; keep only detections whose footprint falls inside the ROI polygon. | Lightweight detector + ROI gating ([ADR-0003](adr/ADR-0003-detection-algorithm.md)). |
 | **Fusion & tracking** | Associate camera detections with radar returns; produce stable tracks with position + speed + dwell. | Radar resolves "present & stationary" in the dark / rain. |
 | **Decision state machine** | The brain. Applies dwell, hysteresis, occlusion/multi-track policy, watchdog; decides SHOW/CLEAR. | The only component that may **assert** a warning; **absence** of a live assertion is fail-safe by construction (see actuator). §4, [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md). |
-| **Actuator abstraction** | Translate SHOW/CLEAR into the concrete sign protocol; read back sign status. | Swappable: own LED sign or existing VMS. **Defaults to the safe (blank) state on loss of a fresh assertion heartbeat from the state machine — a dead-man's switch, so a crashed/wedged SM cannot leave a warning stuck on.** See [ADR-0005](adr/ADR-0005-fail-safe-and-system-safety.md). |
+| **Actuator abstraction** | Translate SHOW/CLEAR into the concrete sign protocol; **refresh the SHOW assertion** to the sign controller; read back sign status. | Swappable: own LED sign or existing VMS. The **dead-man's switch lives in the _sign controller_, downstream of the local link** (not in this edge-box component): it blanks the sign on loss of the refreshed SHOW heartbeat, so a crashed SM, a **dead edge box**, or a **cut/jammed link** all fall blank. This abstraction keeps an *inner* dead-man's switch on the SM heartbeat. A latching third-party VMS cannot honour the refresh contract and falls back to watchdog + active CLEAR + status read-back. See [ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.md), [ADR-0005](adr/ADR-0005-fail-safe-and-system-safety.md). |
 | **Health monitor** | Self-test every subsystem; emit heartbeat; drive safe state on fault. | Independent of the perception/decision path; can **force the actuator to safe state directly**, without routing through the (possibly wedged) state machine. See [ADR-0005](adr/ADR-0005-fail-safe-and-system-safety.md). |
 | **Local store** | Hold config, the event-evidence buffer, and a durable outbox for telemetry. | Survives reboots; bounded retention (privacy). |
 | **Comms gateway** | Store-and-forward telemetry; receive config/OTA. | Loss-tolerant; never in the safety path. |
@@ -110,6 +110,13 @@ flowchart TB
 sign placed upstream (cable or radio link), and a non-critical uplink to the center. The editable
 Mermaid source follows.*
 
+> **Fail-safe is a property of the sign controller, not the edge box.** The sign is asserted by a
+> *continuously refreshed* SHOW heartbeat; the **sign controller blanks the sign whenever that
+> heartbeat stops** — so a dead edge box, a wedged OS, or a cut/jammed link all take the sign safe,
+> not just an SM crash. Placing the dead-man's switch upstream of the link (in the edge box) would
+> leave a latched sign stuck ON exactly when the box or link fails. See
+> [ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md).
+
 ```mermaid
 flowchart LR
     subgraph POLE["Roadside mast (≈6–8 m) over the emergency lane"]
@@ -120,7 +127,7 @@ flowchart LR
         PWR --- EDGE
     end
 
-    EDGE -- "local link<br/>(wired / short-range RF)" --> SIGNCTL["Sign controller"]
+    EDGE -- "refreshed SHOW<br/>heartbeat" --> SIGNCTL["Sign controller<br/>dead-man's switch:<br/>blank on heartbeat loss"]
     SIGNCTL --> LED["Upstream warning sign<br/>placed ≥ DSD upstream<br/>(gantry VMS or roadside LED)"]
     EDGE -- "4G·LTE / fibre" --> CLOUD[("TMC / cloud<br/>monitoring · audit · OTA")]
 
@@ -189,13 +196,17 @@ stateDiagram-v2
 
     WARN_ON --> WARN_ON : set still non-empty (assertion refreshed)
     WARN_ON --> WARN_HOLD : a track lost WITHOUT an observed exit (occlusion?)
-    WARN_HOLD --> WARN_ON : re-detected, OR radar still corroborates presence
+    WARN_HOLD --> WARN_ON : re-detected (live radar corroboration renews the hold)
+    WARN_HOLD --> CAMERA_OCCLUDED_DEGRADED : occluded > T_occlusion but radar STILL corroborates → stay ON + alert ops
+    CAMERA_OCCLUDED_DEGRADED --> WARN_ON : camera re-acquires
     WARN_HOLD --> CLEARING : confirmed exit, OR absent ≥ T_hold with NO corroboration (low-confidence clear → logged)
+    CAMERA_OCCLUDED_DEGRADED --> CLEARING : confirmed exit, OR all corroboration lost (→ T_hold → loud clear)
     WARN_ON --> CLEARING : confirmed exit of the last track (fast clear)
     CLEARING --> IDLE : CLEAR + sign status = off
 
     WARN_ON --> SAFE_STATE : T_watchdog, no confirm/corroboration → clear + FAULT
     WARN_HOLD --> SAFE_STATE : critical fault
+    CAMERA_OCCLUDED_DEGRADED --> SAFE_STATE : critical fault
     IDLE --> SAFE_STATE : critical fault
     TRACKING --> SAFE_STATE : critical fault
     CONFIRMED --> SAFE_STATE : critical fault
@@ -210,9 +221,11 @@ safety-relevant ones are the dwell, the two holds, and the watchdog.
 |--------|---------|---------|-----------|
 | `T_dwell` | 5 s (3–10) | Stationary time before a track is declared "stopped". | Too low → false alarms from slow/transient vehicles; too high → late warning. Size it against the **unwarned-exposure budget** ([doc 01 §4](01-requirements.md#4-warning-placement--the-math-the-proposal-omits)). |
 | `T_hold` | 10 s (5–15) | **Brief hysteresis**: hold through a short detection dropout **when no other channel corroborates**. | Absorbs flicker; too high → stale warning after a real departure not seen as an exit. |
-| `T_occlusion` | up to 60 s | Hold a lost track as **presumed-present** *while radar (or another channel) still corroborates a return* — sustained truck occlusion. | Keeps an occluded-but-present vehicle warning **without** stale-ON risk, because the hold extends only while some channel corroborates presence. |
-| `T_activate` | ≤ 2 s | Confirmed → sign actually asserted ON. | Bounded by NFR-01. |
+| `T_occlusion` | up to 60 s (**renewable**) | Hold a lost track as **presumed-present** *while radar (or another channel) still corroborates a return* — sustained truck occlusion. Bounds only **un-renewed** corroboration; a live return renews it. | Past `T_occlusion` with radar **still** corroborating → **CAMERA_OCCLUDED_DEGRADED** (stay ON + alert ops), never a silent clear ([ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)). |
+| `T_activate` | ≤ 2 s | Confirmed → sign actually asserted ON. | Bounded by NFR-01 (qualified for the VMS backend). |
 | `T_watchdog` | ≤ 30 s | Max time a warning may stay ON with **no** fresh confirmation or corroboration from any channel. | On expiry: **clear + raise a fault** (logic may be wedged). Prevents indefinite stale-ON (NFR-04). |
+| `T_assert_refresh` | 0.5 s | Period at which the edge refreshes the SHOW assertion to the **sign controller**. | Must sit well below `T_signhold` so normal jitter never blanks a live warning. |
+| `T_signhold` | 2 s | **Sign-controller dead-man's switch**: blank the sign if no fresh SHOW arrives within this window (covers SM crash, dead edge box, cut link). | Simultaneously the **max stale-ON after a hard failure** *and* the **min heartbeat gap that blanks a live, correct warning** ([ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)). |
 | speed gate | < 3 km/h | Threshold below which a track counts as "stationary". | Separates "stopped" from "creeping along the shoulder". |
 
 **ROI semantics.** A detection counts as in-ROI by **fractional footprint overlap** with the ROI
@@ -222,14 +235,26 @@ deterministically instead of flickering at the edge. The ROI carries a defined *
 boundary** used to recognise a *confirmed exit*
 ([ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md)).
 
+**Calibration is load-bearing — and can drift.** Computing a *ground footprint* (not just an image box)
+requires a per-site **ground-plane homography**, and attributing a radar return to a camera track
+requires **camera↔radar extrinsic calibration** — both underpin ROI gating *and* fusion. **Calibration
+drift** (pole sway in wind, vibration, thermal cycling — the very conditions NFR-13 rates for) silently
+shifts the ROI and degrades fusion, manufacturing either misses or false alarms with no obvious symptom.
+A per-site calibration procedure, a periodic re-check, and a **drift monitor** in the health monitor are
+therefore required, and the failure is tracked as a risk
+([doc 04 R15](04-risk-and-safety.md#1-risk-register)).
+
 **Why each guard exists (mapped to a real failure):**
 
 - *Dwell* → a vehicle that drifts through or briefly touches the shoulder does **not** trigger.
 - *Brief hysteresis (`T_hold`)* → momentary detector flicker does not blink the warning off/on.
 - *Occlusion hold (`T_occlusion`) + radar corroboration* → a through-lane truck that hides the stopped
   car for many seconds does **not** drop a live warning, because radar still sees the return; the hold
-  extends only while *some* channel corroborates presence. This closes the occlusion-induced
-  silent-miss gap that a single absence-timeout would open (ADR-0008).
+  **renews** while *some* channel corroborates presence. If occlusion outlasts `T_occlusion` while radar
+  still corroborates, the machine enters **CAMERA_OCCLUDED_DEGRADED** — the warning stays ON **and**
+  operators are alerted (likely a compound incident or a camera fault), never a silent clear. This
+  closes the occlusion-induced silent-miss gap that a single absence-timeout would open
+  ([ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md), [ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)).
 - *Confirmed exit vs. lost track* → a vehicle **seen leaving** (speed up + crossing the exit boundary)
   clears fast; a track **lost in place** is held, not cleared. Departure carries evidence; occlusion
   does not.
@@ -241,6 +266,32 @@ boundary** used to recognise a *confirmed exit*
 - *Safe state* → on any critical fault the machine leaves normal operation and escalates; the sign can
   be forced safe by the **independent health monitor** even if the state machine is wedged (dead-man's
   switch, [ADR-0005](adr/ADR-0005-fail-safe-and-system-safety.md)).
+
+**Sensing-degraded modes — *initiate* and *hold* are not symmetric.** Losing a sensor is not one flat
+"degraded" state; what the unit can still do depends on *which* sensor:
+
+| Mode | Confirm a **new** stop? | **Hold** an existing warning? | Posture |
+|------|-------------------------|-------------------------------|---------|
+| Camera + radar (FULL) | yes | yes (incl. occlusion hold) | normal |
+| Radar dead (CAMERA-ONLY) | yes | yes, but no occlusion hold | degraded + alert |
+| Camera dead (RADAR-ONLY) | **no** — no class / no image-ROI geometry | only briefly, for already-confirmed tracks | **BLIND-TO-NEW: critical alert** |
+| Both dead | no | no | SAFE STATE + alert |
+
+A camera-dead unit is **blind to new hazards** and must say so loudly — *not* a benign "radar keeps
+running" mode, because radar alone cannot place a new object in the shoulder ROI or class it. Rationale
+and the fault-injection set: [ADR-0009 §B](adr/ADR-0009-failsafe-placement-and-degraded-modes.md); the
+[doc 04 §2](04-risk-and-safety.md#2-fmea-lite-failure-mode--effect--detection--response) FMEA rows
+follow this table.
+
+**Congestion is a distinct false-trigger mode (not a transient pass-through).** In stop-and-go or a jam
+— a *named* high-risk condition — the through lane nearest the shoulder is itself stationary against the
+ROI boundary, so dwell (everything is stationary) and radar (everything is present) cannot discriminate;
+only ROI geometry separates a shoulder breakdown from queued through-traffic, and that is most fragile
+exactly here. The decision logic must therefore detect **general congestion** (multiple stationary
+tracks spanning the through lanes) and **suppress or re-message** the shoulder warning rather than
+assert "stopped vehicle ahead, change lane" into a jam where it is both wrong and counter-productive. It
+is an explicit acceptance scenario ([doc 01 §5](01-requirements.md#5-evaluation-metrics--acceptance-criteria))
+and a tracked risk ([doc 04 R14](04-risk-and-safety.md#1-risk-register)).
 
 ## 5. Runtime data flow (happy path)
 
@@ -313,6 +364,13 @@ and report to the same TMC.
 Concrete encodings (protobuf/JSON, MQTT/HTTPS for telemetry; the sign vendor's protocol or an
 NTCIP-style profile for VMS) are deferred to detailed design; the **abstraction boundaries above are
 the architectural commitment.**
+
+> **Time is load-bearing — give it an owner.** Camera↔radar fusion needs sub-frame *relative* sync, and
+> the audit log needs trustworthy *absolute* timestamps (liability evidence,
+> [doc 04 R10](04-risk-and-safety.md#1-risk-register)). A roadside unit in a tunnel has no NTP and a
+> free-running wall-clock drifts. Choose the time source explicitly in detailed design — e.g. **GNSS/PPS
+> for absolute time + a shared or PTP clock for inter-sensor sync**, holding over connectivity outages —
+> rather than inheriting whatever the OS clock does ([ADR-0001](adr/ADR-0001-sensing-modality.md) AI#3).
 
 ## 8. Recommended technology stack (indicative, not binding)
 

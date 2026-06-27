@@ -16,11 +16,12 @@ nhóm dự án chấp nhận.
 | [ADR-0006](ADR-0006-connectivity-and-power.vi.md) | Kết nối & nguồn điện — phương án pin mặt trời + ắc quy, đo từ xa kiểu lưu và chuyển | Đề xuất |
 | [ADR-0007](ADR-0007-validation-and-data-strategy.vi.md) | Chiến lược kiểm chứng & dữ liệu — những gì thử nghiệm trên bàn (bench)/mô phỏng chứng minh được so với những gì hoãn lại cho hiện trường; kế hoạch thu thập dữ liệu | Đề xuất |
 | [ADR-0008](ADR-0008-detection-persistence-and-multitrack.vi.md) | Tính bền vững của phát hiện — che khuất so với rời đi, giữ trạng thái có radar chứng thực, ngữ nghĩa tập hợp đa vết (track) | Đề xuất |
+| [ADR-0009](ADR-0009-failsafe-placement-and-degraded-modes.vi.md) | Bố trí cơ cấu chấp hành an toàn khi sự cố (cơ chế tự ngắt an toàn trong bộ điều khiển biển báo), các chế độ suy giảm bất đối xứng, giữ-khi-che-khuất có thể gia hạn | Đề xuất |
 
 **Ghi chú phạm vi (thay cho một ADR riêng):** **mô hình phạm vi giám sát** khi triển khai là **các
 vùng giám sát rời rạc tại những vị trí có giá trị cao**, không phải giám sát liên tục, và phạm vi được
 cấp kinh phí là **một vùng thử nghiệm / mô phỏng của nó**. Lý do và chi tiết nằm trong
-[tài liệu 02 §6](../02-system-architecture.vi.md#6-coverage-model) và
+[tài liệu 02 §6](../02-system-architecture.vi.md#6-mô-hình-phạm-vi-giám-sát) và
 [tài liệu 03](../03-roadmap-and-phasing.vi.md).
 
 ## Quy ước

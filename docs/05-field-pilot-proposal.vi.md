@@ -105,7 +105,7 @@ phẩm hóa từng lớp và bổ sung mức độ chặt chẽ mà một triể
 | Tính toán | bo mạch phát triển trên bàn | **thiết bị biên** hiện trường (IP65, có quản lý nhiệt, ngân sách nguồn pin mặt trời) |
 | Bảng cảnh báo | tấm LED tạm thay thế | **tích hợp VMS thực** hoặc **LED dùng pin mặt trời** theo QCVN-41 ở khoảng cách ≥ DSD về phía trước (theo hướng xe tới) |
 | Nguồn điện / kết nối | điện lưới phòng thí nghiệm | **pin mặt trời + ắc quy ≥ 72 h**, LTE lưu và chuyển về TMC |
-| An toàn | *thiết kế* an toàn khi sự cố (fail-safe) | **phân tích mối nguy + trạng thái an toàn đã kiểm chứng + giám sát/cảnh báo qua TMC** |
+| An toàn | *thiết kế* an toàn khi sự cố (cơ chế tự ngắt an toàn của bộ điều khiển biển báo + chế độ suy giảm trung thực, [ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)) | **phân tích mối nguy + trạng thái an toàn đã kiểm chứng + tiêm lỗi (giết-SM, giết-hộp, cắt-liên-kết) + giám sát/cảnh báo qua TMC** |
 | Đánh giá | kịch bản theo từng giai đoạn + lỗi tiêm vào | **giao thông thực** + lỗi tiêm vào + phân tích **trước/sau** |
 | Tuân thủ | chỉ nguyên lý | tuân thủ **QCVN 41**, quản trị **quyền riêng tư dữ liệu**, gia cố an ninh |
 
@@ -178,10 +178,10 @@ thử nghiệm:
 |-----|--------|
 | Tỉ lệ phát hiện (recall) — xe (ban ngày · ban đêm/bất lợi) | ≥ 98% · ≥ 95% |
 | Tỉ lệ phát hiện (recall) — người đi bộ (ban ngày · ban đêm) | ≥ 90% · nỗ lực tối đa |
-| Tỉ lệ kích hoạt sai | tạm thời ≤ 1 lần mỗi điểm mỗi tuần, **hiệu chỉnh theo đơn vị vận hành** theo ngưỡng tin cậy ([tài liệu 04 §5](04-risk-and-safety.vi.md#5-open-safety-questions-for-the-team)) |
+| Tỉ lệ kích hoạt sai | tạm thời ≤ 1 lần mỗi điểm mỗi tuần, **hiệu chỉnh theo đơn vị vận hành** theo ngưỡng tin cậy ([tài liệu 04 §5](04-risk-and-safety.vi.md#5-các-câu-hỏi-an-toàn-còn-mở-cho-nhóm)) |
 | Độ trễ phát hiện / xóa cảnh báo | ≤ dwell + 2 s · ≤ hold + 2 s (khi thoát ra đã xác nhận) |
 | Cự ly cảnh báo trước hiệu quả | ≥ DSD tại hiện trường (đã khảo sát) |
-| Độ sẵn sàng **chức năng** | ≥ 99% |
+| Độ sẵn sàng **chức năng** | ≥ 99% — **được hậu thuẫn bởi một ngân sách độ tin cậy MTBF/MTTR** (một lần sửa chữa từ xa kéo dài nhiều ngày có thể làm cạn kiệt mức 99% chỉ trong một sự cố; đặt MTBF tương ứng với MTTR khả thi trên hiện trường — [tài liệu 04 §5 Q6](04-risk-and-safety.vi.md#5-các-câu-hỏi-an-toàn-còn-mở-cho-nhóm)) |
 | Độ phủ phát hiện lỗi | ≥ 95% danh mục FMEA |
 | **Chỉ số an toàn trước/sau** | giảm đo được về xung đột / suýt va chạm liên quan đến sự cố làn dừng tại các điểm được lắp đặt thiết bị đo đạc (với dữ liệu của đơn vị vận hành) |
 

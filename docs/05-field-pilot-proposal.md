@@ -90,7 +90,7 @@ productises each layer and adds the rigour a public deployment demands.
 | Compute | dev board on a bench | field **edge unit** (IP65, thermal-managed, solar power budget) |
 | Sign | LED panel stand-in | **real VMS integration** or QCVN-41 **solar LED** at ≥ DSD upstream |
 | Power / connectivity | lab mains | **solar + battery ≥ 72 h**, LTE store-and-forward to the TMC |
-| Safety | fail-safe *design* | **hazard analysis + validated safe-state + TMC monitoring/alerting** |
+| Safety | fail-safe *design* (sign-controller dead-man's switch + honest degraded modes, [ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)) | **hazard analysis + validated safe-state + fault-injection (SM-kill, box-kill, link-cut) + TMC monitoring/alerting** |
 | Evaluation | staged scenarios + injected faults | **live traffic** + injected faults + **before/after** analysis |
 | Compliance | principle only | **QCVN 41** conformance, **data-privacy** governance, security hardening |
 
@@ -159,7 +159,7 @@ From [doc 01 §5](01-requirements.md) (field column), plus pilot-specific safety
 | False activation rate | provisional ≤ 1 per site per week, **operator-calibrated** to the trust threshold ([doc 04 §5](04-risk-and-safety.md#5-open-safety-questions-for-the-team)) |
 | Detection / clear latency | ≤ dwell + 2 s · ≤ hold + 2 s (on a confirmed exit) |
 | Effective warning lead distance | ≥ DSD on-site (surveyed) |
-| **Functional** availability | ≥ 99% |
+| **Functional** availability | ≥ 99% — **backed by an MTBF/MTTR reliability budget** (a multi-day remote repair can exhaust 99% in one event; set MTBF against the achievable field MTTR — [doc 04 §5 Q6](04-risk-and-safety.md#5-open-safety-questions-for-the-team)) |
 | Fault-detection coverage | ≥ 95% of the FMEA list |
 | **Before/after safety indicator** | measurable reduction in shoulder-incident conflicts / near-misses at instrumented sites (with operator data) |
 

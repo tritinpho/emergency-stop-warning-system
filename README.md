@@ -37,7 +37,7 @@ triangles) to **active, automatic warning** — the central thesis of the propos
 | 03 | [docs/03-roadmap-and-phasing.md](docs/03-roadmap-and-phasing.md) | Engineering roadmap mapped onto the proposal's 6 phases, MVP definition, **budget reality check** |
 | 04 | [docs/04-risk-and-safety.md](docs/04-risk-and-safety.md) | Risk register, FMEA-lite, fail-safe design, privacy & legal compliance |
 | 05 | [docs/05-field-pilot-proposal.md](docs/05-field-pilot-proposal.md) | Provincial (cấp sở) field-pilot proposal — draft (the follow-on docs 03–04 set up) |
-| — | [docs/adr/README.md](docs/adr/README.md) | Architecture Decision Records index (8 ADRs covering the load-bearing technical choices) |
+| — | [docs/adr/README.md](docs/adr/README.md) | Architecture Decision Records index (9 ADRs covering the load-bearing technical choices) |
 
 Figure 1 from the proposal (the concept infographic) is preserved at
 [docs/assets/figure-1-concept-infographic.jpeg](docs/assets/figure-1-concept-infographic.jpeg) and is
@@ -95,10 +95,13 @@ add the engineering rigor a build needs, and propose a few corrections. The most
 4. **Made the closed loop concrete** as a state machine with **dwell confirmation, hysteresis,
    radar-corroborated occlusion hold, multi-vehicle set semantics, a watchdog, and a
    dead-man's-switch safe state** — so a passing car doesn't false-trigger, a long truck occlusion
-   doesn't drop a live warning, and a crashed controller can't leave the sign stuck on. See
-   [doc 02 §4](docs/02-system-architecture.md#4-the-detectionwarning-state-machine),
-   [ADR-0008](docs/adr/ADR-0008-detection-persistence-and-multitrack.md), and
-   [ADR-0005](docs/adr/ADR-0005-fail-safe-and-system-safety.md).
+   doesn't drop a live warning, and a crashed controller can't leave the sign stuck on. The
+   **dead-man's switch lives in the sign controller** (so a dead edge box or a cut link also blanks the
+   sign), and **degraded modes are honest** (a camera-dead unit is *blind to new hazards*, not "still
+   running"). See [doc 02 §4](docs/02-system-architecture.md#4-the-detectionwarning-state-machine),
+   [ADR-0008](docs/adr/ADR-0008-detection-persistence-and-multitrack.md),
+   [ADR-0005](docs/adr/ADR-0005-fail-safe-and-system-safety.md), and
+   [ADR-0009](docs/adr/ADR-0009-failsafe-placement-and-degraded-modes.md).
 
 5. **Local-first processing.** The detect→warn loop is computed on an edge device at the roadside;
    the cloud is non-critical. A safety warning must not wait on a cellular round-trip.

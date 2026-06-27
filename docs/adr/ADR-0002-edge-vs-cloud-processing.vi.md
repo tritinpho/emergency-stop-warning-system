@@ -85,6 +85,6 @@ ngay bây giờ và để mở cánh cửa cho phương án lai (nó là một t
 
 ## Hạng mục hành động
 
-1. [ ] Cố định ranh giới biên/đám mây trong các hợp đồng giao diện ([tài liệu 02 §7](../02-system-architecture.vi.md#7-interfaces--contracts-initial)).
+1. [ ] Cố định ranh giới biên/đám mây trong các hợp đồng giao diện ([tài liệu 02 §7](../02-system-architecture.vi.md#7-giao-diện--hợp-đồng-ban-đầu)).
 2. [ ] Đặc tả ngữ nghĩa lưu-và-chuyển cho hộp thư gửi đi của dữ liệu đo từ xa (thứ tự, lưu giữ, phản áp).
 3. [ ] Xác nhận thiết bị biên đã chọn đáp ứng được ngân sách độ trễ nhận diện ngay trên thiết bị.

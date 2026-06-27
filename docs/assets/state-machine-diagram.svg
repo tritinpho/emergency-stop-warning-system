@@ -1,10 +1,10 @@
-<svg width="100%" viewBox="0 0 760 360" role="img" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+<svg width="100%" viewBox="0 0 760 392" role="img" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
 <title>Detection-to-warning state machine (set-based, with radar-held occlusion and fail-safe)</title>
 <desc>A state machine over the set of confirmed-stopped tracks in the ROI. Idle leads to tracking then confirmed then warn-on. From warn-on a confirmed exit clears the sign fast, while a track lost without an observed exit goes to warn-hold and is held as long as radar still corroborates its presence, then clears on a real exit or a no-corroboration timeout. A watchdog clears the warning and raises a fault when no channel can confirm. A safe state, which blanks the sign and alerts operators, is reachable from any state on a critical fault and can be forced by the independent health monitor; it returns to idle after a self-test passes. Blue states are normal monitoring, amber states mean the warning is shown, red is the fault safe state.</desc>
 <defs>
 <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
 </defs>
-<rect x="0" y="0" width="760" height="360" fill="#FBFBF9"/>
+<rect x="0" y="0" width="760" height="392" fill="#FBFBF9"/>
 
 <rect x="20" y="8" width="720" height="36" rx="6" fill="#F2F1EC" stroke="#D9D8D2" stroke-width="0.8"/>
 <text x="380" y="25" font-size="11" fill="#5F5E5A" text-anchor="middle">Operates over the SET of confirmed-stopped tracks in the ROI — the warning stays ON while that set is non-empty.</text>
@@ -27,7 +27,7 @@
 <text x="490" y="266" font-size="12" fill="#5F5E5A" text-anchor="middle">re-seen · radar holds</text>
 
 <line x1="298" y1="243" x2="162" y2="243" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-<text x="230" y="237" font-size="12" fill="#5F5E5A" text-anchor="middle">exit · or 10 s timeout</text>
+<text x="230" y="237" font-size="12" fill="#5F5E5A" text-anchor="middle">exit · or 10 s no-radar clear</text>
 
 <line x1="100" y1="220" x2="100" y2="126" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
 <text x="92" y="176" font-size="12" fill="#5F5E5A" text-anchor="end">clear + sign off</text>
@@ -83,4 +83,7 @@
 <rect x="340" y="332" width="13" height="13" rx="3" fill="#FCEBEB" stroke="#A32D2D" stroke-width="0.8"/>
 <text x="360" y="342" font-size="12" fill="#5F5E5A">fault / safe state</text>
 <text x="500" y="342" font-size="12" fill="#A32D2D">– – – fault, from any state</text>
+<line x1="20" y1="358" x2="740" y2="358" stroke="#E2E1DB" stroke-width="1"/>
+<text x="20" y="374" font-size="10.5" fill="#5F5E5A">Occluded &gt; T_occlusion but radar still confirms → warning stays ON + alerts ops (degraded) — never a silent clear.</text>
+<text x="20" y="387" font-size="10.5" fill="#5F5E5A">The dead-man's switch lives in the sign controller, so a dead edge box or a cut link also blanks the sign.</text>
 </svg>
