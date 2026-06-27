@@ -20,6 +20,7 @@ nhóm dự án chấp nhận.
 | [ADR-0010](ADR-0010-operator-override-and-manual-control.vi.md) | Chính sách ghi đè & điều khiển thủ công của người vận hành — có giới hạn, báo động lớn khi sự cố, tôn trọng nhịp tim (không bao giờ chốt, không bao giờ tồn tại âm thầm) | Đề xuất |
 | [ADR-0011](ADR-0011-operator-concept-and-alarm-management.vi.md) | Quy trình vận hành & quản lý cảnh báo của người trực — đường phản hồi có nhân sự, có giới hạn mà "báo động lớn" phụ thuộc vào (gộp trùng, mức ưu tiên, leo thang lại) | Đề xuất |
 | [ADR-0012](ADR-0012-security-and-threat-model.vi.md) | Tư thế an ninh & mô hình mối đe dọa hợp nhất — giới hạn phạm vi tuyên bố NFR-09 vào một bề mặt được liệt kê (liên kết biển báo, ghi đè, cấu hình/OTA, vô hiệu hóa cảm biến) | Đề xuất |
+| [ADR-0013](ADR-0013-degraded-hold-unification.vi.md) | Hợp nhất trạng thái giữ-khi-suy-giảm — một cảnh báo khi camera không xác thực được (che khuất *hoặc* lỗi) được giới hạn bởi T_degraded_max; đóng lỗ giữ-vô-hạn của RADAR-ONLY + liệt kê ma trận trạng thái cảnh báo × chế độ cảm biến | Đề xuất |
 
 **Ghi chú phạm vi (thay cho một ADR riêng):** **mô hình phạm vi giám sát** khi triển khai là **các
 vùng giám sát rời rạc tại những vị trí có giá trị cao**, không phải giám sát liên tục, và phạm vi được

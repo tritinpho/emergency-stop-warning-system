@@ -191,6 +191,9 @@ stateDiagram-v2
       (dwell runs normally — no special-casing).
       A PERSON warrant enters by presence in/beside the ROI (debounced),
       NOT the speed-gate+dwell path a moving occupant would fail (FR-08, ADR-0003).
+      CAMERA_OCCLUDED_DEGRADED means "camera cannot verify the track, radar
+      corroborates" — entered by sustained occlusion OR a camera fault; either way
+      bounded by T_degraded_max (ADR-0013). Only the occlusion cause can re-acquire.
     end note
 
     IDLE --> TRACKING : a track enters ROI
@@ -202,11 +205,14 @@ stateDiagram-v2
     WARN_ON --> WARN_HOLD : a track lost WITHOUT an observed exit (occlusion?)
     WARN_HOLD --> WARN_ON : re-detected (live radar corroboration renews the hold)
     WARN_HOLD --> CAMERA_OCCLUDED_DEGRADED : occluded > T_occlusion but radar STILL corroborates → stay ON + alert ops
-    CAMERA_OCCLUDED_DEGRADED --> WARN_ON : camera re-acquires
+    CONFIRMED --> CAMERA_OCCLUDED_DEGRADED : camera fault while radar corroborates (ADR-0013)
+    WARN_ON --> CAMERA_OCCLUDED_DEGRADED : camera fault while radar corroborates (ADR-0013)
+    CAMERA_OCCLUDED_DEGRADED --> WARN_ON : camera re-acquires (occlusion cause only — a dead camera cannot, ADR-0013)
     WARN_HOLD --> CLEARING : confirmed exit, OR absent ≥ T_hold with NO corroboration (low-confidence clear → logged)
     CAMERA_OCCLUDED_DEGRADED --> CLEARING : confirmed exit, OR all corroboration lost (→ T_hold → loud clear), OR T_degraded_max reached & camera never re-acquired (→ forced loud low-confidence clear + max-severity escalation, ADR-0011)
     WARN_ON --> CLEARING : confirmed exit of the last track (fast clear)
     CLEARING --> IDLE : CLEAR + sign status = off
+    CLEARING --> SAFE_STATE : sign status ≠ off after CLEAR (stuck-ON) → maintenance escalation (ADR-0013)
 
     WARN_ON --> SAFE_STATE : T_watchdog, no confirm/corroboration → clear + FAULT
     WARN_HOLD --> SAFE_STATE : critical fault
@@ -226,7 +232,7 @@ safety-relevant ones are the dwell, the two holds, and the watchdog.
 | `T_dwell` | 5 s (3–10) | Stationary time before a track is declared "stopped". | Too low → false alarms from slow/transient vehicles; too high → late warning. Size it against the **unwarned-exposure budget** ([doc 01 §4](01-requirements.md#4-warning-placement--the-math-the-proposal-omits)). |
 | `T_hold` | 10 s (5–15) | **Brief hysteresis**: hold through a short detection dropout **when no other channel corroborates**. | Absorbs flicker; too high → stale warning after a real departure not seen as an exit. |
 | `T_occlusion` | up to 60 s (**renewable**) | Hold a lost track as **presumed-present** *while radar (or another channel) still corroborates a return* — sustained truck occlusion. Bounds only **un-renewed** corroboration; a live return renews it. | Past `T_occlusion` with radar **still** corroborating → **CAMERA_OCCLUDED_DEGRADED** (stay ON + alert ops), never a silent clear ([ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)). |
-| `T_degraded_max` | e.g. 5 min (tunable) | **Hard bound on `CAMERA_OCCLUDED_DEGRADED`** — the max time the warning may stay ON with the **camera occluded and only radar corroborating** before the machine forces an explicit, loud disposition. | The watchdog **cannot** bound this state — radar corroboration deliberately suppresses it — so without `T_degraded_max` a radar return mistaken for the shoulder car (the occluding through-lane truck, under a weak [ADR-0001](adr/ADR-0001-sensing-modality.md) criterion (b)) holds the sign ON **indefinitely**. On expiry with no camera re-acquire: **forced loud low-confidence clear + max-severity escalation** to the operator, who owns the disposition from there ([ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.md), [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.md)). |
+| `T_degraded_max` | e.g. 5 min (tunable; optional shorter ceiling for the camera-**fault** cause) | **Hard bound on `CAMERA_OCCLUDED_DEGRADED`** — the max time the warning may stay ON with the **camera unable to verify the track (occluded _or_ faulted) and only radar corroborating** before the machine forces an explicit, loud disposition ([ADR-0013](adr/ADR-0013-degraded-hold-unification.md) generalises this to the camera-fault cause). | The watchdog **cannot** bound this state — radar corroboration deliberately suppresses it — so without `T_degraded_max` a radar return mistaken for the shoulder car (the occluding through-lane truck, under a weak [ADR-0001](adr/ADR-0001-sensing-modality.md) criterion (b)) holds the sign ON **indefinitely**. On expiry with no camera re-verify: **forced loud low-confidence clear + max-severity escalation** to the operator, who owns the disposition from there ([ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.md), [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.md)). |
 | `T_activate` | ≤ 2 s | Confirmed → sign actually asserted ON. | Bounded by NFR-01 (qualified for the VMS backend). |
 | `T_watchdog` | ≤ 30 s | Max time a warning may stay ON with **no** fresh confirmation or corroboration from any channel. | On expiry: **clear + raise a fault** (logic may be wedged). Prevents indefinite stale-ON (NFR-04). |
 | `T_assert_refresh` | 0.5 s | Period at which the edge refreshes the SHOW assertion to the **sign controller**. | Must sit well below `T_signhold` so normal jitter never blanks a live warning. |
@@ -247,8 +253,19 @@ requires **camera↔radar extrinsic calibration** — both underpin ROI gating *
 drift** (pole sway in wind, vibration, thermal cycling — the very conditions NFR-13 rates for) silently
 shifts the ROI and degrades fusion, manufacturing either misses or false alarms with no obvious symptom.
 A per-site calibration procedure, a periodic re-check, and a **drift monitor** in the health monitor are
-therefore required, and the failure is tracked as a risk
-([doc 04 R15](04-risk-and-safety.md#1-risk-register)).
+therefore required (a named **FR-10** self-monitoring function, [doc 01 §2](01-requirements.md#2-functional-requirements)),
+and the failure is tracked as a risk ([doc 04 R15](04-risk-and-safety.md#1-risk-register)).
+
+> **Drift-monitor spec (concrete enough to build and bound).** The monitor tracks a small set of
+> **fixed reference points** in the scene (lane markings, a sign post, mounting fiducials — surveyed at
+> calibration) and continuously compares their **observed image positions** against the positions the
+> stored homography predicts; a residual exceeding a per-site **tolerance** (e.g. a few pixels / a
+> fraction of a lane width, set at commissioning) for longer than a debounce raises a **calibration-drift**
+> alarm and marks the unit **degraded** until re-calibrated. **Tier:** the *detection logic* is
+> bench-demonstrable by injecting a synthetic homography shift (B); **real** drift from pole sway /
+> thermal cycling is **field-deferred** (it needs the field enclosure and mast), so at bench scope R15's
+> control is *logic-verified, not field-proven* — stated like the other designed-not-proven items
+> ([doc 01 §3a](01-requirements.md#3a-verification-scope--what-the-funded-benchsim-phase-can-actually-show)).
 
 **Why each guard exists (mapped to a real failure):**
 
@@ -294,7 +311,7 @@ therefore required, and the failure is tracked as a risk
 |------|-------------------------|-------------------------------|---------|
 | Camera + radar (FULL) | yes | yes (incl. occlusion hold) | normal |
 | Radar dead (CAMERA-ONLY) | yes | yes, but no occlusion hold | degraded + alert |
-| Camera dead (RADAR-ONLY) | **no** — no class / no image-ROI geometry | only briefly, for already-confirmed tracks | **BLIND-TO-NEW: critical alert** |
+| Camera dead (RADAR-ONLY) | **no** — no class / no image-ROI geometry | yes, but only as the **bounded camera-unverified hold** (= `CAMERA_OCCLUDED_DEGRADED` semantics): while radar corroborates, **bounded by `T_degraded_max`** → forced loud clear; **no** camera re-acquire ([ADR-0013](adr/ADR-0013-degraded-hold-unification.md)) | **BLIND-TO-NEW: critical alert** |
 | Both dead | no | no | SAFE STATE + alert |
 
 A camera-dead unit is **blind to new hazards** and must say so loudly — *not* a benign "radar keeps
@@ -302,6 +319,24 @@ running" mode, because radar alone cannot place a new object in the shoulder ROI
 and the fault-injection set: [ADR-0009 §B](adr/ADR-0009-failsafe-placement-and-degraded-modes.md); the
 [doc 04 §2](04-risk-and-safety.md#2-fmea-lite-failure-mode--effect--detection--response) FMEA rows
 follow this table.
+
+**Warning × sensor-mode interaction matrix (the two regions are orthogonal).** The warning lifecycle
+above and the sensing-health mode are **concurrent regions** — a unit can be in `WARN_ON` *and* lose its
+camera — so the behaviour lives in their *product*, enumerated here rather than left to inference
+([ADR-0013](adr/ADR-0013-degraded-hold-unification.md) §B). The key correction over the prior single-region
+view: **camera-fault-while-warning is the same bounded camera-unverified hold as occlusion** (`T_degraded_max`),
+not an unbounded "brief" hold.
+
+| Warning state ↓ / Sensing → | **FULL** | **CAMERA-ONLY** (radar dead) | **RADAR-ONLY** (camera dead) | **NEITHER** |
+|---|---|---|---|---|
+| **IDLE / TRACKING** | normal | initiate OK; no radar cross-check; degraded+alert | **BLIND-TO-NEW** — cannot initiate; critical alert | **SAFE STATE** + critical alert |
+| **CONFIRMED / WARN_ON** | normal | initiate OK; no occlusion hold | camera now dead → **bounded camera-unverified hold** (`T_degraded_max`); critical alert | **SAFE STATE** + critical alert |
+| **WARN_HOLD** | hold while corroborated → `CAMERA_OCCLUDED_DEGRADED` past `T_occlusion` | brief `T_hold` only → loud low-confidence clear | **bounded camera-unverified hold** (`T_degraded_max`); critical alert | **SAFE STATE** + critical alert |
+| **CAMERA_OCCLUDED_DEGRADED** | bounded by `T_degraded_max`; re-acquire→`WARN_ON` (occlusion cause) | same; no radar cross-check | bounded by `T_degraded_max`; **no** re-acquire (fault cause) | **SAFE STATE** + critical alert |
+| **CLEARING** | clear; confirm sign off (else→SAFE STATE, stuck-ON) | clear; confirm sign off | clear; confirm sign off | **SAFE STATE** + critical alert |
+
+No cell is unbounded or silent: **RADAR-ONLY** is BLIND-TO-NEW when idle and a `T_degraded_max`-bounded
+hold when a warning is already up; **NEITHER** is always SAFE STATE.
 
 **Congestion is a distinct false-trigger mode (not a transient pass-through).** In stop-and-go or a jam
 — a *named* high-risk condition — the through lane nearest the shoulder is itself stationary against the
@@ -399,7 +434,7 @@ and report to the same TMC.
 | Sign assertion (link) | Edge box → Sign controller | refreshed `SHOW(message_id)` every `T_assert_refresh` (authenticated); controller blanks on loss within `T_signhold`; **own reliability/latency/energy/auth budget** over the ≥ DSD link ([ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)) |
 | Heartbeat | Health monitor → TMC | `{site_id, fw_ver, cfg_ver, model_ver, calib_ver, subsystem_health[], state, ts}` at fixed cadence |
 | Activation/clear event | State machine → TMC/audit | `{site_id, type, evidence_ref?, cfg_ver, model_ver, calib_ver, ts}` (store-and-forward) |
-| Config | TMC → Roadside | `{roi_polygon, T_dwell, T_hold, speed_gate, message_set}` (signed) |
+| Config | TMC → Roadside | `{roi_polygon, T_dwell, T_hold, T_occlusion, T_person_debounce, speed_gate, message_set, T_override_max}` (signed) — site-tunable subset; the **full safety-parameter surface and its FR-20 bounds are §7a** |
 | OTA | TMC → Roadside | signed image + version + rollback token |
 
 > **Every safety-relevant event carries the active-config fingerprint.** A liability-grade audit
@@ -414,6 +449,41 @@ and report to the same TMC.
 > field link whose loss/latency/energy/auth budget governs both fail-safe timing and flap risk
 > ([ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)); validating it over distance is
 > **field-deferred**, since the bench runs it over a metre of cable.
+
+### 7a. Configuration & safety-parameter surface (the authoritative FR-20 bounds list)
+
+The §4 timer table calls its defaults *"starting points to be tuned empirically in Phase 3"* — so the
+safety-relevant parameters are **not** all compile-time constants, and the set that can be **pushed or
+tuned** is **larger than the Config schema above and larger than the list [FR-20](01-requirements.md#2-functional-requirements)
+first enumerated** (which named only ROI / dwell / hold / speed-gate / message-set). That gap is a safety
+hole: FR-20's whole thesis is that *"signing prevents tampering, not operator error"* — a bad
+`T_signhold` or `T_degraded_max` silently breaks the safety function and trips no canary. This table is
+the **single authoritative surface**: every safety-relevant parameter, whether **runtime-config** or a
+**bounded constant**, with the **hard range the unit clamps to under FR-20**. Nothing safety-relevant is
+tunable *outside* this table.
+
+| Parameter | Scope | Default | FR-20 hard bound (clamp/reject) | Notes |
+|-----------|-------|---------|----------------------------------|-------|
+| `roi_polygon` | runtime-config | per-site | within sensor FOV; ≥ min area; on-road | bad ROI = systematic miss/false-alarm |
+| `T_dwell` | runtime-config | 5 s | **3–10 s** | sized vs. unwarned-exposure budget ([doc 01 §4](01-requirements.md#4-warning-placement--the-math-the-proposal-omits)) |
+| `T_hold` | runtime-config | 10 s | **5–15 s** | brief hysteresis |
+| `T_occlusion` | runtime-config | 60 s | **≤ 120 s** | renewable while corroborated |
+| `T_person_debounce` | runtime-config | 1–2 s | **0.5–3 s** | pedestrian presence-onset |
+| `speed_gate` | runtime-config | 3 km/h | **1–5 km/h** | "stationary" threshold |
+| `T_override_max` | runtime-config (policy) | 30 min / 8 h ceiling | **≤ 8 h** | override expiry ceiling ([ADR-0010](adr/ADR-0010-operator-override-and-manual-control.md)) |
+| `message_set` | runtime-config | per QCVN-41 | members ∈ approved set only | conformance ([ADR-0004](adr/ADR-0004-warning-actuator-integration.md)) |
+| `T_degraded_max` | bounded constant (config under tight ceiling) | 5 min (shorter optional for fault cause) | **≤ 10 min** | the backstop on the camera-unverified hold ([ADR-0013](adr/ADR-0013-degraded-hold-unification.md)); must never be tunable to "effectively never" |
+| `T_watchdog` | bounded constant | ≤ 30 s | **≤ 30 s** | stale-ON backstop (NFR-04); ceiling is hard |
+| `T_signhold` | bounded constant | 2 s | **≤ 3 s** | dead-man's-switch window ([ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)); a large value defeats fail-safe |
+| `T_assert_refresh` | bounded constant | 0.5 s | **≤ ¼·`T_signhold`** | must stay well below `T_signhold` (flap control) |
+| `T_activate` | bounded constant | ≤ 2 s | **≤ 2 s** | NFR-01 (LED backend) |
+| drift tolerance | bounded constant (per-site at commissioning) | per-site | within surveyed envelope | drift-monitor threshold (§4, R15) |
+
+**Rule:** the safety-critical backstops (`T_watchdog`, `T_signhold`, `T_assert_refresh`, `T_degraded_max`,
+`T_activate`) are bounded so tightly that no pushed value can disable the invariant they protect; the
+unit **rejects or clamps** any value outside the column above and keeps the last-good, **loud to operators**
+(FR-20, [doc 04 R16](04-risk-and-safety.md#1-risk-register)). Ranges are the starting bounds to confirm in
+the Phase-2 freeze; the *point* is that the list is complete and every entry has a bound.
 
 Concrete encodings (protobuf/JSON, MQTT/HTTPS for telemetry; the sign vendor's protocol or an
 NTCIP-style profile for VMS) are deferred to detailed design; the **abstraction boundaries above are

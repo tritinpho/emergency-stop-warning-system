@@ -84,6 +84,6 @@
 <text x="360" y="342" font-size="12" fill="#5F5E5A">fault / safe state</text>
 <text x="500" y="342" font-size="12" fill="#A32D2D">– – – fault, from any state</text>
 <line x1="20" y1="358" x2="740" y2="358" stroke="#E2E1DB" stroke-width="1"/>
-<text x="20" y="374" font-size="10.5" fill="#5F5E5A">Occluded &gt; T_occlusion, radar confirms → stays ON + alerts ops; T_degraded_max → forced loud clear, never indefinite.</text>
+<text x="20" y="374" font-size="10.5" fill="#5F5E5A">Camera unverified (occlusion OR fault) + radar confirms → stays ON + alerts ops; T_degraded_max → forced loud clear, never indefinite.</text>
 <text x="20" y="387" font-size="10.5" fill="#5F5E5A">The dead-man's switch lives in the sign controller, so a dead edge box or a cut link also blanks the sign.</text>
 </svg>

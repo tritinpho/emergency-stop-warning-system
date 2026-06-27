@@ -18,6 +18,7 @@ accepts them.
 | [ADR-0010](ADR-0010-operator-override-and-manual-control.md) | Operator override & manual-control policy — bounded, fail-loud, heartbeat-honoring (never latch, never silently persist) | Proposed |
 | [ADR-0011](ADR-0011-operator-concept-and-alarm-management.md) | Operator concept of operations & alarm management — the staffed, bounded response path "fail loud" depends on (dedup, severities, re-escalation) | Proposed |
 | [ADR-0012](ADR-0012-security-and-threat-model.md) | Security posture & consolidated threat model — scopes the NFR-09 claim to an enumerated surface (sign link, override, config/OTA, sensor denial) | Proposed |
+| [ADR-0013](ADR-0013-degraded-hold-unification.md) | Degraded-hold unification — a camera-unverified warning (occlusion *or* fault) is bounded by `T_degraded_max`; closes the unbounded RADAR-ONLY hold + enumerates the warning × sensor-mode matrix | Proposed |
 
 **Scope note (in lieu of a separate ADR):** the deployment **coverage model is discrete monitored
 zones at high-value locations**, not continuous coverage, and the funded scope is **one pilot zone /

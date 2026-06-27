@@ -57,7 +57,7 @@ Priority uses MoSCoW: **M**ust / **S**hould / **C**ould / **W**on't-now.
 | FR-07 | Automatically clear the warning after the vehicle has left the ROI, applying a **hold/hysteresis** delay (default 10 s) so brief occlusion does not drop a live warning. | M |
 | FR-08 | Detect a **pedestrian** in or immediately beside the ROI (stranded occupant) and treat as a warrant for warning. **Triggered by *presence* (debounced), not the stationarity gate** — a stranded occupant typically *walks* (3–6 km/h) and would fail the `< 3 km/h` speed gate, so the vehicle stop-detection path would systematically miss them ([doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine), [ADR-0003](adr/ADR-0003-detection-algorithm.md)). *(Harder sensing profile than vehicles — small radar cross-section + camera weakest at night; §5 sets a separate, realistic pedestrian target rather than folding it into vehicle recall. Persistence guarantees are **vehicle-grade**: a pedestrian-only warrant gets no radar occlusion hold — [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md).)* | S |
 | FR-09 | Operate across day, night, rain, and fog (degraded but functional). | M |
-| FR-10 | Continuously self-monitor sensor, compute, link, and sign health; emit a heartbeat. | M |
+| FR-10 | Continuously self-monitor sensor, compute, link, and sign health — **including a calibration-drift monitor** (reference-point residual vs. the stored homography; out-of-tolerance → degraded + alert, R15) — and emit a heartbeat. | M |
 | FR-11 | Enter a defined **safe state** and alert operators on any critical fault (see ADR-0005). | M |
 | FR-12 | Send activation/clear/fault events with timestamps to the TMC and an audit log. | S |
 | FR-13 | Allow an operator to manually override (force-on, force-off, mute) a sign — **bounded, fail-loud, heartbeat-honoring; never latching or silently persistent** ([ADR-0010](adr/ADR-0010-operator-override-and-manual-control.md)). | S |
@@ -67,7 +67,7 @@ Priority uses MoSCoW: **M**ust / **S**hould / **C**ould / **W**on't-now.
 | FR-17 | Integrate with an existing operator-controlled VMS where one is present, instead of adding a sign. | S |
 | FR-18 | Detect generic obstacles (debris, animals) / wrong-way vehicles. | W (future) |
 | FR-19 | Notify emergency services / incident management automatically. | W (future) |
-| FR-20 | Enforce **safety-parameter bounds at the unit**: reject or clamp any pushed config (ROI, dwell, hold, speed gate, message set) that falls outside its declared safe range, and stage/validate a config change like an update. Signing prevents *tampering*, not operator *error* — a bad ROI or `T_dwell=900 s` silently breaks the safety function and won't trip a model canary. | M |
+| FR-20 | Enforce **safety-parameter bounds at the unit**: reject or clamp any pushed parameter that falls outside its declared safe range, keep the last-good, and alert — staging/validating a config change like an update. The bounded set is the **full safety-parameter surface** (ROI, dwell, hold, occlusion, person-debounce, speed gate, override ceiling, message set **and** the safety backstops `T_watchdog` / `T_signhold` / `T_assert_refresh` / `T_degraded_max` / `T_activate`), enumerated with its hard bounds in **[doc 02 §7a](02-system-architecture.md#7-interfaces--contracts-initial)** — not just the site-tunable subset. Signing prevents *tampering*, not operator *error* — a bad ROI, `T_dwell=900 s`, or a `T_signhold` large enough to defeat the dead-man's switch silently breaks the safety function and won't trip a model canary. | M |
 | FR-21 | Defer **OTA updates and non-critical restarts while a warning is active** (the track set is non-empty), or take the sign to a known blank state *loud to operators* for the update window — never silently drop a live warning for a software update (see boot-present handling, [doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine)). | S |
 
 ### Detection-to-warning behaviour (canonical loop)
@@ -92,7 +92,7 @@ The full state machine, with timers and edge cases, is specified in
 | NFR-01 | **Latency** | Stop-confirmed → warning ON ≤ 2 s after dwell elapses (so total stop→warn ≈ dwell + ≤2 s). **Backend-qualified:** met directly by the dedicated LED sign; for an existing operator **VMS** the operator's command/refresh and message-arbitration cycle may exceed 2 s, so NFR-01 carries the VMS adapter's own latency budget ([ADR-0004](adr/ADR-0004-warning-actuator-integration.md), [ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)). |
 | NFR-02 | **Latency** | Vehicle-gone → warning OFF within hold + ≤ 2 s. |
 | NFR-03 | **Availability** | **Functional** availability ≥ 99% per monitored site over the pilot period — the fraction of time the unit can actually *detect-and-warn to spec*, not merely "powered and reporting"; time spent in a degraded/safe state counts as **unavailable**. Excludes scheduled maintenance. Field-measured (see §3a); the **≥ 99% figure is provisional pending an MTBF/MTTR reliability budget** — a single multi-day remote repair can exhaust it ([doc 04 §5 Q6](04-risk-and-safety.md#5-open-safety-questions-for-the-team)). |
-| NFR-04 | **Reliability** | No fault — **software *or* sensor-discrimination** — may leave a **stale ON** warning indefinitely. A watchdog time-bounds any activation with no corroboration; because radar corroboration deliberately suppresses the watchdog, **`T_degraded_max`** separately bounds the `CAMERA_OCCLUDED_DEGRADED` hold that radar would otherwise sustain forever, forcing a loud disposition ([doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine), [ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)). No state holds the sign ON without **lane-attributed** confirmation. |
+| NFR-04 | **Reliability** | No fault — **software *or* sensor-discrimination** — may leave a **stale ON** warning indefinitely. A watchdog time-bounds any activation with no corroboration; because radar corroboration deliberately suppresses the watchdog, **`T_degraded_max`** separately bounds the `CAMERA_OCCLUDED_DEGRADED` hold — the warning held ON while the **camera cannot verify the track (occluded _or_ faulted)** and radar would otherwise sustain it forever — forcing a loud disposition ([doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine), [ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.md), [ADR-0013](adr/ADR-0013-degraded-hold-unification.md) makes the bound cause-agnostic). No state — and no sensor-degraded mode — holds the sign ON without **camera-verified, lane-attributed** confirmation. |
 | NFR-05 | **Robustness** | Maintain target detection in rain and at night via multi-sensor sensing ([ADR-0001](adr/ADR-0001-sensing-modality.md)) — **contingent on the radar stationary-detection validation gate**; field-validated, not claimable from a synthetic-radar bench (§3a, §5). |
 | NFR-06 | **Edge autonomy** | The detect→warn loop must function with the WAN/cloud fully offline ([ADR-0002](adr/ADR-0002-edge-vs-cloud-processing.md)). |
 | NFR-07 | **Power** | Run on mains, or solar+battery with ≥ 72 h autonomy without sun ([ADR-0006](adr/ADR-0006-connectivity-and-power.md)). |
@@ -127,6 +127,7 @@ methodology behind this split is [ADR-0007](adr/ADR-0007-validation-and-data-str
 | NFR-13 (IP65 environment) | **F** | No field-grade enclosure is built at bench scope. |
 | NFR-15 (operator response / alarm mgmt) | **D + F** | Alarm dedup/prioritization and the OVERRIDDEN/degraded surfacing are bench-demonstrable; the **operator response-time** and alarm-load bounds are an operational metric, field-deferred ([ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.md)). |
 | NFR-16 (time integrity) | **B + F** | Relative inter-sensor sync is bench-measurable; **absolute-time hold-over** across a real multi-hour outage (and a GNSS-denied tunnel site) is field-deferred. |
+| FR-10 calibration-drift monitor | **B (logic) + F (real drift)** | The bench can inject a synthetic homography shift to prove the monitor *detects and alarms*; **real** drift (pole sway, vibration, thermal cycling) needs the field mast/enclosure, so R15's control is logic-verified, not field-proven, at bench scope. |
 | All other FR/NFR | **B + S** | Logic, latency, fault handling, privacy, edge autonomy, override, config, and events are exercisable on the rig/sim. |
 
 Everything tagged **F** carries forward to field-pilot acceptance
@@ -260,6 +261,17 @@ the bench rig reports the N it actually achieved. Fix the exact N and bound per 
 methodology ([ADR-0007](adr/ADR-0007-validation-and-data-strategy.md) AI#1); a "≥ 95%" claimed off a
 handful of runs — **or off synthetic recall** — is not a measured result.
 
+> **Generating the evidence is itself a planned deliverable, not a by-product.** The recall N must come
+> from **real captures**, and the per-hour false-activation denominator from **continuous bench-hours** —
+> neither is produced by running the loop a few times. Public datasets are sparse in "stopped vehicle on a
+> Vietnamese expressway shoulder, day *and* night" positives, so hitting *(e.g.)* ≥ 200 real positive
+> events with a Wilson lower bound is a **staging-and-capture task that must be scoped, scheduled, and
+> resourced in Phase 1** — at the same altitude as the radar spike — or Phase 5 arrives with a working
+> loop and too few events to *report* recall to this bar (the 19/20 trap, sprung on ourselves). The
+> acceptance-evidence-generation plan is an explicit Phase-1 deliverable
+> ([doc 03 §3](03-roadmap-and-phasing.md#3-phase-plan-aligned-to-the-proposals-6-phases),
+> [ADR-0007](adr/ADR-0007-validation-and-data-strategy.md)).
+
 **Acceptance for the university task** = demonstrate, on the bench rig and/or simulation, the full
 closed loop (detect → confirm → warn → track → clear) meeting the prototype-column targets (at the
 sample sizes above) across a defined scenario set (day, night, rain, transient pass-through,
@@ -289,6 +301,16 @@ fault handling, and false-trigger resistance to modelled nuisances*; they do **n
 real-world recall in rain/glare/fog, the real false-alarm rate, or real radar clutter performance —
 those are field-deferred ([ADR-0007](adr/ADR-0007-validation-and-data-strategy.md)). Report every
 result with its tier (§3a) so no claim outruns its evidence.
+
+> **One honest headline for the report: this prototype proves _buildability and logic_, not _safety
+> efficacy_.** The three mechanisms that make this a *safety* system rather than an engineering demo —
+> the radar-corroborated occlusion/degraded hold, congestion suppression, and night/adverse robustness —
+> **all** rest on the field-deferred radar criterion (b) that the bench cannot reproduce
+> ([ADR-0001](adr/ADR-0001-sensing-modality.md)). So the funded phase establishes that the system can be
+> *built* and that its decision logic is *correct as specified*; whether it is *effective and sound on a
+> real road* is the cấp sở question. Stating this in aggregate — not only per-metric — pre-empts the
+> reviewer who notices the pattern, and is the scope-honesty the whole [ADR-0007](adr/ADR-0007-validation-and-data-strategy.md)
+> strategy is built on.
 
 ---
 

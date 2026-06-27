@@ -109,6 +109,10 @@ LED panel while preserving a clean path to real VMS in the field pilot.
        degraded-state indication — because the **congestion-suppression design assumes a _second_ legal
        message exists**; if QCVN 41 offers only one usable element, re-messaging is unavailable and the
        design falls back to **suppression-only, a stated coverage gap**
-       ([doc 04 §0](../04-risk-and-safety.md#0-limits-of-protection-residual-hazards)).
+       ([doc 04 §0](../04-risk-and-safety.md#0-limits-of-protection-residual-hazards)). **This is a
+       Phase-1 go/no-go gate** ([doc 03 §5](../03-roadmap-and-phasing.md#5-per-phase-risk-gates)), not a
+       late-design check: a missing element forces a long-lead regulated-exception process that gates the
+       system's only output, so confirm it (or start the exception) at project start, alongside the radar
+       spike.
 5. [ ] Specify the **VMS-adapter latency + arbitration budget** and document the qualified NFR-01 and
        the latching-VMS fail-safe fallback ([ADR-0009](ADR-0009-failsafe-placement-and-degraded-modes.md)).

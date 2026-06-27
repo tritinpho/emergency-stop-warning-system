@@ -95,12 +95,16 @@ refreshed-assertion or hardware-interlock mode on the VMS.
 |------|--------------|-------------------------|------------------------|---------|
 | **FULL** | camera + radar healthy | Yes | Yes (incl. radar occlusion hold) | Normal |
 | **CAMERA-ONLY** | radar dead | **Yes** (camera class + ROI + track-speed) | Yes, but **no radar occlusion hold** and no independent stationary cross-check | Degraded + alert; flag night/weather miss risk |
-| **RADAR-ONLY** | camera dead | **No** — no class, no image-ROI gate; radar azimuth may not resolve shoulder vs. through-lane | Only briefly, for tracks **already** confirmed, while radar corroborates | **BLIND-TO-NEW: critical alert** — *not* a benign run |
+| **RADAR-ONLY** | camera dead | **No** — no class, no image-ROI gate; radar azimuth may not resolve shoulder vs. through-lane | Held **only as the bounded camera-unverified hold** — `T_degraded_max` → forced loud clear, **no** re-acquire ([ADR-0013](ADR-0013-degraded-hold-unification.md)) | **BLIND-TO-NEW: critical alert** — *not* a benign run |
 | **NEITHER** | both down | No | No | **SAFE STATE** (blank) + critical alert |
 
 The load-bearing correction is **RADAR-ONLY**: it is **blind to new hazards** and must escalate as a
-**critical** degradation, while tracks already confirmed may persist for a **bounded** hold so an
-in-progress warning is not dropped the instant the camera fails. A unit that cannot confirm a new stop
+**critical** degradation, while tracks already confirmed may persist only as the **bounded
+camera-unverified hold** — the *same* `T_degraded_max` bound as sustained occlusion, so an in-progress
+warning is not dropped the instant the camera fails **but also cannot stick ON forever** on a radar
+return the dead camera can no longer verify. This "brief hold" was left unbounded in the first cut of
+this ADR; **[ADR-0013](ADR-0013-degraded-hold-unification.md)** closes it by making the `T_degraded_max`
+bound cause-agnostic (occlusion *or* camera fault) and enumerating the warning × sensor-mode matrix. A unit that cannot confirm a new stop
 **must never present itself as monitoring**. (CAMERA-ONLY remains a genuine degraded-run, since the
 camera alone can still initiate; it simply loses radar's weather robustness and occlusion hold.)
 
