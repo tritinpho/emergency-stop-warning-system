@@ -1,0 +1,62 @@
+<svg width="100%" viewBox="0 0 680 486" role="img" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+<title>Deployment / physical layout</title>
+<desc>Physical layout: a roadside mast and cabinet hold the camera and radar sensor head, the edge compute in an IP65 enclosure, and solar-plus-battery power. The edge unit watches the detection zone on the emergency lane, drives a warning sign placed upstream by at least the decision sight distance over a cable or radio link, and connects to the traffic management center over 4G/LTE or fibre.</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+</defs>
+<rect x="0" y="0" width="680" height="486" fill="#FBFBF9"/>
+
+<rect x="430" y="46" width="210" height="54" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="535" y="72" font-size="14" font-weight="500" fill="#085041" text-anchor="middle">Traffic management center</text>
+<text x="535" y="88" font-size="12" fill="#0F6E56" text-anchor="middle">monitoring · audit · OTA</text>
+
+<rect x="40" y="120" width="380" height="200" rx="8" fill="none" stroke="#378ADD" stroke-width="0.8" stroke-dasharray="5 4"/>
+<text x="52" y="140" font-size="14" font-weight="500" fill="#2C2C2A">Roadside mast &amp; cabinet (~6–8 m)</text>
+
+<rect x="64" y="156" width="150" height="46" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+<text x="139" y="178" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle">Camera + radar</text>
+<text x="139" y="194" font-size="12" fill="#185FA5" text-anchor="middle">sensor head (IP65)</text>
+
+<rect x="64" y="224" width="150" height="46" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+<text x="139" y="246" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle">Edge compute</text>
+<text x="139" y="262" font-size="12" fill="#185FA5" text-anchor="middle">IP65 enclosure</text>
+
+<rect x="246" y="190" width="158" height="48" rx="6" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="325" y="212" font-size="14" font-weight="500" fill="#2C2C2A" text-anchor="middle">Solar + battery</text>
+<text x="325" y="228" font-size="12" fill="#5F5E5A" text-anchor="middle">≥ 72 h backup</text>
+
+<rect x="64" y="360" width="156" height="50" rx="6" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.8"/>
+<text x="142" y="382" font-size="14" font-weight="500" fill="#633806" text-anchor="middle">Warning sign</text>
+<text x="142" y="398" font-size="12" fill="#854F0B" text-anchor="middle">VMS/LED + controller</text>
+
+<rect x="430" y="362" width="180" height="46" rx="6" fill="none" stroke="#B4B2A9" stroke-width="0.8" stroke-dasharray="4 4"/>
+<text x="520" y="378" font-size="12" fill="#5F5E5A" text-anchor="middle">Detection zone (ROI)</text>
+<rect x="444" y="386" width="152" height="20" rx="4" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.8"/>
+<text x="520" y="400" font-size="12" fill="#633806" text-anchor="middle">stopped vehicle</text>
+
+<line x1="139" y1="202" x2="139" y2="224" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="146" y="217" font-size="12" fill="#5F5E5A" text-anchor="start">feed</text>
+<line x1="246" y1="226" x2="216" y2="247" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="250" y="244" font-size="12" fill="#5F5E5A" text-anchor="start">power</text>
+
+<line x1="380" y1="120" x2="486" y2="100" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="392" y="114" font-size="12" fill="#5F5E5A" text-anchor="start">4G·LTE / fibre</text>
+
+<line x1="139" y1="270" x2="139" y2="360" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="146" y="336" font-size="12" fill="#5F5E5A" text-anchor="start">warning command · cable/RF</text>
+
+<line x1="406" y1="300" x2="488" y2="360" stroke="#888780" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+<text x="452" y="326" font-size="12" fill="#5F5E5A" text-anchor="middle">watches ROI</text>
+
+<line x1="220" y1="430" x2="430" y2="430" stroke="#5F5E5A" stroke-width="1" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+<text x="325" y="446" font-size="12" fill="#5F5E5A" text-anchor="middle">≥ decision sight distance (~315 m · not to scale)</text>
+
+<rect x="44" y="456" width="13" height="13" rx="3" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+<text x="63" y="466" font-size="12" fill="#5F5E5A">edge device</text>
+<rect x="180" y="456" width="13" height="13" rx="3" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.8"/>
+<text x="199" y="466" font-size="12" fill="#5F5E5A">driver-facing</text>
+<rect x="330" y="456" width="13" height="13" rx="3" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="349" y="466" font-size="12" fill="#5F5E5A">center</text>
+<rect x="450" y="456" width="13" height="13" rx="3" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
+<text x="469" y="466" font-size="12" fill="#5F5E5A">power / infra</text>
+</svg>

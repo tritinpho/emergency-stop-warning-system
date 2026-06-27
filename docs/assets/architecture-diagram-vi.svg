@@ -1,0 +1,79 @@
+<svg width="100%" viewBox="0 0 680 540" role="img" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+<title>Kiến trúc hệ thống cảnh báo tự động làn dừng xe khẩn cấp</title>
+<desc>Thiết bị tại hiện trường (cảm biến, nhận diện, máy trạng thái, bảng cảnh báo và bộ giám sát tình trạng độc lập) phát hiện xe đang dừng trong vùng phát hiện của làn dừng khẩn cấp và bật bảng cảnh báo đặt phía trước, cách tối thiểu bằng cự ly tầm nhìn quyết định. Trung tâm điều hành giao thông chỉ giám sát qua kết nối lưu-và-chuyển.</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+</defs>
+<rect x="0" y="0" width="680" height="540" fill="#FBFBF9"/>
+
+<rect x="40" y="46" width="600" height="130" rx="8" fill="none" stroke="#B4B2A9" stroke-width="0.8" stroke-dasharray="4 4"/>
+<text x="54" y="66" font-size="14" font-weight="500" fill="#2C2C2A">Bố trí trên đường — một đoạn giám sát</text>
+<line x1="214" y1="80" x2="426" y2="80" stroke="#888780" stroke-width="1" marker-end="url(#arrow)"/>
+<text x="320" y="76" font-size="12" fill="#5F5E5A" text-anchor="middle">hướng lưu thông</text>
+
+<rect x="70" y="92" width="130" height="46" rx="6" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.8"/>
+<text x="135" y="113" font-size="14" font-weight="500" fill="#633806" text-anchor="middle">Bảng cảnh báo</text>
+<text x="135" y="129" font-size="12" fill="#854F0B" text-anchor="middle">bảng VMS / LED</text>
+
+<text x="320" y="108" font-size="12" fill="#5F5E5A" text-anchor="middle">≥ cự ly tầm nhìn quyết định</text>
+<text x="320" y="123" font-size="12" fill="#5F5E5A" text-anchor="middle">~315 m ở 100 km/h</text>
+<line x1="200" y1="134" x2="440" y2="134" stroke="#5F5E5A" stroke-width="1" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+
+<rect x="440" y="86" width="170" height="64" rx="6" fill="none" stroke="#B4B2A9" stroke-width="0.8" stroke-dasharray="4 4"/>
+<text x="525" y="102" font-size="12" fill="#5F5E5A" text-anchor="middle">Vùng phát hiện (ROI)</text>
+<rect x="454" y="112" width="142" height="28" rx="4" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.8"/>
+<text x="525" y="130" font-size="12" fill="#633806" text-anchor="middle">Xe đang dừng</text>
+
+<rect x="40" y="192" width="600" height="188" rx="8" fill="none" stroke="#378ADD" stroke-width="0.8" stroke-dasharray="5 4"/>
+<text x="54" y="212" font-size="14" font-weight="500" fill="#2C2C2A">Thiết bị hiện trường — biên · trọng yếu an toàn</text>
+
+<rect x="58" y="236" width="118" height="54" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+<text x="117" y="258" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle">Cảm biến</text>
+<text x="117" y="275" font-size="12" fill="#185FA5" text-anchor="middle">camera + radar</text>
+
+<rect x="196" y="236" width="130" height="54" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+<text x="261" y="258" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle">Nhận diện</text>
+<text x="261" y="275" font-size="12" fill="#185FA5" text-anchor="middle">phát hiện ROI</text>
+
+<rect x="346" y="236" width="140" height="54" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+<text x="416" y="258" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle">Máy trạng thái</text>
+<text x="416" y="275" font-size="12" fill="#185FA5" text-anchor="middle">chờ · watchdog</text>
+
+<rect x="506" y="236" width="116" height="54" rx="6" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.8"/>
+<text x="564" y="258" font-size="14" font-weight="500" fill="#633806" text-anchor="middle">Bảng cảnh báo</text>
+<text x="564" y="275" font-size="12" fill="#854F0B" text-anchor="middle">bật / tắt</text>
+
+<line x1="176" y1="263" x2="196" y2="263" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="326" y1="263" x2="346" y2="263" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="486" y1="263" x2="506" y2="263" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="196" y="312" width="290" height="42" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+<text x="341" y="332" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle">Giám sát tình trạng</text>
+<text x="341" y="348" font-size="12" fill="#185FA5" text-anchor="middle">tự kiểm · trạng thái an toàn</text>
+<line x1="212" y1="312" x2="122" y2="290" stroke="#888780" stroke-width="0.6" stroke-dasharray="3 3"/>
+<line x1="341" y1="312" x2="416" y2="290" stroke="#888780" stroke-width="0.6" stroke-dasharray="3 3"/>
+<line x1="470" y1="312" x2="560" y2="290" stroke="#888780" stroke-width="0.6" stroke-dasharray="3 3"/>
+
+<text x="54" y="373" font-size="12" fill="#5F5E5A">vòng kín:  phát hiện → xác nhận → cảnh báo → theo dõi → hủy</text>
+
+<line x1="340" y1="380" x2="340" y2="404" stroke="#5F5E5A" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+<text x="352" y="396" font-size="12" fill="#5F5E5A">dữ liệu lên · cấu hình / OTA xuống</text>
+
+<rect x="40" y="404" width="600" height="92" rx="8" fill="none" stroke="#1D9E75" stroke-width="0.8" stroke-dasharray="5 4"/>
+<text x="54" y="424" font-size="14" font-weight="500" fill="#2C2C2A">Trung tâm điều hành giao thông — không trọng yếu</text>
+<text x="54" y="440" font-size="12" fill="#5F5E5A">chỉ giám sát · lưu &amp; chuyển · chịu mất mạng</text>
+
+<rect x="76" y="452" width="182" height="36" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="167" y="474" font-size="14" font-weight="500" fill="#085041" text-anchor="middle">Giám sát &amp; cảnh báo</text>
+<rect x="276" y="452" width="150" height="36" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="351" y="474" font-size="14" font-weight="500" fill="#085041" text-anchor="middle">Nhật ký sự kiện</text>
+<rect x="444" y="452" width="160" height="36" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="524" y="474" font-size="14" font-weight="500" fill="#085041" text-anchor="middle">Cấu hình &amp; OTA</text>
+
+<rect x="58" y="508" width="13" height="13" rx="3" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
+<text x="78" y="518" font-size="12" fill="#5F5E5A">biên · an toàn</text>
+<rect x="230" y="508" width="13" height="13" rx="3" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.8"/>
+<text x="250" y="518" font-size="12" fill="#5F5E5A">cảnh báo tài xế</text>
+<rect x="410" y="508" width="13" height="13" rx="3" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
+<text x="430" y="518" font-size="12" fill="#5F5E5A">trung tâm điều hành</text>
+</svg>
