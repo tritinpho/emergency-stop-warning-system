@@ -38,6 +38,8 @@ phản quang do tài xế đặt) sang **cảnh báo chủ động, tự động
 | 04 | [docs/04-risk-and-safety.vi.md](docs/04-risk-and-safety.vi.md) | Bảng đăng ký rủi ro, FMEA rút gọn, thiết kế an toàn khi sự cố (fail-safe), quyền riêng tư & tuân thủ pháp lý |
 | 05 | [docs/05-field-pilot-proposal.vi.md](docs/05-field-pilot-proposal.vi.md) | Đề xuất thử nghiệm hiện trường cấp sở — bản nháp (giai đoạn tiếp theo mà tài liệu 03–04 chuẩn bị) |
 | 06 | [docs/06-traceability-matrix.vi.md](docs/06-traceability-matrix.vi.md) | **Ma trận truy vết kiểm chứng** — mỗi yêu cầu một dòng kiểm toán được → ADR → tầng → kịch bản → tiêu chí đạt (cổng tiền-xây-dựng) |
+| 07 | [docs/07-simulation-methodology.vi.md](docs/07-simulation-methodology.vi.md) | **Phương pháp luận mô phỏng & kiểm chứng** (cố định Giai đoạn 2) — khung kiểm thử, mô hình cảm biến tổng hợp, bộ chuẩn đối chiếu (oracle), danh mục kịch bản có mã, tiêu chí đạt đăng ký trước |
+| 08 | [docs/08-interface-control-document.vi.md](docs/08-interface-control-document.vi.md) | **Tài liệu Kiểm soát Giao diện (ICD) v1** — danh mục giao diện cụ thể, lược đồ thông điệp, giao thức liên kết biển báo được xác thực, hợp đồng cấu hình/OTA/ghi đè |
 | — | [docs/adr/README.vi.md](docs/adr/README.vi.md) | Mục lục các Bản ghi quyết định kiến trúc (ADR) (13 ADR bao quát các lựa chọn kỹ thuật trọng yếu) |
 
 Hình 1 từ thuyết minh (infographic khái niệm) được lưu tại

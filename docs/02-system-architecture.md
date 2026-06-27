@@ -487,7 +487,10 @@ the Phase-2 freeze; the *point* is that the list is complete and every entry has
 
 Concrete encodings (protobuf/JSON, MQTT/HTTPS for telemetry; the sign vendor's protocol or an
 NTCIP-style profile for VMS) are deferred to detailed design; the **abstraction boundaries above are
-the architectural commitment.**
+the architectural commitment.** The contracts are concretised in **[doc 08 — Interface Control Document
+(ICD v1)](08-interface-control-document.md)**, which freezes the interface inventory, message schemas, the
+authenticated refreshed-`SHOW` sign-link protocol, and the config/OTA/override semantics (wire encodings
+firm up during Phase-4 integration).
 
 > **Time is load-bearing — give it an owner.** Camera↔radar fusion needs sub-frame *relative* sync, and
 > the audit log needs trustworthy *absolute* timestamps (liability evidence,
