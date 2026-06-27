@@ -1,6 +1,6 @@
 # ADR-0007: Validation & data strategy — what simulation proves, and where the data comes from
 
-**Status:** Proposed
+**Status:** Accepted (software side) — 2026-06-27
 **Date:** 2026-06-27
 **Deciders:** PI (ThS. Phó Trí Tín), technical lead, CV engineer
 

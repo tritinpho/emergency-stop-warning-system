@@ -1,6 +1,6 @@
 # ADR-0008: Detection persistence — occlusion, departure, and multi-track policy
 
-**Status:** Proposed
+**Status:** Accepted (software side) — 2026-06-27
 **Date:** 2026-06-27
 **Deciders:** PI (ThS. Phó Trí Tín), technical lead, CV engineer, road-safety advisor
 

@@ -1,6 +1,6 @@
 # ADR-0010: Operator override & manual-control policy
 
-**Status:** Proposed
+**Status:** Accepted (software side) — 2026-06-27 *(override mechanism; operator-authority scope pending ops — [ADR-0011](ADR-0011-operator-concept-and-alarm-management.md))*
 **Date:** 2026-06-27
 **Deciders:** PI (ThS. Phó Trí Tín), technical lead, road-safety advisor, expressway operator liaison
 

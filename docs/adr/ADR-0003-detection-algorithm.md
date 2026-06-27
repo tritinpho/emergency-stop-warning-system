@@ -1,6 +1,6 @@
 # ADR-0003: Detection approach — lightweight detector + ROI gating + dwell logic
 
-**Status:** Proposed
+**Status:** Accepted (software side) — 2026-06-27
 **Date:** 2026-06-26
 **Deciders:** PI, technical lead, CV engineer
 

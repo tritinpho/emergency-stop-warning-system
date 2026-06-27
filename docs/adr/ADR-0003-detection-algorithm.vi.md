@@ -2,7 +2,7 @@
 
 > 🇬🇧 Bản gốc tiếng Anh: [ADR-0003-detection-algorithm.md](ADR-0003-detection-algorithm.md)
 
-**Trạng thái:** Đề xuất
+**Trạng thái:** Đã chấp nhận (phía phần mềm) — 2026-06-27
 **Ngày:** 2026-06-26
 **Người quyết định:** Chủ nhiệm đề tài, trưởng nhóm kỹ thuật, kỹ sư thị giác máy tính (CV)
 

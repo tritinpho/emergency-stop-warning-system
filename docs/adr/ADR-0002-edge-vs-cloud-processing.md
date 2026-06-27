@@ -1,6 +1,6 @@
 # ADR-0002: Run the safety loop at the edge; cloud is monitoring-only
 
-**Status:** Proposed
+**Status:** Accepted (software side) — 2026-06-27
 **Date:** 2026-06-26
 **Deciders:** PI, technical lead
 

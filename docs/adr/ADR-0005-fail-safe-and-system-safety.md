@@ -1,6 +1,6 @@
 # ADR-0005: Fail-safe posture, safe state, and health escalation
 
-**Status:** Proposed
+**Status:** Accepted (software side) — 2026-06-27
 **Date:** 2026-06-26
 **Deciders:** PI, technical lead, road-safety advisor
 

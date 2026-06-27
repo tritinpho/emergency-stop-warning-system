@@ -2,7 +2,7 @@
 
 > 🇬🇧 Bản gốc tiếng Anh: [ADR-0007-validation-and-data-strategy.md](ADR-0007-validation-and-data-strategy.md)
 
-**Trạng thái:** Đề xuất
+**Trạng thái:** Đã chấp nhận (phía phần mềm) — 2026-06-27
 **Ngày:** 2026-06-27
 **Người quyết định:** Chủ nhiệm đề tài (PI) (ThS. Phó Trí Tín), trưởng nhóm kỹ thuật, kỹ sư thị giác máy tính (CV)
 

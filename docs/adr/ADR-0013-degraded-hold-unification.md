@@ -1,6 +1,6 @@
 # ADR-0013: Degraded-hold unification — a camera-unverified warning is bounded regardless of cause, and the warning × sensor-mode matrix
 
-**Status:** Proposed
+**Status:** Accepted (software side) — 2026-06-27
 **Date:** 2026-06-27
 **Deciders:** PI (ThS. Phó Trí Tín), technical lead, road-safety advisor, CV engineer
 

@@ -2,7 +2,7 @@
 
 > 🇬🇧 Bản gốc tiếng Anh: [ADR-0010-operator-override-and-manual-control.md](ADR-0010-operator-override-and-manual-control.md)
 
-**Trạng thái:** Đề xuất
+**Trạng thái:** Đã chấp nhận (phía phần mềm) — 2026-06-27 *(cơ chế ghi đè; phạm vi thẩm quyền người vận hành chờ bộ phận vận hành — [ADR-0011](ADR-0011-operator-concept-and-alarm-management.vi.md))*
 **Ngày:** 2026-06-27
 **Người quyết định:** Chủ nhiệm (ThS. Phó Trí Tín), trưởng nhóm kỹ thuật, cố vấn an toàn giao thông, đầu mối liên hệ đơn vị vận hành cao tốc
 

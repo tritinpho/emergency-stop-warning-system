@@ -2,7 +2,7 @@
 
 > 🇬🇧 Bản gốc tiếng Anh: [ADR-0005-fail-safe-and-system-safety.md](ADR-0005-fail-safe-and-system-safety.md)
 
-**Trạng thái:** Đề xuất
+**Trạng thái:** Đã chấp nhận (phía phần mềm) — 2026-06-27
 **Ngày:** 2026-06-26
 **Người quyết định:** Chủ nhiệm đề tài (PI), trưởng nhóm kỹ thuật, cố vấn an toàn giao thông đường bộ
 

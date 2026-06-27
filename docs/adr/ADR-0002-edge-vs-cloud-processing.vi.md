@@ -2,7 +2,7 @@
 
 > 🇬🇧 Bản gốc tiếng Anh: [ADR-0002-edge-vs-cloud-processing.md](ADR-0002-edge-vs-cloud-processing.md)
 
-**Trạng thái:** Đề xuất
+**Trạng thái:** Đã chấp nhận (phía phần mềm) — 2026-06-27
 **Ngày:** 2026-06-26
 **Người quyết định:** Chủ nhiệm đề tài, trưởng nhóm kỹ thuật
 
