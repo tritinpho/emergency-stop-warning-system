@@ -47,7 +47,8 @@ The state machine operates over the **set of confirmed-stopped tracks inside the
      `T_occlusion` (default 60 s) bounds only **un-renewed** corroboration: a live corroborating return
      **renews** the hold, and if occlusion persists past `T_occlusion` *while radar still corroborates*,
      the unit enters **CAMERA-OCCLUDED-DEGRADED** (warning stays ON **+ operator alert**) rather than
-     clearing — a long camera outage is never silently turned into a clear
+     clearing — a long camera outage is never silently turned into a clear — itself **bounded by
+     `T_degraded_max`** so the degraded hold cannot persist indefinitely on an unverifiable radar return
      ([ADR-0009](ADR-0009-failsafe-placement-and-degraded-modes.md) §C);
    - with **no corroboration from any sensor**, the track is retained only for the brief `T_hold`
      hysteresis (default 10 s) and then moved to clearing — but clearing a *possibly-still-present*
@@ -56,7 +57,9 @@ The state machine operates over the **set of confirmed-stopped tracks inside the
    confirmation or corroboration from *any* channel; on expiry the warning clears **and raises a
    fault** (the logic may be wedged — [ADR-0005](ADR-0005-fail-safe-and-system-safety.md)). Radar
    presence counts as corroboration, so a genuinely-present, camera-occluded vehicle does **not** trip
-   the watchdog.
+   the watchdog. That deliberate gap — a corroborated hold the watchdog will not bound — is closed
+   instead by **`T_degraded_max`** ([ADR-0009 §C](ADR-0009-failsafe-placement-and-degraded-modes.md)), so
+   the degraded hold is loud-disposed rather than left ON forever.
 
 **Scope: the persistence guarantees are vehicle-grade, not pedestrian-grade.** The occlusion hold and
 the radar-corroborated set semantics above all lean on the **radar presence channel**. A pedestrian has
@@ -64,7 +67,10 @@ a negligible radar cross-section ([doc 04 H-C](../04-risk-and-safety.md#1-risk-r
 **pedestrian-only warrant** (a person in/beside the ROI with no associated vehicle) gets **no radar
 corroboration and therefore no occlusion hold** — it runs effectively camera-only and falls back to the
 brief `T_hold` hysteresis. This is a real, narrower guarantee for FR-08 and must be **stated, not assumed
-equal to the vehicle case** ([doc 01 FR-08](../01-requirements.md#2-functional-requirements)).
+equal to the vehicle case** ([doc 01 FR-08](../01-requirements.md#2-functional-requirements)). Its
+**onset** is likewise distinct — *presence* in/beside the ROI (debounced), **not** the stationarity gate
+a moving occupant would fail ([ADR-0003](ADR-0003-detection-algorithm.md),
+[doc 02 §4](../02-system-architecture.md#4-the-detectionwarning-state-machine)).
 
 The concrete timers and the enriched state diagram live in
 [doc 02 §4](../02-system-architecture.md#4-the-detectionwarning-state-machine); this ADR fixes the

@@ -55,7 +55,7 @@ Priority uses MoSCoW: **M**ust / **S**hould / **C**ould / **W**on't-now.
 | FR-05 | On confirmation, automatically activate the upstream warning sign(s) showing "STOPPED VEHICLE AHEAD" (*PHÍA TRƯỚC CÓ XE DỪNG KHẨN CẤP*). | M |
 | FR-06 | Continue to track the stopped vehicle while the warning is active. | M |
 | FR-07 | Automatically clear the warning after the vehicle has left the ROI, applying a **hold/hysteresis** delay (default 10 s) so brief occlusion does not drop a live warning. | M |
-| FR-08 | Detect a **pedestrian** in or immediately beside the ROI (stranded occupant) and treat as a warrant for warning. *(Harder sensing profile than vehicles — small radar cross-section + camera weakest at night; §5 sets a separate, realistic pedestrian target rather than folding it into vehicle recall. Persistence guarantees are **vehicle-grade**: a pedestrian-only warrant gets no radar occlusion hold — [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md).)* | S |
+| FR-08 | Detect a **pedestrian** in or immediately beside the ROI (stranded occupant) and treat as a warrant for warning. **Triggered by *presence* (debounced), not the stationarity gate** — a stranded occupant typically *walks* (3–6 km/h) and would fail the `< 3 km/h` speed gate, so the vehicle stop-detection path would systematically miss them ([doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine), [ADR-0003](adr/ADR-0003-detection-algorithm.md)). *(Harder sensing profile than vehicles — small radar cross-section + camera weakest at night; §5 sets a separate, realistic pedestrian target rather than folding it into vehicle recall. Persistence guarantees are **vehicle-grade**: a pedestrian-only warrant gets no radar occlusion hold — [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md).)* | S |
 | FR-09 | Operate across day, night, rain, and fog (degraded but functional). | M |
 | FR-10 | Continuously self-monitor sensor, compute, link, and sign health; emit a heartbeat. | M |
 | FR-11 | Enter a defined **safe state** and alert operators on any critical fault (see ADR-0005). | M |
@@ -92,7 +92,7 @@ The full state machine, with timers and edge cases, is specified in
 | NFR-01 | **Latency** | Stop-confirmed → warning ON ≤ 2 s after dwell elapses (so total stop→warn ≈ dwell + ≤2 s). **Backend-qualified:** met directly by the dedicated LED sign; for an existing operator **VMS** the operator's command/refresh and message-arbitration cycle may exceed 2 s, so NFR-01 carries the VMS adapter's own latency budget ([ADR-0004](adr/ADR-0004-warning-actuator-integration.md), [ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)). |
 | NFR-02 | **Latency** | Vehicle-gone → warning OFF within hold + ≤ 2 s. |
 | NFR-03 | **Availability** | **Functional** availability ≥ 99% per monitored site over the pilot period — the fraction of time the unit can actually *detect-and-warn to spec*, not merely "powered and reporting"; time spent in a degraded/safe state counts as **unavailable**. Excludes scheduled maintenance. Field-measured (see §3a); the **≥ 99% figure is provisional pending an MTBF/MTTR reliability budget** — a single multi-day remote repair can exhaust it ([doc 04 §5 Q6](04-risk-and-safety.md#5-open-safety-questions-for-the-team)). |
-| NFR-04 | **Reliability** | No single software fault may leave a **stale ON** warning indefinitely — a watchdog must time-bound any activation and re-confirm. |
+| NFR-04 | **Reliability** | No fault — **software *or* sensor-discrimination** — may leave a **stale ON** warning indefinitely. A watchdog time-bounds any activation with no corroboration; because radar corroboration deliberately suppresses the watchdog, **`T_degraded_max`** separately bounds the `CAMERA_OCCLUDED_DEGRADED` hold that radar would otherwise sustain forever, forcing a loud disposition ([doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine), [ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)). No state holds the sign ON without **lane-attributed** confirmation. |
 | NFR-05 | **Robustness** | Maintain target detection in rain and at night via multi-sensor sensing ([ADR-0001](adr/ADR-0001-sensing-modality.md)) — **contingent on the radar stationary-detection validation gate**; field-validated, not claimable from a synthetic-radar bench (§3a, §5). |
 | NFR-06 | **Edge autonomy** | The detect→warn loop must function with the WAN/cloud fully offline ([ADR-0002](adr/ADR-0002-edge-vs-cloud-processing.md)). |
 | NFR-07 | **Power** | Run on mains, or solar+battery with ≥ 72 h autonomy without sun ([ADR-0006](adr/ADR-0006-connectivity-and-power.md)). |
@@ -103,6 +103,8 @@ The full state machine, with timers and edge cases, is specified in
 | NFR-12 | **Cost** | Per-site bill of materials targeted for a credible field-pilot unit (tracked in [doc 03](03-roadmap-and-phasing.md)); the university build stays inside the 20M VND envelope (prototype/sim). |
 | NFR-13 | **Environment** | Field units rated for outdoor temperature, humidity, dust, vibration (IP65+ enclosures). |
 | NFR-14 | **Extensibility** | Architecture must allow adding sensor types and new event classes (FR-18/19) without redesign. |
+| NFR-15 | **Operability / safety** | The fail-loud controls are only effective with a **staffed, bounded operator response path**. Alarms are **deduplicated and prioritized** to bound operator load; each safety-relevant escalation (BLIND-TO-NEW, CAMERA_OCCLUDED_DEGRADED, low-confidence clear, OVERRIDDEN-past-window, sign-stuck) carries a **severity and a target acknowledge/respond time** and **re-escalates if unacknowledged**. The operating concept and these bounds are specified in [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.md); the numbers are provisional pending field tuning. |
+| NFR-16 | **Time integrity** | **Relative** inter-sensor sync sufficient for camera↔radar fusion (sub-frame) **and** trustworthy **absolute** timestamps for the audit log (liability evidence, [doc 04 R10](04-risk-and-safety.md#1-risk-register)), both **holding over connectivity outages**. The time source is chosen explicitly (e.g. **GNSS/PPS + PTP**), never inherited from a free-running OS clock ([doc 02 §7](02-system-architecture.md#7-interfaces--contracts-initial), [ADR-0001](adr/ADR-0001-sensing-modality.md) AI#3). |
 
 ---
 
@@ -123,6 +125,8 @@ methodology behind this split is [ADR-0007](adr/ADR-0007-validation-and-data-str
 | NFR-07 (solar ≥ 72 h autonomy) | **F** | Design-only at bench scope (lab mains). |
 | NFR-11 / NFR-14 (standards, extensibility) | **D** | Conformance review and architectural argument, not a runtime test. |
 | NFR-13 (IP65 environment) | **F** | No field-grade enclosure is built at bench scope. |
+| NFR-15 (operator response / alarm mgmt) | **D + F** | Alarm dedup/prioritization and the OVERRIDDEN/degraded surfacing are bench-demonstrable; the **operator response-time** and alarm-load bounds are an operational metric, field-deferred ([ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.md)). |
+| NFR-16 (time integrity) | **B + F** | Relative inter-sensor sync is bench-measurable; **absolute-time hold-over** across a real multi-hour outage (and a GNSS-denied tunnel site) is field-deferred. |
 | All other FR/NFR | **B + S** | Logic, latency, fault handling, privacy, edge autonomy, override, config, and events are exercisable on the rig/sim. |
 
 Everything tagged **F** carries forward to field-pilot acceptance
@@ -247,22 +251,38 @@ because they are validated very differently.
 without a sample size and a confidence level: 19/20 events is 95%, but its lower 95% confidence bound is
 ~75%. Each **rate** metric therefore carries a **minimum event count and a confidence statement** —
 e.g. *recall ≥ 95% with a lower 95% (Wilson) bound ≥ 90% over ≥ 200 staged events*, and false-activation
-reported with its exposure denominator and a confidence interval. Simulation can generate the volume
-cheaply — a concrete reason to use it — while the bench rig reports the N it actually achieved. Fix the
-exact N and bound per metric in the simulation methodology
-([ADR-0007](adr/ADR-0007-validation-and-data-strategy.md) AI#1); a "≥ 95%" claimed off a handful of
-runs is not a measured result.
+reported with its exposure denominator and a confidence interval. **Be precise about what the N counts.**
+Simulation can cheaply generate volume for the *logic / timing / false-trigger-on-modelled-nuisance*
+metrics — but a Wilson bound on **recall** computed from synthetic events the loop itself consumes
+measures the **simulator's determinism, not real detection**, so **synthetic N does _not_ count toward
+the recall claim**. The recall N+Wilson bound is a statistic on **real captures** (bench, then field);
+the bench rig reports the N it actually achieved. Fix the exact N and bound per metric in the simulation
+methodology ([ADR-0007](adr/ADR-0007-validation-and-data-strategy.md) AI#1); a "≥ 95%" claimed off a
+handful of runs — **or off synthetic recall** — is not a measured result.
 
 **Acceptance for the university task** = demonstrate, on the bench rig and/or simulation, the full
 closed loop (detect → confirm → warn → track → clear) meeting the prototype-column targets (at the
 sample sizes above) across a defined scenario set (day, night, rain, transient pass-through,
 **through-lane congestion / stop-and-go stationary beside the ROI — must _not_ false-trigger**,
-**brief and sustained occlusion with and without radar corroboration**, **multiple simultaneous
-vehicles arriving and leaving**, pedestrian, **a vehicle already present at boot**, and **injected
-sensor/compute/sign faults — including killing the state-machine process, killing the edge box, and
-cutting the sign link to prove the sign-controller dead-man's switch blanks the sign in every case**
+**brief and sustained occlusion with and without radar corroboration**, **the `T_degraded_max` forced
+clear of a sustained camera-occlusion**, **multiple simultaneous vehicles arriving and leaving**,
+pedestrian **(including a *moving* stranded occupant who never satisfies the speed gate)**, **a vehicle
+already present at boot**, **operator override expiry and out-of-policy override rejection (FR-13,
+[ADR-0010](adr/ADR-0010-operator-override-and-manual-control.md))**, **out-of-bounds config rejection
+(FR-20) and OTA-deferral while a warning is active (FR-21)**, and **injected sensor/compute/sign faults —
+including killing the state-machine process, killing the edge box, and cutting the sign link to prove the
+sign-controller dead-man's switch blanks the sign in every case**
 ([ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.md))), plus the feasibility report and
 the field-pilot development proposal the grant calls for.
+
+> **Two of those scenarios are *designed*, not *field-sound*, at bench scope.** The congestion
+> no-false-trigger and the sustained-occlusion hold both rest on radar **resolving the shoulder from the
+> adjacent through lane** at the monitored range — criterion (b) of the
+> [ADR-0001](adr/ADR-0001-sensing-modality.md) gate, which a few-metre bench **cannot reproduce** (an
+> angular problem) and which is test-track/field-deferred. Report both as *logic-validated as specified*,
+> not *proven sound in the field* ([ADR-0007](adr/ADR-0007-validation-and-data-strategy.md)); a weak (b)
+> inverts each — congestion → false-trigger, occlusion → stale-ON
+> ([doc 04 R12/R14](04-risk-and-safety.md#1-risk-register)).
 
 **Provability boundary (state it in the report).** Bench/sim results substantiate *logic, timing,
 fault handling, and false-trigger resistance to modelled nuisances*; they do **not** substantiate

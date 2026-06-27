@@ -72,14 +72,18 @@ Option B is the balanced choice.
   private data egress.
 - **Harder:** solar/battery sizing, enclosure thermal design, and field maintenance; a hard power
   budget that sensor/compute choices must honour; store-and-forward sync logic (ordering, retention,
-  backpressure).
+  backpressure). The **gate-grade mmWave radar** ([ADR-0001](ADR-0001-sensing-modality.md)) draws more
+  than a generic presence unit — its power is a **first-class input to this budget**, reconciled like its
+  cost was ([doc 03 §1](../03-roadmap-and-phasing.md#1-scope--budget-reality-check-read-first)).
 - **Revisit when:** a corridor offers reliable mains + fibre (simplify to Option A locally), or
   richer real-time central analytics justify premium backhaul.
 
 ## Action Items
 
 1. [ ] Compute the site energy budget (sensors + compute + sign signalling) and size panel + battery
-       for ≥72 h autonomy.
+       for ≥72 h autonomy — **including the gate-grade mmWave radar's draw**, which exceeds the
+       generic-presence assumption in [ADR-0001](ADR-0001-sensing-modality.md); fold it in once the
+       module is selected.
 2. [ ] Select the cellular module/plan; design the store-and-forward outbox (retention, ordering).
 3. [ ] Evaluate LoRaWAN as a heartbeat side-channel for low-coverage sites.
 4. [ ] Specify the outdoor enclosure (IP65+, thermal) for sensors, compute, and battery.

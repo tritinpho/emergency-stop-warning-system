@@ -18,6 +18,8 @@ nhóm dự án chấp nhận.
 | [ADR-0008](ADR-0008-detection-persistence-and-multitrack.vi.md) | Tính bền vững của phát hiện — che khuất so với rời đi, giữ trạng thái có radar chứng thực, ngữ nghĩa tập hợp đa vết (track) | Đề xuất |
 | [ADR-0009](ADR-0009-failsafe-placement-and-degraded-modes.vi.md) | Bố trí cơ cấu chấp hành an toàn khi sự cố (cơ chế tự ngắt an toàn trong bộ điều khiển biển báo), các chế độ suy giảm bất đối xứng, giữ-khi-che-khuất có thể gia hạn | Đề xuất |
 | [ADR-0010](ADR-0010-operator-override-and-manual-control.vi.md) | Chính sách ghi đè & điều khiển thủ công của người vận hành — có giới hạn, báo động lớn khi sự cố, tôn trọng nhịp tim (không bao giờ chốt, không bao giờ tồn tại âm thầm) | Đề xuất |
+| [ADR-0011](ADR-0011-operator-concept-and-alarm-management.vi.md) | Quy trình vận hành & quản lý cảnh báo của người trực — đường phản hồi có nhân sự, có giới hạn mà "báo động lớn" phụ thuộc vào (gộp trùng, mức ưu tiên, leo thang lại) | Đề xuất |
+| [ADR-0012](ADR-0012-security-and-threat-model.vi.md) | Tư thế an ninh & mô hình mối đe dọa hợp nhất — giới hạn phạm vi tuyên bố NFR-09 vào một bề mặt được liệt kê (liên kết biển báo, ghi đè, cấu hình/OTA, vô hiệu hóa cảm biến) | Đề xuất |
 
 **Ghi chú phạm vi (thay cho một ADR riêng):** **mô hình phạm vi giám sát** khi triển khai là **các
 vùng giám sát rời rạc tại những vị trí có giá trị cao**, không phải giám sát liên tục, và phạm vi được

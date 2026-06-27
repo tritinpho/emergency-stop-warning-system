@@ -23,6 +23,18 @@ detections, **gated by the ROI polygon**, followed by a **lightweight tracker** 
 appearance + geometric gating + temporal confirmation + radar cross-check — is more robust than any
 single technique.
 
+**Two distinct onset triggers, by class.** A **vehicle** warrant uses *stationarity* — track speed below
+the gate (`< 3 km/h`) for `T_dwell`. A **person** warrant uses *presence* — a `person`-class detection in
+or immediately beside the ROI, debounced (`T_person_debounce`), **not** the stationarity gate: a stranded
+occupant typically *walks* (3–6 km/h) and would never satisfy `< 3 km/h`, so reusing the vehicle path
+would systematically miss exactly the pedestrian hazard
+([doc 04 H-C](../04-risk-and-safety.md#1-risk-register)) the person class exists to cover. Persistence for
+a pedestrian-only warrant is correspondingly narrower (no radar occlusion hold —
+[ADR-0008](ADR-0008-detection-persistence-and-multitrack.md)). A stopped **motorcycle** sits between the
+two: a vehicle class (stationarity onset), but its small radar cross-section makes its occlusion-hold
+corroboration weaker than a car's — treat its persistence as vehicle-grade only while radar actually
+returns it, else camera-only.
+
 ## Options Considered
 
 ### Option A: Classical background subtraction / frame differencing only
@@ -85,3 +97,4 @@ safety system — than a single opaque model (Option C), and far more robust tha
 2. [ ] Define the ROI polygon configuration format and a per-site calibration procedure.
 3. [ ] Specify the stationarity decision: detector track speed + radar speed + dwell, with thresholds.
 4. [ ] Assemble an evaluation clip set covering the doc-01 §5 scenarios (incl. night/rain/occlusion).
+5. [ ] Specify the **person-warrant onset** as *presence* in/beside the ROI with a debounce (`T_person_debounce`) and a defined "beside-ROI" margin — distinct from the vehicle stationarity gate; include a **moving stranded occupant** in the evaluation set.

@@ -104,16 +104,36 @@ in-progress warning is not dropped the instant the camera fails. A unit that can
 **must never present itself as monitoring**. (CAMERA-ONLY remains a genuine degraded-run, since the
 camera alone can still initiate; it simply loses radar's weather robustness and occlusion hold.)
 
-### C. Sustained occlusion with live corroboration never clears silently
+### C. Sustained occlusion with live corroboration never clears silently — and is time-bounded
 
 Refine ADR-0008's hold: **`T_occlusion` bounds *un-renewed* corroboration.** While radar keeps
 returning a corroborating detection, the hold **renews** and the warning persists. If camera occlusion
 persists **beyond `T_occlusion` while radar still corroborates**, the unit enters a
 **CAMERA-OCCLUDED-DEGRADED** state: the warning **stays ON** (the hazard is still corroborated) **and**
 the operator is alerted to investigate — sustained occlusion is often a *compound* incident (a second
-stopped vehicle) or a camera fault. The only paths that clear a warning remain: a **confirmed exit**
-(fast), **loss of all corroboration with no exit** (→ `T_hold` → loud low-confidence clear), or a
-**wedged-logic watchdog expiry** (→ clear + fault). **None is silent.**
+stopped vehicle) or a camera fault.
+
+**This state must itself be time-bounded — it is the one place the watchdog cannot reach.** The watchdog
+([ADR-0008](ADR-0008-detection-persistence-and-multitrack.md) §4) is *deliberately* suppressed while any
+channel corroborates, so in CAMERA-OCCLUDED-DEGRADED — camera occluded, only radar holding the warning ON
+— nothing autonomous bounds the hold. Two failure shapes make that dangerous: a **permanently occluded
+but genuinely-present** vehicle (correct to keep warning, but a hours-long hold should be *owned by the
+operator*, not sustained silently by the machine), and — worse — a **weak criterion (b)**
+([ADR-0001](ADR-0001-sensing-modality.md)) where the "corroborating" return is the **occluding
+through-lane truck**, not a departed shoulder car, making the warning a **stale-ON keyed to
+through-traffic** that would never clear. A confirmed exit cannot rescue either case: a *camera-occluded*
+unit cannot observe a footprint cross the exit boundary.
+
+Therefore **`T_degraded_max` (default ~5 min, tunable) bounds time in CAMERA-OCCLUDED-DEGRADED.** On
+expiry with no camera re-acquire, the unit forces an explicit, **loud** disposition — a **low-confidence
+clear + max-severity operator escalation** ([ADR-0011](ADR-0011-operator-concept-and-alarm-management.md))
+— handing the decision to a human with CCTV/patrol rather than trusting an unverifiable radar return
+forever. It is the same trade ADR-0008 makes when evidence runs out (fail loud, hand off), applied to the
+one state the watchdog can't see. The paths that clear a warning are now **four**: a **confirmed exit**
+(fast), **loss of all corroboration with no exit** (→ `T_hold` → loud low-confidence clear), a
+**wedged-logic watchdog expiry** (→ clear + fault), and **`T_degraded_max` expiry** (→ forced loud clear
++ escalation). **None is silent, and none is unbounded** (NFR-04, broadened to sensor-discrimination
+stale-ON).
 
 ## Options Considered
 
@@ -158,9 +178,10 @@ and the sign; moving it into the sign controller satisfies it for the whole chai
 endpoint, which the bench LED stand-in and a field LED sign both have anyway. B's degraded-mode
 asymmetry is not a refinement but a correctness fix: calling radar-only a "degraded run" would let a
 camera-blind unit keep *advertising* coverage it no longer has — the silent-miss failure wearing a
-"degraded but OK" label. C's renewable-hold rule closes the last silent-clear path in ADR-0008. All
-three buy out silent-miss modes for modest, testable engineering, consistent with guiding principle 1
-(fail safe, fail loud).
+"degraded but OK" label. C's renewable-hold rule closes the last silent-clear path in ADR-0008, and its **`T_degraded_max` bound
+closes the last *indefinite-hold* path** — the one state the watchdog deliberately cannot reach. All
+three buy out silent-miss (and indefinite stale-ON) modes for modest, testable engineering, consistent
+with guiding principle 1 (fail safe, fail loud).
 
 ## Consequences
 
@@ -189,8 +210,10 @@ three buy out silent-miss modes for modest, testable engineering, consistent wit
        and reconcile the [doc 04 §2](../04-risk-and-safety.md#2-fmea-lite-failure-mode--effect--detection--response)
        FMEA rows.
 4. [ ] Implement **CAMERA-OCCLUDED-DEGRADED** (warning persists + operator alert) at `T_occlusion`
-       expiry under live corroboration; add **sustained-occlusion-with-radar** to the acceptance suite
-       (ties [ADR-0008](ADR-0008-detection-persistence-and-multitrack.md) AI#5).
+       expiry under live corroboration, **bounded by `T_degraded_max`** → forced loud low-confidence
+       clear + max-severity escalation ([ADR-0011](ADR-0011-operator-concept-and-alarm-management.md));
+       add **sustained-occlusion-with-radar** *and the `T_degraded_max` forced clear* to the acceptance
+       suite (ties [ADR-0008](ADR-0008-detection-persistence-and-multitrack.md) AI#5).
 5. [ ] Document the **latching-VMS backend caveat** and its residual stale-ON window in the
        [ADR-0004](ADR-0004-warning-actuator-integration.md) VMS adapter spec.
 6. [ ] Characterise the **edge↔sign link** (cable / RF) loss + latency budget at the ≥ DSD deployment

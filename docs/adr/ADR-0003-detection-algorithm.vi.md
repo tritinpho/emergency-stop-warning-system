@@ -26,6 +26,17 @@ xe/người, **được giới hạn bởi đa giác ROI**, theo sau là một *
 được + giới hạn hình học + xác nhận theo thời gian + kiểm tra chéo bằng radar — vững chắc hơn bất kỳ kỹ
 thuật đơn lẻ nào.
 
+**Hai kích hoạt khởi phát khác biệt, theo lớp.** Một cảnh báo cho **xe** dùng *tính đứng yên* — tốc độ
+vết dưới cổng (`< 3 km/h`) trong `T_dwell`. Một cảnh báo cho **người** dùng *hiện diện* — một phát hiện
+lớp `person` trong hoặc ngay cạnh ROI, có khử dội (`T_person_debounce`), **không** theo cổng tĩnh tại: một
+người mắc kẹt thường *đi bộ* (3–6 km/h) và sẽ không bao giờ thỏa `< 3 km/h`, nên tái dùng đường của xe sẽ
+bỏ sót một cách hệ thống đúng cái hiểm họa người đi bộ ([tài liệu 04 H-C](../04-risk-and-safety.vi.md#1-bảng-đăng-ký-rủi-ro))
+mà lớp `person` tồn tại để bao phủ. Tính bền vững cho một cảnh báo chỉ-do-người-đi-bộ tương ứng hẹp hơn
+(không có giữ-khi-che-khuất bằng radar — [ADR-0008](ADR-0008-detection-persistence-and-multitrack.vi.md)).
+Một chiếc **mô tô** đang dừng nằm giữa hai loại: là một lớp xe (khởi phát theo tính đứng yên), nhưng tiết
+diện phản xạ radar nhỏ khiến đối chứng giữ-khi-che-khuất của nó yếu hơn của một ô tô — coi tính bền vững
+của nó là cấp-độ-xe chỉ khi radar thực sự còn trả tín hiệu, ngược lại là chỉ-camera.
+
 ## Các phương án đã xét
 
 ### Phương án A: Chỉ trừ nền cổ điển / sai phân khung
@@ -94,3 +105,4 @@ so với sai phân điểm ảnh (Phương án A). Nó phù hợp với giới h
 2. [ ] Xác định định dạng cấu hình đa giác ROI và một quy trình hiệu chuẩn theo từng vị trí.
 3. [ ] Đặc tả quyết định tính đứng yên: tốc độ vết của bộ phát hiện + tốc độ radar + thời gian chờ, cùng các ngưỡng.
 4. [ ] Lắp ráp một tập clip đánh giá bao phủ các kịch bản ở tài liệu 01 §5 (gồm cả ban đêm/mưa/che khuất).
+5. [ ] Đặc tả **khởi phát cảnh báo cho người** là *hiện diện* trong/cạnh ROI với một khoảng khử dội (`T_person_debounce`) và một biên "cạnh-ROI" được định nghĩa — khác biệt với cổng tĩnh tại của xe; đưa một **người mắc kẹt đang di chuyển** vào tập đánh giá.

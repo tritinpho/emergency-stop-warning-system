@@ -189,6 +189,8 @@ stateDiagram-v2
       WARN is ON while the set is non-empty.
       A vehicle already present at boot is treated as a new track
       (dwell runs normally — no special-casing).
+      A PERSON warrant enters by presence in/beside the ROI (debounced),
+      NOT the speed-gate+dwell path a moving occupant would fail (FR-08, ADR-0003).
     end note
 
     IDLE --> TRACKING : a track enters ROI
@@ -202,7 +204,7 @@ stateDiagram-v2
     WARN_HOLD --> CAMERA_OCCLUDED_DEGRADED : occluded > T_occlusion but radar STILL corroborates → stay ON + alert ops
     CAMERA_OCCLUDED_DEGRADED --> WARN_ON : camera re-acquires
     WARN_HOLD --> CLEARING : confirmed exit, OR absent ≥ T_hold with NO corroboration (low-confidence clear → logged)
-    CAMERA_OCCLUDED_DEGRADED --> CLEARING : confirmed exit, OR all corroboration lost (→ T_hold → loud clear)
+    CAMERA_OCCLUDED_DEGRADED --> CLEARING : confirmed exit, OR all corroboration lost (→ T_hold → loud clear), OR T_degraded_max reached & camera never re-acquired (→ forced loud low-confidence clear + max-severity escalation, ADR-0011)
     WARN_ON --> CLEARING : confirmed exit of the last track (fast clear)
     CLEARING --> IDLE : CLEAR + sign status = off
 
@@ -224,11 +226,13 @@ safety-relevant ones are the dwell, the two holds, and the watchdog.
 | `T_dwell` | 5 s (3–10) | Stationary time before a track is declared "stopped". | Too low → false alarms from slow/transient vehicles; too high → late warning. Size it against the **unwarned-exposure budget** ([doc 01 §4](01-requirements.md#4-warning-placement--the-math-the-proposal-omits)). |
 | `T_hold` | 10 s (5–15) | **Brief hysteresis**: hold through a short detection dropout **when no other channel corroborates**. | Absorbs flicker; too high → stale warning after a real departure not seen as an exit. |
 | `T_occlusion` | up to 60 s (**renewable**) | Hold a lost track as **presumed-present** *while radar (or another channel) still corroborates a return* — sustained truck occlusion. Bounds only **un-renewed** corroboration; a live return renews it. | Past `T_occlusion` with radar **still** corroborating → **CAMERA_OCCLUDED_DEGRADED** (stay ON + alert ops), never a silent clear ([ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)). |
+| `T_degraded_max` | e.g. 5 min (tunable) | **Hard bound on `CAMERA_OCCLUDED_DEGRADED`** — the max time the warning may stay ON with the **camera occluded and only radar corroborating** before the machine forces an explicit, loud disposition. | The watchdog **cannot** bound this state — radar corroboration deliberately suppresses it — so without `T_degraded_max` a radar return mistaken for the shoulder car (the occluding through-lane truck, under a weak [ADR-0001](adr/ADR-0001-sensing-modality.md) criterion (b)) holds the sign ON **indefinitely**. On expiry with no camera re-acquire: **forced loud low-confidence clear + max-severity escalation** to the operator, who owns the disposition from there ([ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.md), [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.md)). |
 | `T_activate` | ≤ 2 s | Confirmed → sign actually asserted ON. | Bounded by NFR-01 (qualified for the VMS backend). |
 | `T_watchdog` | ≤ 30 s | Max time a warning may stay ON with **no** fresh confirmation or corroboration from any channel. | On expiry: **clear + raise a fault** (logic may be wedged). Prevents indefinite stale-ON (NFR-04). |
 | `T_assert_refresh` | 0.5 s | Period at which the edge refreshes the SHOW assertion to the **sign controller**. | Must sit well below `T_signhold` so normal jitter never blanks a live warning. |
 | `T_signhold` | 2 s | **Sign-controller dead-man's switch**: blank the sign if no fresh SHOW arrives within this window (covers SM crash, dead edge box, cut link). | Simultaneously the **max stale-ON after a hard failure** *and* the **min heartbeat gap that blanks a live, correct warning** ([ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)). |
 | speed gate | < 3 km/h | Threshold below which a track counts as "stationary". | Separates "stopped" from "creeping along the shoulder". |
+| `T_person_debounce` | ~1–2 s in/beside ROI | **Onset trigger for a pedestrian warrant** (FR-08): a *person* class detected in or immediately beside the ROI, debounced — **not** the speed-gate+dwell path, which a stranded occupant *walking* around their vehicle (3–6 km/h) would fail. | Too low → a person crossing/passing transiently false-triggers; too high → late warning for someone at risk. Persistence is still narrower than a vehicle's (no radar occlusion hold — [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md)). |
 
 **ROI semantics.** A detection counts as in-ROI by **fractional footprint overlap** with the ROI
 polygon (default ≥ 50 % of the track's ground footprint inside), not a single point — so a vehicle
@@ -249,6 +253,11 @@ therefore required, and the failure is tracked as a risk
 **Why each guard exists (mapped to a real failure):**
 
 - *Dwell* → a vehicle that drifts through or briefly touches the shoulder does **not** trigger.
+- *Person presence-onset* → a **pedestrian** warrant (FR-08) is raised on *presence* in/beside the ROI
+  (debounced, `T_person_debounce`), **not** the stationarity gate — because a stranded occupant typically
+  *moves* (walks around the vehicle) and would never satisfy the `< 3 km/h` speed gate. Using the vehicle
+  path for persons would systematically miss exactly the at-risk pedestrian hazard H-C names
+  ([doc 04 §1](04-risk-and-safety.md#1-risk-register), [ADR-0003](adr/ADR-0003-detection-algorithm.md)).
 - *Brief hysteresis (`T_hold`)* → momentary detector flicker does not blink the warning off/on.
 - *Occlusion hold (`T_occlusion`) + radar corroboration* → a through-lane truck that hides the stopped
   car for many seconds does **not** drop a live warning, because radar still sees the return; the hold
@@ -265,6 +274,15 @@ therefore required, and the failure is tracked as a risk
 - *Watchdog* → if the logic wedges, or every channel genuinely loses the target with no exit seen, the
   watchdog **clears and raises a fault** — a *loud*, logged, low-confidence clear, never a silent
   stuck-ON. **No warning can be stuck on forever.**
+- *Bounded degraded hold (`T_degraded_max`)* → the watchdog above is **deliberately suppressed** while
+  radar corroborates ([ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md)), so
+  `CAMERA_OCCLUDED_DEGRADED` — camera occluded, only radar holding the warning ON — is the one state the
+  watchdog cannot bound. If criterion (b) is weak, the "corroborating" return may be the **occluding
+  through-lane truck**, not the shoulder car, and the warning would stay ON **indefinitely** on an
+  unverifiable return. `T_degraded_max` forces a **loud** disposition (low-confidence clear +
+  max-severity operator escalation, [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.md)) so
+  **no state — software *or* sensor-discrimination — holds the sign ON forever without lane-attributed
+  confirmation** (NFR-04). This closes the last indefinite-hold path.
 - *Safe state* → on any critical fault the machine leaves normal operation and escalates; the sign can
   be forced safe by the **independent health monitor** even if the state machine is wedged (dead-man's
   switch, [ADR-0005](adr/ADR-0005-fail-safe-and-system-safety.md)).
@@ -310,7 +328,10 @@ for a vehicle that was already protected**
 ([doc 01 §4](01-requirements.md#4-warning-placement--the-math-the-proposal-omits)). Planned OTA/restarts
 are deferred while a warning is active (FR-21); unplanned ones are not, so this re-exposure is a stated
 residual. A persisted *warning-active-at-shutdown* flag may shorten re-confirmation for a vehicle still
-at the same ROI position on reboot — to be decided in detailed design.
+at the same ROI position on reboot — **an open safety question** to settle in detailed design
+([doc 04 §5 Q7](04-risk-and-safety.md#5-open-safety-questions-for-the-team)): shortening re-confirmation
+trades the re-exposure window against a possible **stale-ON on a vehicle that actually departed during
+the outage**, so it must not be done blindly.
 
 ## 5. Runtime data flow (happy path)
 
@@ -403,7 +424,8 @@ the architectural commitment.**
 > [doc 04 R10](04-risk-and-safety.md#1-risk-register)). A roadside unit in a tunnel has no NTP and a
 > free-running wall-clock drifts. Choose the time source explicitly in detailed design — e.g. **GNSS/PPS
 > for absolute time + a shared or PTP clock for inter-sensor sync**, holding over connectivity outages —
-> rather than inheriting whatever the OS clock does ([ADR-0001](adr/ADR-0001-sensing-modality.md) AI#3).
+> rather than inheriting whatever the OS clock does. This is now a **requirement (NFR-16)**, not merely a
+> design note ([ADR-0001](adr/ADR-0001-sensing-modality.md) AI#3).
 
 ## 8. Recommended technology stack (indicative, not binding)
 

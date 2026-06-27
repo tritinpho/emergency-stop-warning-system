@@ -46,8 +46,17 @@ Adopt **fail-safe + fail-loud**:
 4. A **watchdog** bounds every activation: no warning may remain ON without fresh confirmation or
    corroboration (`T_watchdog`, NFR-04), eliminating indefinite stale-ON. Its interaction with the
    occlusion hold is specified in [ADR-0008](ADR-0008-detection-persistence-and-multitrack.md) — the
-   watchdog clears **and raises a fault**, so a clear under uncertainty is never silent.
+   watchdog clears **and raises a fault**, so a clear under uncertainty is never silent. The one state the
+   watchdog *deliberately* does not bound (camera occluded, radar still corroborating) is bounded instead
+   by **`T_degraded_max`** ([ADR-0009 §C](ADR-0009-failsafe-placement-and-degraded-modes.md)), so no state
+   holds the sign ON indefinitely.
 5. The unit **never reports healthy when it is degraded**; "blind" is an alarm condition, not silence.
+6. The fail-loud escalation assumes a **bounded operator response path** — alarm dedup/prioritization,
+   severities, target response times, re-escalation — specified in
+   [ADR-0011](ADR-0011-operator-concept-and-alarm-management.md); and the control / telemetry / override
+   attack surface is enumerated in the threat model
+   ([ADR-0012](ADR-0012-security-and-threat-model.md)). Both were left implicit in the first cut: "fail
+   loud" is only a control if someone is listening, and "cannot be spoofed" needs a stated surface.
 
 > Why blank-on-fault rather than a persistent generic caution? A sign that is *always* cautioning
 > becomes wallpaper and erodes trust in the real, specific warning (the cry-wolf failure). The honest

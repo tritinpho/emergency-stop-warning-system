@@ -83,6 +83,6 @@
 <text x="360" y="342" font-size="12" fill="#5F5E5A">lỗi / an toàn</text>
 <text x="500" y="342" font-size="12" fill="#A32D2D">– – – lỗi · mọi trạng thái</text>
 <line x1="20" y1="358" x2="740" y2="358" stroke="#E2E1DB" stroke-width="1"/>
-<text x="20" y="374" font-size="10.5" fill="#5F5E5A">Bị che &gt; T_occlusion nhưng radar vẫn xác nhận → cảnh báo vẫn BẬT + báo trực (suy giảm) — không bao giờ hủy âm thầm.</text>
+<text x="20" y="374" font-size="10.5" fill="#5F5E5A">Bị che &gt; T_occlusion, radar vẫn xác nhận → vẫn BẬT + báo trực; T_degraded_max → buộc hủy lớn tiếng, không vô hạn.</text>
 <text x="20" y="387" font-size="10.5" fill="#5F5E5A">Cơ chế tự ngắt an toàn nằm ở bộ điều khiển biển báo, nên hộp biên chết hay đứt liên kết cũng làm trống bảng.</text>
 </svg>

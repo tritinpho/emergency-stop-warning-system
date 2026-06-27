@@ -130,6 +130,12 @@ claim, do not quietly rest it on synthetic data**.
 - **Harder:** camera-radar **time synchronisation and extrinsic calibration**; a fusion module to
   design and test; slightly higher per-site cost and power; **and the stationary-in-clutter radar
   capability must be validated, not assumed** (the gate above).
+- **Forward (power):** the gate-grade module the budget reconciliation selected (imaging/HRR FMCW eval
+  kit, [doc 03 §1](../03-roadmap-and-phasing.md#1-scope--budget-reality-check-read-first)) draws **more
+  than the "radar is low-power" generic-presence assumption** this ADR leaned on. Its **cost** was
+  reconciled into the budget; its **power** is still an open input to the solar / ≥72 h sizing
+  ([ADR-0006](ADR-0006-connectivity-and-power.md)/NFR-07). Moot at bench (mains); reconcile before the
+  field unit.
 - **Conditional:** the entire adverse-condition benefit is **contingent on the radar gate**. Until it
   passes on real hardware, treat night/rain/fog robustness as a *designed hypothesis*, not a measured
   result ([ADR-0007](ADR-0007-validation-and-data-strategy.md)).
@@ -145,7 +151,7 @@ claim, do not quietly rest it on synthetic data**.
 
 ## Action Items
 
-1. [ ] Select a specific **stopped-vehicle-capable** radar (imaging / HRR FMCW, 24/77 GHz, with clutter mapping) and camera (good WDR + IR) — not a generic presence module.
+1. [ ] Select a specific **stopped-vehicle-capable** radar (imaging / HRR FMCW, 24/77 GHz, with clutter mapping) and camera (good WDR + IR) — not a generic presence module; **record its power draw** as an input to the [ADR-0006](ADR-0006-connectivity-and-power.md) solar budget (it exceeds the generic-presence assumption).
 2. [ ] **Validation gate (Phase 3):** demonstrate (a) reliable detection of a *stationary* vehicle in roadside clutter at the shoulder grazing geometry, day and night, **and** (b) azimuth/lane discrimination sufficient to attribute the return to the shoulder ROI vs. the adjacent through lane at the monitored range — before claiming adverse-condition robustness. Run an early, cheap feasibility spike in Phase 1 ([doc 03 §5](../03-roadmap-and-phasing.md#5-per-phase-risk-gates)) so a gate failure is found before the design leans its full weight on radar. **Venue split:** (a) is bench/Phase-3 at short range; **(b) needs lane separation at the monitored range** (test track or field) and is **field-deferred** — a bench pass of (a) alone does not discharge the gate. Record which criterion each result actually evidences.
 3. [ ] Define the fusion contract and the time-sync method (shared clock / PTP / timestamp align).
 4. [ ] Build the synthetic radar channel for the simulation harness — with a **documented, conservative** sensor model ([ADR-0007](ADR-0007-validation-and-data-strategy.md)).

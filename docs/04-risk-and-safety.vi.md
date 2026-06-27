@@ -97,15 +97,17 @@ Khả năng xảy ra (L) và Mức tác động (I): 1 = thấp, 5 = cao. Mức 
 | R5 | **Mù trong điều kiện bất lợi** — đêm/mưa/sương mù vô hiệu hóa camera | 4 | 4 | 16 | Radar (+ nhiệt ảnh tùy chọn); các bài kiểm tra nghiệm thu theo điều kiện cụ thể; cảnh báo chế độ suy giảm. |
 | R6 | **Mất nguồn/kết nối** tại hiện trường | 3 | 3 | 9 | Pin mặt trời + ắc quy ≥72 h; tự chủ tại biên ([ADR-0002](adr/ADR-0002-edge-vs-cloud-processing.vi.md)); lưu và chuyển; cảnh báo nhịp tín hiệu (heartbeat). |
 | R7 | **Tài xế phụ thuộc/chủ quan quá mức** — tài xế ngừng quan sát, tin tưởng vào hệ thống | 3 | 4 | 12 | Định hình như một *công cụ hỗ trợ*, không phải một bảo đảm; hành vi nhất quán, đáng tin cậy; không hứa hẹn phủ sóng toàn bộ. |
-| R8 | **Giả mạo / can thiệp trái phép (spoofing/tampering)** — bảng cảnh báo bị ép hiển thị thông điệp sai | 2 | 4 | 8 | Điều khiển có xác thực, mã hóa; firmware được ký; an ninh vật lý; đọc lại trạng thái (NFR-09). |
+| R8 | **Giả mạo / can thiệp trái phép (spoofing/tampering)** — bảng cảnh báo bị ép hiển thị thông điệp sai | 2 | 4 | 8 | Điều khiển có xác thực, mã hóa; firmware được ký; an ninh vật lý; đọc lại trạng thái (NFR-09); bề mặt tấn công được liệt kê và tuyên bố NFR-09 được giới hạn phạm vi trong mô hình mối đe dọa hợp nhất ([ADR-0012](adr/ADR-0012-security-and-threat-model.vi.md)). |
 | R9 | **Quyền riêng tư / pháp lý** — thu thập PII (biển số, khuôn mặt) và lưu giữ | 3 | 3 | 9 | Suy luận trên thiết bị; **không lưu giữ video thô**; tối thiểu hóa bằng chứng sự kiện; kiểm soát truy cập (§4). |
 | R10 | **Trách nhiệm pháp lý của sự phụ thuộc** — một hệ thống an toàn được triển khai nhưng có thể mắc lỗi có thể *làm tăng* mức phơi nhiễm của đơn vị vận hành so với khi không có hệ thống nào (sự phụ thuộc được tạo ra), cộng thêm sự mơ hồ về việc ai chịu trách nhiệm nếu một cảnh báo bị lỗi | 2 | 4 | 8 | Khái niệm vận hành rõ ràng; nhật ký sự kiện (audit log) chứng minh hành vi đúng đặc tả; định hình rõ ràng "khuyến cáo, tài xế chịu trách nhiệm"; **thỏa thuận với đơn vị vận hành giải quyết minh thị câu hỏi về sự phụ thuộc**; phát biểu giới hạn bảo vệ (§0). |
 | R11 | **Vượt ngân sách / vượt phạm vi** — cố gắng triển khai hiện trường trên một nguồn tài trợ nguyên mẫu | 4 | 3 | 12 | MVP và giới hạn ngân sách được giới hạn phạm vi ([doc 03](03-roadmap-and-phasing.vi.md)); thử nghiệm hiện trường được hoãn sang cấp sở. |
-| R12 | **Che khuất** — xe tải đi ngang che mất xe đang dừng | 3 | 3 | 9 | Thời gian giữ hysteresis hấp thụ che khuất ngắn; radar (hình học khác); vị trí/độ cao đặt cảm biến. **Phụ thuộc vào việc radar phân biệt làn ([ADR-0001](adr/ADR-0001-sensing-modality.vi.md) cổng b); nếu yếu, khoảng giữ-khi-che-khuất có thể _đảo_ thành một lần giữ-giả (kẹt-BẬT) trên chính chiếc xe tải che khuất — kiểm chứng tại hiện trường, không khép lại được trên bàn thử.** |
+| R12 | **Che khuất** — xe tải đi ngang che mất xe đang dừng | 3 | 3 | 9 | Thời gian giữ hysteresis hấp thụ che khuất ngắn; radar (hình học khác); vị trí/độ cao đặt cảm biến. **Phụ thuộc vào việc radar phân biệt làn ([ADR-0001](adr/ADR-0001-sensing-modality.vi.md) cổng b); nếu yếu, khoảng giữ-khi-che-khuất có thể _đảo_ thành một lần giữ-giả (kẹt-BẬT) trên chính chiếc xe tải che khuất — kiểm chứng tại hiện trường, không khép lại được trên bàn thử.** Được giới hạn bởi **`T_degraded_max`**: lần kẹt-BẬT đảo ngược không thể kéo dài vô hạn — quá hạn này bảng bị buộc xóa lớn tiếng + định đoạt bởi người trực ([ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md), [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.vi.md)). |
 | R13 | **Lớp đối tượng giả** — mảnh vỡ/bóng đổ/động vật kích hoạt hoặc gây nhầm lẫn | 2 | 3 | 6 | Bộ phát hiện học máy có phân lớp; cổng lọc ROI; dwell; chứng thực bằng radar. |
 | R14 | **Kích hoạt giả do ùn tắc** — dòng xe lưu thông đang dừng cạnh ROI bị đọc nhầm thành một xe dừng trên lề; điều kiện "mật độ cao" là tệ nhất cho việc phân biệt ROI | 3 | 3 | 9 | Phát hiện ùn tắc (các vết đứng yên trải dài qua các làn lưu thông) → ngăn chặn/đổi thông điệp; hình học ROI + phân biệt làn bằng radar; kịch bản nghiệm thu minh thị ([doc 02 §4](02-system-architecture.vi.md#4-máy-trạng-thái-phát-hiệncảnh-báo)). |
 | R15 | **Lỗi hiệu chuẩn / trôi hiệu chuẩn** — homography sai hoặc thông số ngoại lai camera↔radar sai, hoặc trôi do cột rung lắc / chấn động / nhiệt, làm dịch chuyển ROI một cách thầm lặng → bỏ sót hoặc báo động giả có hệ thống | 3 | 4 | 12 | Quy trình hiệu chuẩn theo từng vị trí; kiểm tra lại định kỳ; **bộ giám sát trôi** trong bộ giám sát tình trạng; cảnh báo khi vượt dung sai ([doc 02 §4](02-system-architecture.vi.md#4-máy-trạng-thái-phát-hiệncảnh-báo)). |
-| R16 | **Cấu hình không an toàn / đẩy OTA** — một ROI/bộ định thời sai hoặc một mô hình bị thoái lui phá vỡ chức năng an toàn từ xa; việc ký chặn *can thiệp trái phép*, chứ không chặn *lỗi của người vận hành* | 2 | 4 | 8 | **Ràng buộc biên tham số tại thiết bị** (FR-20); triển khai theo từng giai đoạn/được kiểm chứng + số liệu canary; **hoãn OTA khi một cảnh báo đang hoạt động** (FR-21); khôi phục có ký (§2). |
+| R16 | **Cấu hình không an toàn / đẩy OTA** — một ROI/bộ định thời sai hoặc một mô hình bị thoái lui phá vỡ chức năng an toàn từ xa; việc ký chặn *can thiệp trái phép*, chứ không chặn *lỗi của người vận hành* | 2 | 4 | 8 | **Ràng buộc biên tham số tại thiết bị** (FR-20); triển khai theo từng giai đoạn/được kiểm chứng + số liệu canary; **hoãn OTA khi một cảnh báo đang hoạt động** (FR-21); khôi phục có ký (§2); kênh cấu hình/OTA nằm trong mô hình mối đe dọa ([ADR-0012](adr/ADR-0012-security-and-threat-model.vi.md)). |
+| R17 | **Người trực không phản hồi / mệt mỏi vì cảnh báo** — "báo động lớn khi sự cố" định tuyến các phần dư của bỏ-sót-âm-thầm, chế-độ-suy-giảm, hết-hạn-ghi-đè và ức-chế-khi-ùn-tắc tới người trực, nhưng một trung tâm bị ngập cảnh báo hoặc không có nhân sự có thể không hành động, nên biện pháp bù trừ (điều xe tuần tra / CCTV) không bao giờ kích hoạt | 3 | 4 | 12 | **Quy trình vận hành + quản lý cảnh báo** (NFR-15, [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.vi.md)): gộp trùng/ưu tiên cảnh báo, mức nghiêm trọng + thời gian phản hồi mục tiêu, leo thang lại khi không xác nhận; **`T_degraded_max`** buộc một định đoạt của máy thay vì chờ người trực mãi. Phần dư: thời gian phản hồi được tinh chỉnh ở hiện trường và nhân sự là cam kết của đơn vị vận hành, nêu rõ trong thỏa thuận vận hành (R10). |
+| R18 | **Kẹt-BẬT trong một trạng thái suy giảm vượt qua mọi giới hạn tự động** — `CAMERA_OCCLUDED_DEGRADED` giữ bảng BẬT chỉ dựa trên radar trong khi watchdog bị vô hiệu hóa | 2 | 4 | 8 | Giới hạn cuối **`T_degraded_max`** → buộc xóa lớn-tiếng độ-tin-cậy-thấp + leo thang mức cao nhất; NFR-04 được mở rộng để bao quát kẹt-BẬT do phân biệt-cảm-biến ([tài liệu 02 §4](02-system-architecture.vi.md#4-máy-trạng-thái-phát-hiệncảnh-báo), [ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)). |
 
 **Các mức phơi nhiễm cao nhất cần thiết kế đối phó trước tiên:** R5 (mù trong điều kiện bất lợi), R1 (bỏ sót thầm lặng), R4
 (đặt quá gần) — cả ba đều được xử lý bằng các quyết định mang tính chịu lực đã được đưa ra (ADR-0001,
@@ -132,6 +134,8 @@ ADR-0005, doc 01 §4).
 | **Lỗi hiệu chuẩn / trôi hiệu chuẩn** (homography hoặc thông số ngoại lai camera↔radar) | ROI dịch chuyển → bỏ sót hoặc báo động giả có hệ thống, không có triệu chứng rõ ràng | **Bộ giám sát trôi** so với các mốc tham chiếu; kiểm tra lại định kỳ | Cảnh báo khi vượt dung sai; hiệu chuẩn lại; coi như chế độ suy giảm cho tới khi được khắc phục (R15) |
 | **Người vận hành ép tắt / tắt tạm trong khi có mối nguy thật** | Bỏ sót thầm lặng do người vận hành gây ra | Ghi đè được ghi nhật ký + tư thế nhịp tim **OVERRIDDEN**; tự hết hiệu lực bắt buộc; leo thang qua TMC | Có giới hạn, báo động lớn khi sự cố, giới hạn thời gian; tự tiếp tục khi hết hạn ([ADR-0010](adr/ADR-0010-operator-override-and-manual-control.vi.md)) |
 | **Lệnh ép bật bị chốt / ghi đè bị giả mạo** | Kẹt-BẬT hoặc báo động giả; ngăn-hoặc-khẳng-định trái phép | Ép bật do hộp biên trung chuyển, **được làm mới (không chốt)**; kênh ghi đè đã xác thực; đọc lại trạng thái | Cơ chế tự ngắt an toàn vẫn xóa trống khi giết-hộp / cắt-liên-kết / hết hạn; từ chối ghi đè không xác thực / ngoài chính sách (ADR-0010, NFR-09) |
+| **`CAMERA_OCCLUDED_DEGRADED` vượt quá `T_degraded_max`** (camera không bao giờ thu nhận lại; radar có thể đang đối chứng chính chiếc xe *che khuất* ở làn thông xe, không phải xe ở lề) | Kẹt-BẬT vô hạn mà watchdog không bắt được (đối chứng bằng radar vô hiệu hóa nó) | Bộ định thời `T_degraded_max` | **Buộc xóa lớn-tiếng độ-tin-cậy-thấp + leo thang mức cao nhất**; người trực nắm quyền định đoạt qua CCTV / tuần tra ([ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md), [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.vi.md)) |
+| **Cảnh báo của người trực không được xác nhận / ngập cảnh báo** | Biện pháp "báo động lớn" mất hiệu lực — không có bù trừ bằng tuần tra/CCTV cho một lần bỏ-sót-âm-thầm hay trạng thái suy giảm | Hết-hạn-xác-nhận; bộ giám sát tốc độ cảnh báo | **Leo thang lại** theo mức nghiêm trọng; gộp trùng/ưu tiên để giới hạn tải (NFR-15, [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.vi.md)) |
 
 Danh sách FMEA này cũng là **tập kiểm thử tiêm lỗi** cho nghiệm thu (doc 01 §5 — mục tiêu ≥95%
 độ phủ phát hiện). **Lưu ý:** mục tiêu đó kiểm chứng các bộ phát hiện mà bạn *đã xây dựng* đối với các
@@ -162,6 +166,14 @@ Hành vi an toàn được đặc tả trong [ADR-0005](adr/ADR-0005-fail-safe-a
 - **Các chế độ suy giảm trung thực:** một thiết bị có camera chết là **mù với sự cố mới** (chỉ riêng
   radar không thể khởi tạo một lần xác nhận trong-ROI mới) và leo thang ở mức **trọng yếu (critical)** —
   nó không bao giờ quảng cáo phạm vi phủ mà nó đã đánh mất ([ADR-0009 §B](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)).
+- **Không giữ-suy-giảm vô hạn:** watchdog cố ý bị vô hiệu hóa bởi đối chứng bằng radar, nên
+  **`T_degraded_max`** giới hạn riêng `CAMERA_OCCLUDED_DEGRADED` — quá hạn này bảng bị buộc về một định đoạt
+  **lớn tiếng** (xóa độ-tin-cậy-thấp + leo thang), không bao giờ giữ BẬT mãi dựa trên một tín hiệu radar
+  không kiểm chứng được ([ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)).
+- **Một người lắng nghe các sự cố lớn tiếng:** "báo động lớn khi sự cố" chỉ là một biện pháp kiểm soát
+  nếu có người hành động. Đường phản hồi của người trực — gộp trùng/ưu tiên cảnh báo, mức nghiêm trọng,
+  thời gian phản hồi mục tiêu, leo thang lại khi không xác nhận — là một **yêu cầu được đặc tả** (NFR-15,
+  [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.vi.md)), không phải một giả định.
 - **Giữ gìn niềm tin:** dwell + hysteresis ngăn dao động (flapping) và kích hoạt sai, giữ cho cảnh báo
   đáng tin cậy (chống báo động giả lặp lại).
 
@@ -177,7 +189,7 @@ Hành vi an toàn được đặc tả trong [ADR-0005](adr/ADR-0005-fail-safe-a
 | **Giới hạn mục đích** | Hệ thống dùng để **cảnh báo an toàn, không phải cưỡng chế** | Không có quy trình xử phạt/định danh; cách định hình và phạm vi dữ liệu phản ánh điều này (nguyên tắc định hướng 2). |
 | **Tuân thủ về biển báo** | Biển báo/thông điệp đường bộ được quản lý theo quy định | Nội dung cảnh báo và bảng cảnh báo tuân thủ **QCVN 41** (quy chuẩn kỹ thuật quốc gia về báo hiệu đường bộ); tập thông điệp được rà soát. |
 | **Tiêu chuẩn đường bộ/hình học** | Việc bố trí & lắp đặt được quản lý theo quy định | Tuân theo tiêu chuẩn hình học đường cao tốc (ví dụ **TCVN 5729**) và yêu cầu của đơn vị vận hành; bố trí dựa trên DSD (doc 01 §4). |
-| **An ninh** | Ngăn chặn cảnh báo bị giả mạo/can thiệp | Kênh có xác thực, mã hóa; firmware được ký; an ninh vật lý (NFR-09, R8). Tuyên bố "không thể bị giả mạo" được **giới hạn trong một mô hình mối đe dọa đã phát biểu** — bao gồm liên kết edge↔biển báo cục bộ và việc từ chối cảm biến — cần làm rõ trước khi triển khai (§5 Q5). |
+| **An ninh** | Ngăn chặn cảnh báo bị giả mạo/can thiệp | Kênh có xác thực, mã hóa; firmware được ký; an ninh vật lý (NFR-09, R8). Tuyên bố "không thể bị giả mạo" được **giới hạn trong mô hình mối đe dọa hợp nhất** ([ADR-0012](adr/ADR-0012-security-and-threat-model.vi.md)) — bao quát liên kết SHOW-làm-mới edge↔biển báo cục bộ, kênh ghi đè (ADR-0010), cấu hình/OTA, và việc từ chối cảm biến (gây nhiễu radar, làm chói camera/IR-flood); việc gia cố sâu thuộc giai đoạn hiện trường (§5 Q5). |
 | **Trách nhiệm pháp lý / khái niệm vận hành** | Làm rõ trách nhiệm | Ghi chép hệ thống là **khuyến cáo** (tài xế vẫn chịu trách nhiệm); duy trì một **nhật ký sự kiện**; thống nhất vai trò với đơn vị vận hành; **giải quyết minh thị việc liệu triển khai một bộ phát hiện có thể mắc lỗi có làm tăng mức phơi nhiễm của đơn vị vận hành so với khi không có hay không** — cố vấn pháp lý của đơn vị vận hành sẽ hỏi, nên hãy nêu nó lên ở giai đoạn cấp sở (R10). |
 | **Phê duyệt** | Triển khai hiện trường cần sự phê duyệt của cơ quan có thẩm quyền | Phối hợp với cơ quan quản lý đường bộ/đơn vị vận hành từ sớm; coi việc phê duyệt là một điều kiện tiên quyết của thử nghiệm hiện trường (cấp sở). |
 
@@ -198,11 +210,12 @@ Hành vi an toàn được đặc tả trong [ADR-0005](adr/ADR-0005-fail-safe-a
    cơ chế quản trị nào?
 4. **Thời hạn lưu giữ và chính sách truy cập** nào đối với bằng chứng sự kiện thỏa mãn được cả nhu cầu kiểm toán lẫn
    nghĩa vụ về quyền riêng tư?
-5. **Mô hình mối đe dọa** cho liên kết edge↔biển báo và các cảm biến là gì? Tuyên bố "không thể bị giả
-   mạo" (NFR-09) cần được liệt kê các bề mặt tấn công của nó — lệnh `SHOW`/`CLEAR` bị giả mạo/phát lại
+5. **Mô hình mối đe dọa** cho liên kết edge↔biển báo và các cảm biến là gì? **Nay được hợp nhất trong
+   [ADR-0012](adr/ADR-0012-security-and-threat-model.vi.md)** — giữ lại đây như mục *hoàn tất* còn mở.
+   Tuyên bố "không thể bị giả mạo" (NFR-09) cần được liệt kê các bề mặt tấn công của nó — lệnh `SHOW`/`CLEAR` bị giả mạo/phát lại
    hoặc một **nhịp tín hiệu bị nhiễu (jammed heartbeat)** trên liên kết cục bộ (lưu ý: nhiễu nhịp tín hiệu
    buộc về một trạng thái *để trống*, vốn an toàn khi sự cố nhưng là một sự từ-chối-cảnh-báo), **nhiễu
-   radar**, **làm chói camera / dội đèn IR**, và cấu hình/OTA — và **nhịp tín hiệu SHOW-được-làm-mới của
+   radar**, **làm chói camera / dội đèn IR**, **kênh ghi đè** (ADR-0010), và cấu hình/OTA — và **nhịp tín hiệu SHOW-được-làm-mới của
    liên kết biển báo phải được xác thực**, chứ không chỉ telemetry. Việc gia cố sâu là một nhiệm vụ ở giai
    đoạn hiện trường; hãy giới hạn tuyên bố NFR-09 trong phạm vi phân tích thực sự đã thực hiện.
 6. **Ngân sách độ tin cậy MTBF/MTTR** nào đứng sau mục tiêu khả dụng chức năng ≥ 99% (NFR-03)? Đối với một
@@ -210,3 +223,8 @@ Hành vi an toàn được đặc tả trong [ADR-0005](adr/ADR-0005-fail-safe-a
    gần như làm cạn kiệt ngân sách, nên mức 99% cần một MTBF minh thị tương ứng với MTTR hiện trường khả thi
    — hoặc nên được nới lỏng. Hãy phát biểu ngân sách này ở giai đoạn thử nghiệm hiện trường thay vì khẳng
    định 99% mà không có cơ sở.
+7. **Tái-phơi-nhiễm khi khởi động lại nóng.** Một cờ *cảnh-báo-đang-hoạt-động-lúc-tắt* được lưu lại có nên
+   rút ngắn việc xác nhận lại cho một chiếc xe vẫn ở cùng vị trí ROI sau một **lần khởi động lại ngoài kế
+   hoạch** ([tài liệu 02 §4](02-system-architecture.vi.md#4-máy-trạng-thái-phát-hiệncảnh-báo)) không? Nó
+   đánh đổi một cửa sổ phơi-nhiễm-không-được-cảnh-báo mới với khả năng **kẹt-BẬT trên một chiếc xe thực ra
+   đã rời đi trong lúc ngừng** — một quyết định thiết kế chi tiết cần giải quyết tường minh, không mặc định.

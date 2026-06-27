@@ -91,15 +91,17 @@ Likelihood (L) and Impact (I): 1 = low, 5 = high. Exposure = L × I.
 | R5 | **Adverse-condition blindness** — night/rain/fog defeats the camera | 4 | 4 | 16 | Radar (+ optional thermal); condition-specific acceptance tests; degraded-mode alerting. |
 | R6 | **Power/connectivity loss** in the field | 3 | 3 | 9 | Solar+battery ≥72 h; edge autonomy ([ADR-0002](adr/ADR-0002-edge-vs-cloud-processing.md)); store-and-forward; heartbeat alarms. |
 | R7 | **Driver over-reliance / complacency** — drivers stop scanning, trusting the system | 3 | 4 | 12 | Frame as an *aid*, not a guarantee; consistent, credible behaviour; do not promise full coverage. |
-| R8 | **Spoofing / tampering** — sign forced to show false messages | 2 | 4 | 8 | Authenticated, encrypted control; signed firmware; physical security; status read-back (NFR-09). |
+| R8 | **Spoofing / tampering** — sign forced to show false messages | 2 | 4 | 8 | Authenticated, encrypted control; signed firmware; physical security; status read-back (NFR-09); attack surface enumerated and the NFR-09 claim scoped in the consolidated threat model ([ADR-0012](adr/ADR-0012-security-and-threat-model.md)). |
 | R9 | **Privacy / legal** — PII capture (plates, faces) and retention | 3 | 3 | 9 | On-device inference; **no raw-video retention**; minimized event evidence; access control (§4). |
 | R10 | **Liability of reliance** — a deployed-but-fallible safety system may *raise* operator exposure vs. having none (reliance is created), plus ambiguity over who is responsible if a warning fails | 2 | 4 | 8 | Clear operating concept; audit log proving spec-conformant behaviour; explicit "advisory, driver-responsible" framing; **operator agreement that explicitly addresses the reliance question**; bounded-protection statement (§0). |
 | R11 | **Budget overrun / over-scope** — trying to field-deploy on a prototype grant | 4 | 3 | 12 | Scoped MVP and budget envelope ([doc 03](03-roadmap-and-phasing.md)); field pilot deferred to cấp sở. |
-| R12 | **Occlusion** — passing trucks hide the stopped vehicle | 3 | 3 | 9 | Hysteresis hold absorbs brief occlusion; radar (different geometry); sensor placement/height. **Depends on radar lane-discrimination ([ADR-0001](adr/ADR-0001-sensing-modality.md) gate b); if weak, the occlusion hold can _invert_ to a false-hold (stale-ON) on the occluding truck — field-validated, not bench-closable.** |
+| R12 | **Occlusion** — passing trucks hide the stopped vehicle | 3 | 3 | 9 | Hysteresis hold absorbs brief occlusion; radar (different geometry); sensor placement/height. **Depends on radar lane-discrimination ([ADR-0001](adr/ADR-0001-sensing-modality.md) gate b); if weak, the occlusion hold can _invert_ to a false-hold (stale-ON) on the occluding truck — field-validated, not bench-closable.** Bounded by **`T_degraded_max`**: the inverted stale-ON cannot persist indefinitely — past the bound the sign is forced to a loud clear + operator disposition ([ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.md), [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.md)). |
 | R13 | **False object classes** — debris/shadows/animals trigger or confuse | 2 | 3 | 6 | Learned detector with classes; ROI gating; dwell; radar corroboration. |
 | R14 | **Congestion false-trigger** — stopped through-traffic beside the ROI reads as a shoulder stop; the "high density" condition is worst-case for ROI discrimination | 3 | 3 | 9 | Congestion detection (stationary tracks spanning through lanes) → suppress/re-message; ROI geometry + radar lane discrimination; explicit acceptance scenario ([doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine)). |
 | R15 | **Calibration error / drift** — bad homography or camera↔radar extrinsics, or drift from pole sway / vibration / thermal, silently shifts the ROI → systematic miss or false alarm | 3 | 4 | 12 | Per-site calibration procedure; periodic re-check; **drift monitor** in the health monitor; alert on out-of-tolerance ([doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine)). |
-| R16 | **Unsafe config / OTA push** — a wrong ROI/timer or a regressed model breaks the safety function remotely; signing stops *tampering*, not operator *error* | 2 | 4 | 8 | Unit-side **parameter-bounds enforcement** (FR-20); staged/validated rollout + canary metrics; **defer OTA while a warning is active** (FR-21); signed rollback (§2). |
+| R16 | **Unsafe config / OTA push** — a wrong ROI/timer or a regressed model breaks the safety function remotely; signing stops *tampering*, not operator *error* | 2 | 4 | 8 | Unit-side **parameter-bounds enforcement** (FR-20); staged/validated rollout + canary metrics; **defer OTA while a warning is active** (FR-21); signed rollback (§2); config/OTA channel in the threat model ([ADR-0012](adr/ADR-0012-security-and-threat-model.md)). |
+| R17 | **Operator non-response / alarm fatigue** — "fail loud" routes silent-miss, degraded-mode, override-expiry and congestion-suppression residuals to the operator, but a flooded or unstaffed TMC may not act, so the compensating control (patrol / CCTV dispatch) never fires | 3 | 4 | 12 | **Operator concept of operations + alarm management** (NFR-15, [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.md)): dedup/prioritize alarms, severity + target response time, re-escalation on non-ack; **`T_degraded_max`** forces a machine disposition rather than waiting on the operator forever. Residual: response-time is field-tuned and staffing is the operator's commitment, surfaced in the operator agreement (R10). |
+| R18 | **Stale-ON in a degraded state outliving every autonomous bound** — `CAMERA_OCCLUDED_DEGRADED` keeps the sign ON on radar alone while the watchdog is suppressed | 2 | 4 | 8 | **`T_degraded_max`** terminal bound → forced loud low-confidence clear + max-severity escalation; NFR-04 broadened to cover sensor-discrimination stale-ON ([doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine), [ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)). |
 
 **Top exposures to design against first:** R5 (adverse-condition blindness), R1 (silent miss), R4
 (placement too close) — all three are addressed by load-bearing decisions already taken (ADR-0001,
@@ -126,6 +128,8 @@ ADR-0005, doc 01 §4).
 | **Calibration error / drift** (homography or cam↔radar extrinsics) | ROI shifts → systematic miss or false alarm, no obvious symptom | **Drift monitor** vs. reference landmarks; periodic re-check | Alert on out-of-tolerance; re-calibrate; treat as degraded until corrected (R15) |
 | **Operator force-off / mute during a real hazard** | Operator-induced silent miss | Override logged + **OVERRIDDEN** heartbeat posture; mandatory auto-expiry; TMC escalation | Bounded, fail-loud, time-limited; auto-resume on expiry ([ADR-0010](adr/ADR-0010-operator-override-and-manual-control.md)) |
 | **Operator force-on left latched / spoofed override** | Stale-ON or cry-wolf; unauthorized suppression-or-assertion | Edge-mediated **refreshed (non-latching)** force-on; authenticated override channel; status read-back | Dead-man's switch still blanks on box-kill / link-cut / expiry; reject unauthenticated / out-of-policy override (ADR-0010, NFR-09) |
+| **`CAMERA_OCCLUDED_DEGRADED` outlives `T_degraded_max`** (camera never re-acquires; radar may be corroborating the *occluding* through-lane vehicle, not the shoulder car) | Indefinite stale-ON the watchdog can't catch (radar corroboration suppresses it) | `T_degraded_max` timer | **Forced loud low-confidence clear + max-severity escalation**; operator owns the disposition via CCTV / patrol ([ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.md), [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.md)) |
+| **Operator alarm unacknowledged / alarm flood** | "Fail-loud" control ineffective — no patrol/CCTV compensation for a silent-miss or degraded state | Acknowledge-timeout; alarm-rate monitor | **Re-escalation** by severity; dedup/prioritize to bound load (NFR-15, [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.md)) |
 
 This FMEA list is also the **fault-injection test set** for acceptance (doc 01 §5 — target ≥95%
 detection coverage). **Caveat:** that target verifies the detectors you *built* against the faults you
@@ -155,6 +159,14 @@ The safe behaviour is specified in [ADR-0005](adr/ADR-0005-fail-safe-and-system-
 - **Honest degraded modes:** a camera-dead unit is **blind to new hazards** (radar alone cannot
   initiate a new in-ROI confirmation) and escalates as **critical** — it never advertises coverage it
   has lost ([ADR-0009 §B](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)).
+- **No indefinite degraded hold:** the watchdog is deliberately suppressed by radar corroboration, so
+  **`T_degraded_max`** separately bounds `CAMERA_OCCLUDED_DEGRADED` — past it the sign is forced to a
+  **loud** disposition (low-confidence clear + escalation), never held ON forever on an unverifiable
+  radar return ([ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)).
+- **A listener for the loud failures:** "fail loud" is only a control if someone acts on it. The
+  operator response path — alarm dedup/prioritization, severities, target response times, re-escalation
+  on non-ack — is a **specified requirement** (NFR-15, [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.md)),
+  not an assumption.
 - **Trust-preserving:** dwell + hysteresis prevent flapping and false triggers, keeping the warning
   credible (anti-cry-wolf).
 
@@ -170,7 +182,7 @@ The proposal does not address these; for a public-road camera system they are ma
 | **Purpose limitation** | System is for **safety warning, not enforcement** | No ticketing/identification pipeline; framing and data scope reflect this (guiding principle 2). |
 | **Signage conformance** | Road signs/messages are regulated | Warning content and the sign conform to **QCVN 41** (national technical regulation on road signs & signals); message set reviewed. |
 | **Road/geometric standards** | Placement & installation are regulated | Follow expressway geometric standards (e.g., **TCVN 5729**) and operator requirements; DSD-based placement (doc 01 §4). |
-| **Security** | Prevent spoofed/tampered warnings | Authenticated, encrypted channels; signed firmware; physical security (NFR-09, R8). The "cannot be spoofed" claim is **scoped to a stated threat model** — including the local edge↔sign link and sensor denial — owed before deployment (§5 Q5). |
+| **Security** | Prevent spoofed/tampered warnings | Authenticated, encrypted channels; signed firmware; physical security (NFR-09, R8). The "cannot be spoofed" claim is **scoped to the consolidated threat model** ([ADR-0012](adr/ADR-0012-security-and-threat-model.md)) — covering the local edge↔sign refreshed-SHOW link, the override channel (ADR-0010), config/OTA, and sensor denial (radar jam, camera blind/IR-flood); deep hardening is field-staged (§5 Q5). |
 | **Liability / operating concept** | Clarify responsibility | Document the system as **advisory** (drivers remain responsible); maintain an **audit log**; agree roles with the operator; **explicitly address whether deploying a fallible detector raises operator exposure vs. none** — the operator's counsel will ask, so surface it at the cấp sở stage (R10). |
 | **Approvals** | Field deployment needs authority sign-off | Engage road authority/operator early; treat approvals as a field-pilot (cấp sô) prerequisite. |
 
@@ -191,13 +203,20 @@ The proposal does not address these; for a public-road camera system they are ma
    what governance?
 4. What **retention period and access policy** for event evidence satisfies both audit needs and
    privacy duty?
-5. What is the **threat model** for the edge↔sign link and the sensors? The "cannot be spoofed" claim
-   (NFR-09) needs its attack surfaces enumerated — forged/replayed `SHOW`/`CLEAR` or a **jammed
-   heartbeat** on the local link (note: jamming the heartbeat forces a *blank*, which is fail-safe but a
-   denial-of-warning), **radar jamming**, **camera blinding / IR-flood**, and config/OTA — and the
-   **sign-link refreshed-SHOW heartbeat must be authenticated**, not just the telemetry. Deep hardening
-   is a field-stage task; scope the NFR-09 claim to the analysis actually done.
+5. What is the **threat model** for the edge↔sign link and the sensors? **Now consolidated in
+   [ADR-0012](adr/ADR-0012-security-and-threat-model.md)** — retained here as the open *completion* item.
+   The "cannot be spoofed" claim (NFR-09) needs its attack surfaces enumerated — forged/replayed
+   `SHOW`/`CLEAR` or a **jammed heartbeat** on the local link (note: jamming the heartbeat forces a
+   *blank*, which is fail-safe but a denial-of-warning), **radar jamming**, **camera blinding /
+   IR-flood**, the **override channel** (ADR-0010), and config/OTA — and the **sign-link refreshed-SHOW
+   heartbeat must be authenticated**, not just the telemetry. Deep hardening is a field-stage task; scope
+   the NFR-09 claim to the analysis actually done.
 6. What **MTBF/MTTR reliability budget** backs the ≥ 99% functional-availability target (NFR-03)? For a
    remote single unit, one multi-day field repair (~0.5% of a year *each*) nearly exhausts the budget,
    so 99% needs an explicit MTBF given the achievable field MTTR — or it should be relaxed. State the
    budget at the field-pilot stage rather than asserting 99% unbacked.
+7. **Warm-reboot re-exposure.** Should a persisted *warning-active-at-shutdown* flag shorten
+   re-confirmation for a vehicle still at the same ROI position after an **unplanned reboot**
+   ([doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine))? It trades a fresh
+   unwarned-exposure window against a possible **stale-ON on a vehicle that actually departed during the
+   outage** — a detailed-design decision to settle explicitly, not by default.

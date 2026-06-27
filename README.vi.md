@@ -37,7 +37,8 @@ phản quang do tài xế đặt) sang **cảnh báo chủ động, tự động
 | 03 | [docs/03-roadmap-and-phasing.vi.md](docs/03-roadmap-and-phasing.vi.md) | Lộ trình kỹ thuật ánh xạ lên 6 giai đoạn của thuyết minh, định nghĩa MVP, **rà soát thực tế ngân sách** |
 | 04 | [docs/04-risk-and-safety.vi.md](docs/04-risk-and-safety.vi.md) | Bảng đăng ký rủi ro, FMEA rút gọn, thiết kế an toàn khi sự cố (fail-safe), quyền riêng tư & tuân thủ pháp lý |
 | 05 | [docs/05-field-pilot-proposal.vi.md](docs/05-field-pilot-proposal.vi.md) | Đề xuất thử nghiệm hiện trường cấp sở — bản nháp (giai đoạn tiếp theo mà tài liệu 03–04 chuẩn bị) |
-| — | [docs/adr/README.vi.md](docs/adr/README.vi.md) | Mục lục các Bản ghi quyết định kiến trúc (ADR) (10 ADR bao quát các lựa chọn kỹ thuật trọng yếu) |
+| 06 | [docs/06-traceability-matrix.vi.md](docs/06-traceability-matrix.vi.md) | **Ma trận truy vết kiểm chứng** — mỗi yêu cầu một dòng kiểm toán được → ADR → tầng → kịch bản → tiêu chí đạt (cổng tiền-xây-dựng) |
+| — | [docs/adr/README.vi.md](docs/adr/README.vi.md) | Mục lục các Bản ghi quyết định kiến trúc (ADR) (12 ADR bao quát các lựa chọn kỹ thuật trọng yếu) |
 
 Hình 1 từ thuyết minh (infographic khái niệm) được lưu tại
 [docs/assets/figure-1-concept-infographic.jpeg](docs/assets/figure-1-concept-infographic.jpeg) và được

@@ -188,6 +188,8 @@ stateDiagram-v2
       WARN is ON while the set is non-empty.
       A vehicle already present at boot is treated as a new track
       (dwell runs normally — no special-casing).
+      A PERSON warrant enters by presence in/beside the ROI (debounced),
+      NOT the speed-gate+dwell path a moving occupant would fail (FR-08, ADR-0003).
     end note
 
     IDLE --> TRACKING : a track enters ROI
@@ -201,7 +203,7 @@ stateDiagram-v2
     WARN_HOLD --> CAMERA_OCCLUDED_DEGRADED : occluded > T_occlusion but radar STILL corroborates → stay ON + alert ops
     CAMERA_OCCLUDED_DEGRADED --> WARN_ON : camera re-acquires
     WARN_HOLD --> CLEARING : confirmed exit, OR absent ≥ T_hold with NO corroboration (low-confidence clear → logged)
-    CAMERA_OCCLUDED_DEGRADED --> CLEARING : confirmed exit, OR all corroboration lost (→ T_hold → loud clear)
+    CAMERA_OCCLUDED_DEGRADED --> CLEARING : confirmed exit, OR all corroboration lost (→ T_hold → loud clear), OR T_degraded_max reached & camera never re-acquired (→ forced loud low-confidence clear + max-severity escalation, ADR-0011)
     WARN_ON --> CLEARING : confirmed exit of the last track (fast clear)
     CLEARING --> IDLE : CLEAR + sign status = off
 
@@ -224,11 +226,13 @@ watchdog.
 | `T_dwell` | 5 s (3–10) | Thời gian đứng yên trước khi một vết được tuyên bố là "đang dừng". | Quá thấp → báo động giả từ xe chạy chậm/thoáng qua; quá cao → cảnh báo muộn. Cân chỉnh nó theo **ngân sách phơi nhiễm không-được-cảnh-báo** ([tài liệu 01 §4](01-requirements.vi.md#4-bố-trí-cảnh-báo--phép-tính-mà-đề-xuất-bỏ-sót)). |
 | `T_hold` | 10 s (5–15) | **Hysteresis ngắn**: giữ qua một lần rớt phát hiện ngắn **khi không có kênh nào khác đối chứng**. | Hấp thụ nhấp nháy; quá cao → cảnh báo cũ sau một lần rời đi thực sự nhưng không được nhận là một thoát ra. |
 | `T_occlusion` | tối đa 60 s (**làm mới được**) | Giữ một vết bị mất ở trạng thái **giả định-còn-hiện-diện** *trong khi radar (hoặc một kênh khác) vẫn còn đối chứng một tín hiệu phản hồi* — che khuất kéo dài bởi xe tải. Chỉ giới hạn phần đối chứng **không được làm mới**; một tín hiệu phản hồi đang hoạt động sẽ làm mới nó. | Quá `T_occlusion` mà radar **vẫn** đối chứng → **CAMERA_OCCLUDED_DEGRADED** (vẫn BẬT + cảnh báo cho vận hành), không bao giờ xóa âm thầm ([ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)). |
+| `T_degraded_max` | ví dụ 5 phút (tinh chỉnh được) | **Giới hạn cứng cho `CAMERA_OCCLUDED_DEGRADED`** — thời gian tối đa cảnh báo có thể duy trì BẬT khi **camera bị che và chỉ radar đối chứng** trước khi máy buộc một định đoạt rõ ràng, lớn tiếng. | Watchdog **không thể** giới hạn trạng thái này — đối chứng bằng radar cố ý vô hiệu hóa nó — nên không có `T_degraded_max` thì một tín hiệu radar bị nhầm là xe ở lề (xe tải che khuất ở làn thông xe, khi tiêu chí (b) của [ADR-0001](adr/ADR-0001-sensing-modality.vi.md) yếu) sẽ giữ bảng BẬT **vô hạn**. Khi hết hạn mà camera chưa thu nhận lại được: **buộc xóa lớn-tiếng độ-tin-cậy-thấp + leo thang mức cao nhất** tới người trực, người sau đó nắm quyền định đoạt ([ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md), [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.vi.md)). |
 | `T_activate` | ≤ 2 s | Từ confirmed → bảng thực sự được khẳng định BẬT. | Bị giới hạn bởi NFR-01 (đã định mức cho phần phụ trợ VMS). |
 | `T_watchdog` | ≤ 30 s | Thời gian tối đa một cảnh báo có thể duy trì BẬT mà **không** có xác nhận hoặc đối chứng mới từ bất kỳ kênh nào. | Khi hết hạn: **xóa + phát ra một lỗi** (logic có thể đang bị kẹt cứng). Ngăn tình trạng kẹt-BẬT vô thời hạn (NFR-04). |
 | `T_assert_refresh` | 0.5 s | Chu kỳ mà thiết bị biên làm mới tín hiệu khẳng định SHOW gửi tới **bộ điều khiển biển báo**. | Phải nằm dưới `T_signhold` đủ nhiều để nhiễu động bình thường không bao giờ làm trống một cảnh báo đang hoạt động. |
 | `T_signhold` | 2 s | **Cơ chế tự ngắt an toàn của bộ điều khiển biển báo (dead-man's switch)**: làm trống biển báo nếu không có SHOW mới đến trong khoảng thời gian này (bao quát máy trạng thái bị sập, thiết bị biên chết, liên kết bị cắt). | Đồng thời là **thời gian kẹt-BẬT tối đa sau một sự cố cứng** *và* **khoảng hở nhịp tối thiểu khiến một cảnh báo đúng và đang hoạt động bị làm trống** ([ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)). |
 | cổng tốc độ | < 3 km/h | Ngưỡng mà dưới đó một vết được tính là "đứng yên". | Phân biệt "đang dừng" với "bò chậm dọc lề đường". |
+| `T_person_debounce` | ~1–2 s trong/cạnh ROI | **Kích hoạt cảnh báo cho người đi bộ** (FR-08): một đối tượng lớp *person* được phát hiện trong hoặc ngay cạnh ROI, có khử dội — **không** theo đường speed-gate+dwell, vốn một người gặp nạn đang *đi bộ* (3–6 km/h) sẽ không thỏa `< 3 km/h`. | Quá thấp → một người băng/qua thoáng qua gây kích hoạt giả; quá cao → cảnh báo muộn cho người đang gặp nguy. Tính bền vững vẫn hẹp hơn của xe (không có giữ-khi-che-khuất bằng radar — [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md)). |
 
 **Ngữ nghĩa ROI.** Một phát hiện được tính là trong-ROI bằng **mức chồng lấn vùng tiếp xúc theo tỷ lệ**
 với đa giác ROI (mặc định ≥ 50 % vùng tiếp xúc mặt đất của vết nằm bên trong), chứ không phải một điểm
@@ -250,6 +254,11 @@ sát tình trạng, và lỗi này được theo dõi như một rủi ro
 **Vì sao mỗi điều kiện bảo vệ tồn tại (ánh xạ tới một lỗi thực tế):**
 
 - *Dwell* → một xe trôi qua hoặc chạm vào lề đường trong chốc lát **không** kích hoạt.
+- *Kích hoạt theo hiện diện cho người đi bộ* → một cảnh báo cho **người** (FR-08) được nêu ra khi *hiện
+  diện* trong/cạnh ROI (có khử dội, `T_person_debounce`), **không** theo cổng tĩnh tại — vì một người gặp
+  nạn thường *di chuyển* (đi bộ quanh xe) và sẽ không bao giờ thỏa cổng tốc độ `< 3 km/h`. Dùng đường của
+  xe cho người sẽ bỏ sót một cách hệ thống đúng cái hiểm họa người đi bộ mà H-C nêu tên
+  ([tài liệu 04 §1](04-risk-and-safety.vi.md#1-bảng-đăng-ký-rủi-ro), [ADR-0003](adr/ADR-0003-detection-algorithm.vi.md)).
 - *Hysteresis ngắn (`T_hold`)* → nhấp nháy phát hiện trong chốc lát không làm cảnh báo chớp tắt/bật.
 - *Giữ khi che khuất (`T_occlusion`) + đối chứng bằng radar* → một xe tải ở làn thông xe che khuất chiếc
   xe đang dừng trong nhiều giây **không** làm rớt một cảnh báo đang hoạt động, vì radar vẫn còn thấy tín
@@ -267,6 +276,15 @@ sát tình trạng, và lỗi này được theo dõi như một rủi ro
 - *Watchdog* → nếu logic bị kẹt cứng, hoặc mọi kênh thực sự mất mục tiêu mà không thấy thoát ra, watchdog
   **xóa và phát ra một lỗi** — một lần xóa độ-tin-cậy-thấp *rõ ràng*, có ghi nhật ký, không bao giờ là một
   lần kẹt-BẬT âm thầm. **Không cảnh báo nào có thể kẹt BẬT mãi mãi.**
+- *Giữ-suy-giảm có giới hạn (`T_degraded_max`)* → watchdog ở trên **cố ý bị vô hiệu hóa** trong khi radar
+  còn đối chứng ([ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md)), nên
+  `CAMERA_OCCLUDED_DEGRADED` — camera bị che, chỉ radar giữ cảnh báo BẬT — là trạng thái duy nhất watchdog
+  không giới hạn được. Nếu tiêu chí (b) yếu, tín hiệu "đối chứng" có thể là **xe tải che khuất ở làn thông
+  xe**, không phải xe ở lề, và cảnh báo sẽ ở BẬT **vô hạn** dựa trên một tín hiệu không kiểm chứng được.
+  `T_degraded_max` buộc một định đoạt **lớn tiếng** (xóa độ-tin-cậy-thấp + leo thang mức cao nhất tới người
+  trực, [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.vi.md)) để **không trạng thái nào —
+  phần mềm *hay* phân biệt-cảm-biến — giữ bảng BẬT mãi mà không có xác nhận quy-được-về-làn** (NFR-04).
+  Đây là đường giữ-vô-hạn cuối cùng được khép lại.
 - *Trạng thái an toàn* → khi có bất kỳ lỗi trọng yếu nào, máy rời khỏi vận hành bình thường và leo thang
   xử lý; bảng có thể bị buộc về trạng thái an toàn bởi **bộ giám sát tình trạng độc lập** ngay cả khi máy
   trạng thái bị kẹt cứng (cơ chế an toàn tự kích hoạt khi mất tín hiệu (dead-man's switch),
@@ -298,7 +316,7 @@ vết đứng yên trải khắp các làn thông xe) và **chặn hoặc đổi
 là một kịch bản chấp nhận tường minh ([tài liệu 01 §5](01-requirements.vi.md#5-chỉ-số-đánh-giá--tiêu-chí-nghiệm-thu))
 và một rủi ro được theo dõi ([tài liệu 04 R14](04-risk-and-safety.vi.md#1-bảng-đăng-ký-rủi-ro)). Hai hệ quả phải được nêu rõ, không che giấu: (1) chặn cảnh báo trong một đám kẹt xe là một **khoảng trống phạm vi bao phủ có chủ đích trong một điều kiện nguy-hiểm-hàng-đầu _có tên gọi_** ("mật độ giao thông cao", [tài liệu 00 §1](00-context-and-glossary.vi.md)), nên nó được ghi nhận như một **giới hạn của sự bảo vệ** ([tài liệu 04 §0](04-risk-and-safety.vi.md)), chứ không chỉ là một biện pháp kiểm soát kích hoạt sai; (2) việc *đổi-thông-điệp* tiền giả định tồn tại một **thông báo tuân thủ QCVN 41 thứ hai** — nếu không có, chỉ có ức chế là khả dụng ([ADR-0004](adr/ADR-0004-warning-actuator-integration.vi.md)).
 
-**Khởi động lại nóng trong khi một cảnh báo đang BẬT — một sự tái-phơi-nhiễm mà quy tắc xe-có-mặt-khi-khởi-động nguội không bao trùm.** Quy tắc xe-có-mặt-khi-khởi-động (coi một xe có mặt lúc khởi động là một vết mới, chạy đủ dwell) được viết cho khởi động *nguội*. Một **lần khởi động lại ngoài kế hoạch** (chớp nguồn, sập-rồi-khởi-động-lại) *trong khi một cảnh báo đang BẬT* thì khác: cơ chế tự ngắt an toàn làm trống biển báo đúng cách trong thời gian ngừng, nhưng khi khởi động lại chiếc xe vẫn-đang-dừng phải phục vụ lại trọn vẹn `T_dwell` trước khi cảnh báo quay lại — một **cửa sổ phơi-nhiễm-không-được-cảnh-báo mới cho một chiếc xe vốn đã được bảo vệ** ([tài liệu 01 §4](01-requirements.vi.md#4-bố-trí-cảnh-báo--phép-tính-mà-đề-xuất-bỏ-sót)). Các lần OTA/khởi động lại theo kế hoạch được hoãn khi một cảnh báo đang hoạt động (FR-21); các lần ngoài kế hoạch thì không, nên sự tái-phơi-nhiễm này là một phần dư đã được nêu. Một cờ *cảnh-báo-đang-hoạt-động-lúc-tắt* được lưu lại có thể rút ngắn việc xác nhận lại cho một chiếc xe vẫn ở cùng vị trí ROI khi khởi động lại — sẽ quyết định trong thiết kế chi tiết.
+**Khởi động lại nóng trong khi một cảnh báo đang BẬT — một sự tái-phơi-nhiễm mà quy tắc xe-có-mặt-khi-khởi-động nguội không bao trùm.** Quy tắc xe-có-mặt-khi-khởi-động (coi một xe có mặt lúc khởi động là một vết mới, chạy đủ dwell) được viết cho khởi động *nguội*. Một **lần khởi động lại ngoài kế hoạch** (chớp nguồn, sập-rồi-khởi-động-lại) *trong khi một cảnh báo đang BẬT* thì khác: cơ chế tự ngắt an toàn làm trống biển báo đúng cách trong thời gian ngừng, nhưng khi khởi động lại chiếc xe vẫn-đang-dừng phải phục vụ lại trọn vẹn `T_dwell` trước khi cảnh báo quay lại — một **cửa sổ phơi-nhiễm-không-được-cảnh-báo mới cho một chiếc xe vốn đã được bảo vệ** ([tài liệu 01 §4](01-requirements.vi.md#4-bố-trí-cảnh-báo--phép-tính-mà-đề-xuất-bỏ-sót)). Các lần OTA/khởi động lại theo kế hoạch được hoãn khi một cảnh báo đang hoạt động (FR-21); các lần ngoài kế hoạch thì không, nên sự tái-phơi-nhiễm này là một phần dư đã được nêu. Một cờ *cảnh-báo-đang-hoạt-động-lúc-tắt* được lưu lại có thể rút ngắn việc xác nhận lại cho một chiếc xe vẫn ở cùng vị trí ROI khi khởi động lại — **một câu hỏi an toàn còn mở** cần giải quyết tường minh trong thiết kế chi tiết ([tài liệu 04 §5 Q7](04-risk-and-safety.vi.md#5-các-câu-hỏi-an-toàn-còn-mở-cho-nhóm)): rút ngắn việc xác nhận lại đánh đổi cửa sổ tái-phơi-nhiễm với khả năng **kẹt-BẬT trên một chiếc xe thực ra đã rời đi trong lúc ngừng**, nên không được làm một cách mù quáng.
 
 ## 5. Luồng dữ liệu lúc chạy (đường thuận lợi)
 
@@ -392,7 +410,8 @@ giới trừu tượng hóa ở trên là cam kết kiến trúc.**
 > tại hiện trường trong hầm không có NTP và đồng hồ tường chạy tự do thì bị trôi. Hãy chọn nguồn thời gian một
 > cách tường minh trong thiết kế chi tiết — ví dụ **GNSS/PPS cho thời gian tuyệt đối + một đồng hồ dùng chung
 > hoặc PTP cho đồng bộ giữa các cảm biến**, duy trì qua các lần mất kết nối — thay vì thừa hưởng bất cứ thứ gì
-> mà đồng hồ của hệ điều hành làm ([ADR-0001](adr/ADR-0001-sensing-modality.vi.md) AI#3).
+> mà đồng hồ của hệ điều hành làm. Đây nay là một **yêu cầu (NFR-16)**, không chỉ là một ghi chú thiết kế
+> ([ADR-0001](adr/ADR-0001-sensing-modality.vi.md) AI#3).
 
 ## 8. Ngăn xếp công nghệ khuyến nghị (mang tính chỉ dẫn, không ràng buộc)
 
