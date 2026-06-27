@@ -5,6 +5,8 @@
 > *"Nghiên cứu giải pháp cảnh báo tự động cho làn dừng xe khẩn cấp để giảm thiểu tai nạn giao thông"*
 > — Trường Đại học Quản lý và Công nghệ TP.HCM, Khoa Công nghệ. Chủ nhiệm: ThS. Phó Trí Tín.
 
+> 🇻🇳 **Phiên bản tiếng Việt (bản dịch đầy đủ):** [README.vi.md](README.vi.md) — toàn bộ tài liệu 00–04 và các ADR đều có bản `.vi.md` song song.
+
 ---
 
 ## What this system does
@@ -34,6 +36,7 @@ triangles) to **active, automatic warning** — the central thesis of the propos
 | 02 | [docs/02-system-architecture.md](docs/02-system-architecture.md) | The architecture: logical & physical views, components, the detection→warning state machine, data flow, deployment, interfaces, tech stack |
 | 03 | [docs/03-roadmap-and-phasing.md](docs/03-roadmap-and-phasing.md) | Engineering roadmap mapped onto the proposal's 6 phases, MVP definition, **budget reality check** |
 | 04 | [docs/04-risk-and-safety.md](docs/04-risk-and-safety.md) | Risk register, FMEA-lite, fail-safe design, privacy & legal compliance |
+| 05 | [docs/05-field-pilot-proposal.md](docs/05-field-pilot-proposal.md) | Provincial (cấp sở) field-pilot proposal — draft (the follow-on docs 03–04 set up) |
 | — | [docs/adr/README.md](docs/adr/README.md) | Architecture Decision Records index (6 ADRs covering the load-bearing technical choices) |
 
 Figure 1 from the proposal (the concept infographic) is preserved at
@@ -41,6 +44,12 @@ Figure 1 from the proposal (the concept infographic) is preserved at
 faithfully reflected by the architecture in document 02.
 
 ## Architecture at a glance
+
+![System architecture overview: a roadside edge unit detects a stopped vehicle in the emergency-lane detection zone and drives an upstream warning sign placed at least the decision sight distance ahead; a non-critical traffic management center provides oversight.](docs/assets/architecture-diagram.svg)
+
+*Tiếng Việt: [sơ đồ kiến trúc](docs/assets/architecture-diagram-vi.svg) · [máy trạng thái](docs/assets/state-machine-diagram-vi.svg) · [trình tự vận hành](docs/assets/runtime-sequence-diagram-vi.svg).*
+
+<details><summary>Same view as an editable Mermaid diagram</summary>
 
 ```mermaid
 flowchart LR
@@ -54,6 +63,8 @@ flowchart LR
     style Field fill:#eef6ff,stroke:#3b82f6
     style C fill:#f0fdf4,stroke:#22c55e
 ```
+
+</details>
 
 The **safety-critical loop (sensor → edge → sign) runs entirely at the edge** and never depends on
 the network or cloud. The center is for monitoring, audit, and software updates only. See
@@ -115,4 +126,5 @@ Nothing here is built yet. ADRs are marked *Proposed* until the project team acc
 
 *Language note:* documents are written in English (engineering lingua franca, matching the project
 name) with a **bilingual glossary** mapping every key term back to the Vietnamese proposal. A full
-Vietnamese rendering can be produced on request.
+Vietnamese rendering is available — every document has a `.vi.md` sibling (start at
+[README.vi.md](README.vi.md)), and every diagram has a `-vi.svg` variant.

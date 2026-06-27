@@ -105,3 +105,5 @@ A field pilot proposal backed by: a working closed-loop prototype, measured prot
 accepted architecture and ADRs, a **safety case skeleton** (from [doc 04](04-risk-and-safety.md)),
 a per-site **DSD-based siting method**, and a realistic field **bill of materials and budget**. That
 package is exactly what a provincial grant and an expressway-operator partnership need to say yes.
+
+→ That follow-on is drafted in **[doc 05 — field-pilot proposal](05-field-pilot-proposal.md)**.

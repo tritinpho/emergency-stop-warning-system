@@ -10,6 +10,13 @@ this way. It is faithful to Figure 1 of the proposal (the concept infographic, p
 [assets/figure-1-concept-infographic.jpeg](assets/figure-1-concept-infographic.jpeg)) and makes it
 buildable.
 
+![Polished system architecture: road geometry (warning sign placed ≥ decision sight distance upstream of the detection zone), the roadside edge unit (sensors → perception → state machine → warning-sign actuator, with an independent health monitor), and a non-critical traffic management center.](assets/architecture-diagram.svg)
+
+*Tiếng Việt: [sơ đồ kiến trúc](assets/architecture-diagram-vi.svg).*
+
+*Overview — the safety-critical loop (blue) runs at the edge; the center (teal) is oversight only;
+amber is everything the driver sees. The detailed views follow below.*
+
 ---
 
 ## 1. Architectural drivers
@@ -93,6 +100,14 @@ flowchart TB
 
 ## 3. Physical / deployment architecture
 
+![Deployment / physical layout: a roadside mast and cabinet hold the camera+radar sensor head, the edge compute (IP65), and solar+battery power; the edge unit watches the detection zone, drives a warning sign placed upstream by ≥ the decision sight distance over a cable/RF link, and connects to the traffic management center over 4G·LTE/fibre.](assets/deployment-diagram.svg)
+
+*Tiếng Việt: [sơ đồ triển khai](assets/deployment-diagram-vi.svg).*
+
+*The roadside unit is one physical site: sensors + edge compute + power on the mast/cabinet, the
+sign placed upstream (cable or radio link), and a non-critical uplink to the center. The editable
+Mermaid source follows.*
+
 ```mermaid
 flowchart LR
     subgraph POLE["Roadside mast (≈6–8 m) over the emergency lane"]
@@ -139,6 +154,15 @@ This is where the proposal's "chu trình khép kín" (closed loop) becomes preci
 authority over the sign and the place where false-trigger, flapping, and stale-ON risks are
 controlled.
 
+![Detection-to-warning state machine: the idle → tracking → confirmed → warn-on → warn-hold → clearing cycle, with a watchdog self-loop on warn-on and a central safe state reachable from any state on a critical fault, returning to idle after a self-test passes.](assets/state-machine-diagram.svg)
+
+*Tiếng Việt: [sơ đồ máy trạng thái](assets/state-machine-diagram-vi.svg).*
+
+*Blue = normal monitoring, amber = warning shown, red = fault safe state. Dwell (default 5 s) gates
+false triggers; the warn-on ⇄ warn-hold pair with a 10 s hold absorbs occlusion; the watchdog
+re-confirms so no warning can stick on; the safe state is reachable from any state. The editable
+Mermaid source follows.*
+
 ```mermaid
 stateDiagram-v2
     [*] --> IDLE
@@ -179,6 +203,14 @@ stateDiagram-v2
 - *Safe state* → on any critical fault the machine leaves normal operation and escalates (ADR-0005).
 
 ## 5. Runtime data flow (happy path)
+
+![Runtime sequence: vehicle stops → sensors feed perception → state machine confirms after a 5 s dwell → sign shown → center notified asynchronously; while the vehicle stays, tracks keep the hold timer reset; on departure, after a 10 s hold the state machine clears the sign and notifies the center.](assets/runtime-sequence-diagram.svg)
+
+*Tiếng Việt: [sơ đồ trình tự](assets/runtime-sequence-diagram-vi.svg).*
+
+*The sign displays "stopped vehicle ahead" (PHÍA TRƯỚC CÓ XE DỪNG KHẨN CẤP). Dashed arrows are
+asynchronous/return messages — the TMC notifications are fire-and-forget, so a down link never
+stalls the safety loop. The editable Mermaid source follows.*
 
 ```mermaid
 sequenceDiagram
