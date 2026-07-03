@@ -21,6 +21,7 @@ consequences. They follow the standard ADR format. The **software-owned** decisi
 | [ADR-0012](ADR-0012-security-and-threat-model.md) | Security posture & consolidated threat model — scopes the NFR-09 claim to an enumerated surface (sign link, override, config/OTA, sensor denial) | Proposed — **hardware/ops** (sw auth done) |
 | [ADR-0013](ADR-0013-degraded-hold-unification.md) | Degraded-hold unification — a camera-unverified warning (occlusion *or* fault) is bounded by `T_degraded_max`; closes the unbounded RADAR-ONLY hold + enumerates the warning × sensor-mode matrix | **Accepted (sw)** 2026-06-27 |
 | [ADR-0014](ADR-0014-sign-link-bearer.md) | Sign-link bearer for IF-4 — LoRa point-to-point, and the 433 MHz duty-cycle constraint on the dead-man's switch | Proposed — **hardware/firmware + software** (sw analysis done; gated on bench + regulatory) |
+| [ADR-0015](ADR-0015-state-machine-implementation-strategy.md) | State-machine build strategy — SC-01..30 oracles as the executable spec, fixed-rate tick, MicroPython runtime | **Accepted (sw)** 2026-07-03 · D3 runtime pending spike |
 
 **Scope note (in lieu of a separate ADR):** the deployment **coverage model is discrete monitored
 zones at high-value locations**, not continuous coverage, and the funded scope is **one pilot zone /
