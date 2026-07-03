@@ -24,6 +24,7 @@ cơ quan quản lý) — cột Trạng thái nêu rõ đội nào.
 | [ADR-0012](ADR-0012-security-and-threat-model.vi.md) | Tư thế an ninh & mô hình mối đe dọa hợp nhất — giới hạn phạm vi tuyên bố NFR-09 vào một bề mặt được liệt kê (liên kết biển báo, ghi đè, cấu hình/OTA, vô hiệu hóa cảm biến) | Đề xuất — **phần cứng/vận hành** (xác thực pm đã xong) |
 | [ADR-0013](ADR-0013-degraded-hold-unification.vi.md) | Hợp nhất trạng thái giữ-khi-suy-giảm — một cảnh báo khi camera không xác thực được (che khuất *hoặc* lỗi) được giới hạn bởi T_degraded_max; đóng lỗ giữ-vô-hạn của RADAR-ONLY + liệt kê ma trận trạng thái cảnh báo × chế độ cảm biến | **Đã chấp nhận (pm)** 2026-06-27 |
 | [ADR-0014](ADR-0014-sign-link-bearer.vi.md) | Phương tiện mang tín hiệu cho liên kết biển báo IF-4 — LoRa điểm-điểm, và ràng buộc chu kỳ làm việc 433 MHz lên cơ chế tự ngắt an toàn | Đề xuất — **phần cứng/firmware + phần mềm** (phân tích pm đã xong; chờ đo bench + pháp lý) |
+| [ADR-0015](ADR-0015-state-machine-implementation-strategy.vi.md) | Chiến lược hiện thực máy trạng thái — bộ oracle SC-01..30 làm đặc tả thực thi, tick cố định nhịp, runtime MicroPython | **Đã chấp nhận (pm)** 2026-07-03 · D3 runtime chờ spike |
 
 **Ghi chú phạm vi (thay cho một ADR riêng):** **mô hình phạm vi giám sát** khi triển khai là **các
 vùng giám sát rời rạc tại những vị trí có giá trị cao**, không phải giám sát liên tục, và phạm vi được
