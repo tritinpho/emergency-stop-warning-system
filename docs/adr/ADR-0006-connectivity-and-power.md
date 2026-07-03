@@ -27,6 +27,11 @@ needs vs intermittent links, cost, and maintenance.
   Optionally **LoRaWAN** as a low-power side-channel for heartbeats where cellular is poor. The
   safety loop **never** depends on any of these.
 
+> **Not the sign link.** The LoRa/LoRaWAN mentioned here is the **non-safety** edge→TMC telemetry
+> side-channel. The edge→**sign** link (IF-4) is safety-critical and is specified separately in
+> [ADR-0014](ADR-0014-sign-link-bearer.md) — do not conflate the two: the IF-4 bearer inherits
+> authentication, anti-replay, and refreshed-assertion timing that a telemetry side-channel does not.
+
 ## Options Considered
 
 ### Option A: Assume mains + always-on cellular

@@ -91,5 +91,10 @@ simulation · **F** = field-deferred (cấp sở) · **D** = design/review only.
 - **Fault coverage is a fraction of *bench-injectable* modes.** Calibration drift, edge-box/link death at
   the ≥ DSD distance, and solar depletion are **field-only**; the ≥ 95 % fault-detection target is
   reported over what the bench can inject ([doc 04 §2](04-risk-and-safety.md#2-fmea-lite-failure-mode--effect--detection--response)).
+- **The IF-4 sign-link bearer is now decided** — LoRa point-to-point ([ADR-0014](adr/ADR-0014-sign-link-bearer.md))
+  — and adds a **field-deferred** item: the over-distance **duty-cycle / loss / latency budget that sets
+  `T_signhold`** (the 433 MHz duty limit can bind the dead-man's-switch refresh rate). It governs
+  FR-11 / NFR-01 / NFR-04 at the link layer and joins the ≥ DSD link validation already field-deferred by
+  [ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md).
 - **Everything tagged F carries to field-pilot acceptance** ([doc 05 §11](05-field-pilot-proposal.md#11-acceptance-kpis-field));
   nothing tagged F is a measured prototype result.

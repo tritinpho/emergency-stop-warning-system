@@ -194,6 +194,6 @@ suốt về **thời gian + dấu vân tay**.
 **Hoãn lại sang lần tích hợp đầu tiên (Giai đoạn 4), được theo dõi như các hạng mục mở:**
 - **Mã hóa truyền** cụ thể — protobuf so với JSON cho IF-2/3/6/7; cây topic MQTT chính xác.
 - **Hồ sơ giao thức VMS** cụ thể (kiểu NTCIP / API của nhà cung cấp) cho phần phụ trợ VMS-hiện-có, và các quy tắc ưu tiên phân xử của nó ([ADR-0004](adr/ADR-0004-warning-actuator-integration.vi.md) AI#2/#5).
-- Lựa chọn **liên kết hiện trường vật lý** (cáp so với RF) cho IF-4 và ngân sách mất gói/độ trễ/năng lượng/xác thực của nó ở cự ly ≥ DSD (kiểm chứng bị hoãn sang hiện trường, [ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)).
+- **Liên kết hiện trường vật lý** cho IF-4: **phương tiện mang nay đã được chọn — LoRa điểm-điểm** ([ADR-0014](adr/ADR-0014-sign-link-bearer.vi.md)); ngân sách mất-gói/độ-trễ/năng-lượng/xác-thực **và chu kỳ làm việc** của nó ở cự ly ≥ DSD — vốn đồng-quyết-định `T_signhold` — vẫn **bị hoãn sang hiện trường** ([ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)).
 - **Quản lý khóa** chính xác cho xác thực IF-4/8/9/10 (nguyên mẫu: khóa được cấp phát lúc đưa vào vận hành; quản lý khóa ở quy mô đội thiết bị là việc của hiện trường/sản-phẩm-hóa, [ADR-0012](adr/ADR-0012-security-and-threat-model.vi.md)).
 - Nội dung **`message_set`** đã duyệt — chờ cổng tuân thủ QCVN 41 ([ADR-0004](adr/ADR-0004-warning-actuator-integration.vi.md) AI#4); nếu chỉ tồn tại một phần tử hợp pháp duy nhất, việc **đổi-thông-điệp** khi ùn tắc là không khả dụng và thiết kế chỉ-ức-chế.

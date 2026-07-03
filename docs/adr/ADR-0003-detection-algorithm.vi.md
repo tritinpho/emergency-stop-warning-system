@@ -98,6 +98,12 @@ so với sai phân điểm ảnh (Phương án A). Nó phù hợp với giới h
 - **Xem xét lại khi:** độ chính xác hiện trường đòi hỏi một mô hình mạnh hơn tại các vị trí khó (thay
   bộ phát hiện phía sau cùng một giao diện), hoặc khi các lớp sự kiện mới (mảnh vỡ, đi ngược chiều)
   biện minh cho một mô hình phong phú hơn (FR-18).
+- **Ghi chú nền tảng (2026-07-03, Tuần 1 phần cứng):** mục tiêu biên cụ thể là **Kendryte K230**
+  (RISC-V + KPU, CanMV/MicroPython, `kmodel`), không phải đường Jetson/TensorRT mà Phương án B ngầm giả
+  định — bộ phát hiện phải chuyển đổi/lượng-tử-hóa sang `kmodel` và đo chuẩn lại (AI#1). Với radar hiện
+  đang vắng mặt ([ADR-0001](ADR-0001-sensing-modality.vi.md) chưa được giải quyết), việc kiểm tra chéo
+  tính đứng yên bằng radar là không có — tính đứng yên chỉ dựa vào theo dõi bằng camera cho đến khi RQ-H1
+  được giải quyết ([tài liệu 09](../09-software-hardware-handoff.vi.md)).
 
 ## Hạng mục hành động
 

@@ -190,6 +190,6 @@ fingerprint** cross-cutting rules.
 **Deferred to first integration (Phase 4), tracked as open items:**
 - Concrete **wire encoding** — protobuf vs JSON for IF-2/3/6/7; exact MQTT topic tree.
 - The specific **VMS protocol profile** (NTCIP-style / vendor API) for the existing-VMS backend, and its arbitration-priority rules ([ADR-0004](adr/ADR-0004-warning-actuator-integration.md) AI#2/#5).
-- The **physical field-link** choice (cable vs RF) for IF-4 and its loss/latency/energy/auth budget at ≥ DSD distance (field-deferred validation, [ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)).
+- The **physical field-link** for IF-4: the **bearer is now chosen — LoRa point-to-point** ([ADR-0014](adr/ADR-0014-sign-link-bearer.md)); its loss/latency/energy/auth **and duty-cycle** budget at ≥ DSD distance — which co-determines `T_signhold` — remains **field-deferred** ([ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)).
 - Exact **key-management** for IF-4/8/9/10 auth (prototype: keys provisioned at commissioning; fleet-scale key management is field/productisation, [ADR-0012](adr/ADR-0012-security-and-threat-model.md)).
 - The approved **`message_set`** contents — pending the QCVN-41 conformance gate ([ADR-0004](adr/ADR-0004-warning-actuator-integration.md) AI#4); if only one legal element exists, congestion **re-messaging** is unavailable and the design is suppression-only.
