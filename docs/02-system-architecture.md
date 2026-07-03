@@ -121,7 +121,7 @@ Mermaid source follows.*
 flowchart LR
     subgraph POLE["Roadside mast (≈6–8 m) over the emergency lane"]
         SENSORS["AI camera + radar<br/>(IP65, heated/IR as needed)"]
-        EDGE["Edge compute<br/>(e.g. Jetson Orin Nano / Pi+accelerator)<br/>IP65 enclosure"]
+        EDGE["Edge compute<br/>(Kendryte K230: RISC-V + KPU NPU,<br/>CanMV/MicroPython)<br/>IP65 enclosure"]
         PWR["Power: mains, or<br/>solar panel + battery (≥72h)"]
         SENSORS --- EDGE
         PWR --- EDGE
@@ -504,7 +504,7 @@ firm up during Phase-4 integration).
 
 | Layer | Recommendation | Rationale |
 |-------|----------------|-----------|
-| Edge compute | NVIDIA Jetson Orin Nano *or* Raspberry Pi 5 + Hailo/Coral accelerator | Enough TOPS for a small detector at the edge; low power for solar. |
+| Edge compute | **Kendryte K230** (RISC-V + KPU NPU, CanMV/MicroPython) — selected by the hardware team | On-chip NPU runs a small detector at low, solar-friendly power; detector converts to `kmodel` ([ADR-0003](adr/ADR-0003-detection-algorithm.md)); safety loop per [ADR-0015](adr/ADR-0015-state-machine-implementation-strategy.md). |
 | Camera | Global-shutter or good-WDR IP camera; IR illumination for night | Handles glare and night per NFR-05. |
 | Radar | Automotive-grade 24/77 GHz presence+range radar | Night/fog/rain presence; complements camera (ADR-0001). |
 | Perception | Compact detector (YOLO-nano / SSD-Mobilenet class) + ROI gating + simple tracker (SORT/ByteTrack) | Robust, cheap, edge-friendly (ADR-0003). |
