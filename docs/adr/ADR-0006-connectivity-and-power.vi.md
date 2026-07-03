@@ -17,6 +17,11 @@ Các yếu tố tác động: tự do chọn vị trí so với mức sẵn có 
 - **Nguồn điện:** hỗ trợ **điện lưới ở nơi có sẵn, và pin mặt trời + ắc quy ở những nơi khác**, được tính toán kích cỡ cho **≥ 72 h tự chủ khi không có nắng** (NFR-07). Điều này biến ngân sách nguồn điện thành một ràng buộc thiết kế hạng nhất, giới hạn việc lựa chọn cảm biến và khối tính toán.
 - **Kết nối:** **4G/LTE (hoặc cáp quang ở nơi có sẵn) cho đo lường từ xa/OTA**, được sử dụng theo cơ chế **lưu và chuyển (store-and-forward)** — các sự kiện và nhịp tín hiệu xếp hàng cục bộ và đồng bộ khi có cơ hội. Tùy chọn dùng **LoRaWAN** làm kênh phụ công suất thấp cho nhịp tín hiệu ở nơi sóng di động kém. Vòng lặp an toàn **không bao giờ** phụ thuộc vào bất kỳ thứ nào trong số này.
 
+> **Không phải liên kết biển báo.** LoRa/LoRaWAN nêu ở đây là kênh phụ đo lường từ xa biên→TMC
+> **không-trọng-yếu-an-toàn**. Liên kết biên→**biển báo** (IF-4) là trọng yếu an toàn và được đặc tả
+> riêng trong [ADR-0014](ADR-0014-sign-link-bearer.vi.md) — đừng lẫn lộn hai thứ: phương tiện mang IF-4
+> thừa hưởng xác thực, chống phát lại, và định thời khẳng-định-làm-mới mà một kênh phụ đo lường từ xa không có.
+
 ## Các phương án đã xét
 
 ### Phương án A: Giả định có điện lưới + sóng di động luôn bật

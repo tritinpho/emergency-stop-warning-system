@@ -90,6 +90,12 @@ safety system — than a single opaque model (Option C), and far more robust tha
   (day/night/rain) for threshold tuning and evaluation; manage model versions via OTA.
 - **Revisit when:** field accuracy demands a stronger model at hard sites (swap the detector behind
   the same interface), or new event classes (debris, wrong-way) justify a richer model (FR-18).
+- **Platform note (2026-07-03, hardware Week-1):** the concrete edge target is the **Kendryte K230**
+  (RISC-V + KPU, CanMV/MicroPython, `kmodel`), not the Jetson/TensorRT path Option B implicitly assumed —
+  the detector must convert/quantise to `kmodel` and re-benchmark (AI#1). With radar currently absent
+  ([ADR-0001](ADR-0001-sensing-modality.md) unresolved), the radar stationarity cross-check is
+  unavailable — stationarity leans on camera tracking alone until RQ-H1 resolves
+  ([doc 09](../09-software-hardware-handoff.md)).
 
 ## Action Items
 

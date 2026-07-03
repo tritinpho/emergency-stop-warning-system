@@ -95,6 +95,11 @@ nghiệm hiện trường ([tài liệu 05 §11](05-field-pilot-proposal.vi.md#1
 - **Bao phủ lỗi là một phần của các chế độ *tiêm-được-trên-bàn-thử*.** Trôi hiệu chuẩn, hộp-biên/liên-kết
   chết ở cự ly ≥ DSD, và cạn pin mặt trời là **chỉ-hiện-trường**; chỉ tiêu ≥ 95 % phát-hiện-lỗi được báo
   cáo trên những gì bàn thử có thể tiêm ([tài liệu 04 §2](04-risk-and-safety.vi.md#2-fmea-lite-kiểu-lỗi--tác-động--phát-hiện--phản-ứng)).
+- **Phương tiện mang liên kết biển báo IF-4 nay đã được quyết** — LoRa điểm-điểm
+  ([ADR-0014](adr/ADR-0014-sign-link-bearer.vi.md)) — và thêm một hạng mục **hoãn-hiện-trường**: ngân sách
+  **chu-kỳ-làm-việc / mất-gói / độ-trễ qua khoảng cách vốn đặt ra `T_signhold`** (giới hạn chu kỳ 433 MHz có
+  thể ràng buộc tốc độ làm mới của cơ chế tự ngắt an toàn). Nó chi phối FR-11 / NFR-01 / NFR-04 ở lớp liên kết
+  và gia nhập việc kiểm chứng liên kết ≥ DSD vốn đã hoãn-hiện-trường bởi [ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md).
 - **Mọi thứ gắn nhãn F được chuyển sang nghiệm thu thử nghiệm hiện trường**
   ([tài liệu 05 §11](05-field-pilot-proposal.vi.md#11-kpi-nghiệm-thu-hiện-trường)); không gì gắn nhãn F là
   một kết quả nguyên mẫu đã đo.
