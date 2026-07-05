@@ -25,7 +25,7 @@ ROI_GATE = default_config()["roi_overlap_gate"]
 
 
 def _run(case):
-    perc = Perception(CALIB)
+    perc = Perception(case.get("calib", CALIB))       # a case may supply its own calibration
     steps = int(case["duration"] / TICK_DT) + 1
     timeline = []
     for i in range(steps):
@@ -63,13 +63,35 @@ def _score(case, timeline):
             fails.append((c["t"], "max_in_roi_lt", c["max_in_roi_lt"], round(max_roi, 2)))
         if "max_in_roi_gt" in c and not (max_roi > c["max_in_roi_gt"]):
             fails.append((c["t"], "max_in_roi_gt", c["max_in_roi_gt"], round(max_roi, 2)))
+    # Whole-run ID-switch metric: distinct track_ids the pipeline ever emitted. A single
+    # real object under dropout / jitter / class-confusion must stay ONE id (no switch).
+    if "n_ids" in case:
+        all_ids = set()
+        for (tt, e) in timeline:
+            for ev in e:
+                all_ids.add(ev["track_id"])
+        if len(all_ids) != case["n_ids"]:
+            fails.append(("run", "n_ids", case["n_ids"], len(all_ids)))
+    return fails
+
+
+def _score_loop(case):
+    """Closed-loop checks: run detections -> perception -> state machine -> sign and assert
+    the sign state at each loop checkpoint (a false detection must never light it; a real
+    track must not be spuriously cleared)."""
+    on_at = _closed_loop(case)
+    fails = []
+    for c in case.get("loop_checks", []):
+        got = on_at.get(round(c["t"], 3))
+        if got != c["on"]:
+            fails.append((c["t"], "sign_on", c["on"], got))
     return fails
 
 
 def _closed_loop(case):
     """End-to-end Level B: scripted detections -> REAL perception -> REAL state machine ->
     sign. Returns the sign on/off state at each tick."""
-    perc = Perception(CALIB)
+    perc = Perception(case.get("calib", CALIB))
     sm = StateMachine(default_config())
     sign = Sign(default_config())
     steps = int(case["duration"] / TICK_DT) + 1
@@ -92,6 +114,8 @@ def main():
     n_pass = 0
     for case in CASES:
         fails = _score(case, _run(case))
+        if "loop_checks" in case:
+            fails = fails + _score_loop(case)
         if fails:
             surprises.append((case["id"], fails))
             print("{:<7} {:<6} {}".format(case["id"], "FAIL", case["title"]))
