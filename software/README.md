@@ -43,29 +43,25 @@ stated reason. A regressed `impl` or a flipped `xfail` exits 1.
 
 ## The board today
 
-**8 passing · 1 intentional red · 21 pending.** The green set covers the happy path, dwell,
-pass-through, brief-occlusion hold, multi-vehicle set semantics, and the three fail-safe
+**30 passing · 0 red · 0 pending** — the full SC-01..30 catalogue is green (`exit 0`). Coverage:
+the happy path, dwell / creep / cold-start, pass-through, the set-based occlusion policy
+(`WARN_HOLD → CAMERA_OCCLUDED_DEGRADED → T_degraded_max` forced clear, incl. the weak-(b)
+stale-ON guard), the FULL / CAMERA-ONLY / RADAR-ONLY / NEITHER sensor-mode matrix (BLIND-TO-NEW),
+the watchdog, congestion suppression, pedestrian presence-onset, the motorcycle small-RCS case,
+warm reboot, operator override (force-on / force-off / mute, out-of-policy clamp), OTA-deferral,
+calibration-drift, sign-stuck → SAFE_STATE, alarm dedup / re-escalate, and the three fail-safe
 blank paths (kill SM / kill box / cut link → sign blanks ≤ `T_signhold`).
 
-## Red → green: how to grow it
+## Extending the board
 
-1. **SC-19 is the first target (currently red on purpose).** It pushes `T_dwell = 900 s`;
-   the oracle expects it clamped to 10 s (FR-20). Wire the clamp in `StateMachine.__init__`:
-
-   ```python
-   from esw.params import clamp_config
-   if config is not None:
-       config, _rejected = clamp_config(config)   # TODO(SC-19) -> this line turns it green
-   ```
-
-   (Verified: with this line, SC-19 flips to green.)
-
-2. **Then take the `todo` rows one at a time.** Each `# TODO(SC-xx)` marker in
-   `state_machine.py` names the scenario it unblocks — the watchdog (SC-28), the
-   occlusion/`CAMERA_OCCLUDED_DEGRADED` hold + `T_degraded_max` (SC-06..09), the sensor-mode
-   matrix (SC-25..27), override (SC-16..18), congestion (SC-11), pedestrian onset (SC-12).
-   Author the scenario's timeline + oracle in `catalogue.py`, flip its status `todo → impl`,
-   implement until green.
+The catalogue is the spec: to add a behaviour, author its scenario (timeline + oracle) in
+`catalogue.py`, then grow `state_machine.py` until the board is green again. A checkpoint may
+assert the sign state (`on`) and/or any disposition field the runner records
+(`state` / `posture` / `mode` / `alert` / `override` / `ota_deferred` / `alarm_count`), so an
+oracle can pin the *disposition*, not just whether the sign is lit (doc 07 §4). Occlusion /
+degraded tests shrink the safety timers via `config_push` (within the FR-20 bounds) for fast
+deterministic runs. Keep every change inside `esw/`'s MicroPython-safe subset — it ships
+byte-identical to the K230.
 
 ## MicroPython / K230 note
 
