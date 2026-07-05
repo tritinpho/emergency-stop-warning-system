@@ -22,24 +22,33 @@ software/
   esw/              # THE SUT — ships to the K230. MicroPython-safe subset, no sim-only branches.
     params.py       #   §7a safety-parameter surface + FR-20 clamps
     state_machine.py#   the decision state machine (doc 02 §4)
+    perception.py   #   IF-1→IF-2 pipeline: ROI gating + tracker (detector-agnostic, ADR-0003)
+    geometry.py     #   ground-plane homography + ROI-overlap geometry
   harness/          # host tooling — NOT shipped. Replaces only the sensor + sign ends.
-    sensors.py      #   scenario script -> IF-2 track events
+    sensors.py      #   Level-A: scenario script -> IF-2 track events
+    frames.py       #   Level-B: scenario script -> detector output (image bboxes)
     sign.py         #   synthetic sign controller + dead-man's switch (IF-4)
     runner.py       #   tick loop, fault injection, oracle comparator
   scenarios/
-    catalogue.py    #   SC-01..30 — the executable spec
-  run_tests.py      # the board
+    catalogue.py        #   SC-01..30 — Level-A executable spec (the state machine)
+    perception_cases.py #   PC-01.. — Level-B perception cases (IF-1→IF-2)
+  run_tests.py            # Level-A state-machine board
+  run_perception_tests.py # Level-B perception board
 ```
 
 ## Run
 
 ```
-python software/run_tests.py          # from the repo root
-micropython run_tests.py              # from software/, on the MicroPython unix port
+python software/run_tests.py             # Level A — SC-01..30 state-machine board
+python software/run_perception_tests.py  # Level B — perception (IF-1→IF-2) board
+micropython run_tests.py                 # from software/, on the MicroPython unix port
 ```
 
-Exit 0 when healthy: every `impl` scenario passes and every `xfail` still fails for its
-stated reason. A regressed `impl` or a flipped `xfail` exits 1.
+Both exit 0 when healthy and 1 on any surprise. **Level A** injects IF-2 events and tests the
+decision logic; **Level B** injects *detections* (image bboxes) and runs the **real** perception
+(ROI gating + tracker) that produces those events (doc 07 §2) — and closes the loop through the
+real state machine to the sign. The detector itself (a K230 `kmodel`) is a drop-in backend behind
+`Perception.step()`, so the perception pipeline is byte-identical in sim and on the board.
 
 ## The board today
 
