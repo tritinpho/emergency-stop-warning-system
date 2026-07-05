@@ -36,6 +36,35 @@ def footprint_box(cx, cy, w, length):
             (cx + hw, cy + hl), (cx - hw, cy + hl)]
 
 
+def footprint_projected(h, bbox, length_m, depth_probe=0.35):
+    """A camera/depth-aware ground footprint (more faithful than the axis-aligned
+    footprint_box near the ROI boundary, where perspective makes a box over/under-count).
+
+    Projects the bbox BASE corners (x1,y2) and (x2,y2) through the homography -- giving a
+    perspective-correct ground WIDTH and orientation from the actual detection -- then
+    extrudes by the class `length_m` along the ground "away-from-camera" direction. That
+    direction is recovered from the image column (a point `depth_probe` of the box height
+    above the base projects farther down-range), so this needs ONLY the homography -- no
+    explicit camera pose. Returns a 4-point ground quad (area/overlap use |area|, so the
+    winding is immaterial)."""
+    x1, y1, x2, y2 = bbox
+    bl = apply_homography(h, x1, y2)
+    br = apply_homography(h, x2, y2)
+    cxb = 0.5 * (x1 + x2)
+    base = apply_homography(h, cxb, y2)
+    up = apply_homography(h, cxb, y2 - depth_probe * (y2 - y1))
+    dx = up[0] - base[0]
+    dy = up[1] - base[1]
+    n = (dx * dx + dy * dy) ** 0.5
+    if n == 0.0:
+        n = 1e-9
+    ux = dx / n
+    uy = dy / n
+    fl = (bl[0] + ux * length_m, bl[1] + uy * length_m)
+    fr = (br[0] + ux * length_m, br[1] + uy * length_m)
+    return [bl, br, fr, fl]
+
+
 def polygon_area(poly):
     """Absolute area of a polygon via the shoelace formula."""
     n = len(poly)
