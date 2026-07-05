@@ -57,9 +57,12 @@ def main():
         for sid, msg, fails in surprises:
             print("  {}: {}".format(sid, msg))
             for (t, exp, got) in fails:
-                print("     t={}s expected on={} got on={}".format(t, exp, got))
+                print("     t={}s expected={} got={}".format(t, exp, got))
         return 1
-    print("harness OK -- implement a 'todo' or the SC-19 clamp to grow the green set.")
+    if n_todo or n_xfail:
+        print("harness OK -- implement a 'todo' or a red target to grow the green set.")
+    else:
+        print("harness OK -- all SC-01..30 green.")
     return 0
 
 
