@@ -74,7 +74,7 @@ So everything good about LoRa (reach, power, cost) is real, and Option A is the 
 
 ## Action Items
 
-1. [ ] **Bench airtime test** (sw + fw): measure SX1276 time-on-air for the real authenticated frame at candidate SF/BW/CR; compute the achievable refresh rate; verify `T_assert_refresh` ≤ ¼·`T_signhold` holds at a legal duty cycle.
+1. [ ] **Bench airtime test** (sw + fw): measure SX1276 time-on-air for the real authenticated frame at candidate SF/BW/CR; compute the achievable refresh rate; verify `T_assert_refresh` ≤ ¼·`T_signhold` holds at a legal duty cycle. **Software has now computed this for the frozen 29-byte frame** ([doc 10 §6](../10-if4-sign-controller-firmware-spec.md)): at SF7 / 10 % class the `T_signhold` floor is **~2.7 s** (fits the 3 s clamp, tight); SF8+ (which the 25 mW ERP range margin may force) or the 1 % terminal class give **4.9–27 s**, which defeats the dead-man's switch. The bench test now has a concrete prediction to confirm or refute.
 2. [ ] **Regulatory-class confirmation** (hw/ops): confirm under Circular 08/2021/TT-BTTTT whether the edge→sign transmitter is the **10 % (gateway)** or **1 % (terminal)** class, and the **25 mW ERP** cap; record the binding duty limit.
 3. [ ] **Range/margin test** at ≥315 m near-LOS incl. wet conditions at the chosen SF; confirm the link budget with fade margin at ≤ 25 mW ERP.
 4. [ ] **Evaluate 920–923 MHz** VN LPWAN as the Option-C front-runner (duty / LBT rules, module availability, power).

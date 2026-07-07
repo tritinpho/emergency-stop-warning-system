@@ -41,7 +41,8 @@ phản quang do tài xế đặt) sang **cảnh báo chủ động, tự động
 | 07 | [docs/07-simulation-methodology.vi.md](docs/07-simulation-methodology.vi.md) | **Phương pháp luận mô phỏng & kiểm chứng** (cố định Giai đoạn 2) — khung kiểm thử, mô hình cảm biến tổng hợp, bộ chuẩn đối chiếu (oracle), danh mục kịch bản có mã, tiêu chí đạt đăng ký trước |
 | 08 | [docs/08-interface-control-document.vi.md](docs/08-interface-control-document.vi.md) | **Tài liệu Kiểm soát Giao diện (ICD) v1** — danh mục giao diện cụ thể, lược đồ thông điệp, giao thức liên kết biển báo được xác thực, hợp đồng cấu hình/OTA/ghi đè |
 | 09 | [docs/09-software-hardware-handoff.vi.md](docs/09-software-hardware-handoff.vi.md) | **Bàn giao yêu cầu & giao diện Phần mềm → Phần cứng** — những gì phần mềm cần ở lựa chọn linh kiện phần cứng/firmware (RQ-H1..H7), và các quyết định liên-đội đang chặn các ADR còn ở trạng thái Đề xuất |
-| — | [docs/adr/README.vi.md](docs/adr/README.vi.md) | Mục lục các Bản ghi quyết định kiến trúc (ADR) (13 ADR; **bộ thuộc phần mềm đã chấp nhận 2026-06-27**, phần còn lại Đề xuất chờ phần cứng/vận hành) |
+| 10 | [docs/10-if4-sign-controller-firmware-spec.vi.md](docs/10-if4-sign-controller-firmware-spec.vi.md) | **Đặc tả firmware bộ điều khiển biển báo IF-4 (RQ-H2)** — bàn giao firmware cơ chế tự ngắt an toàn cho ESP32: khung `SHOW` 29 byte được xác thực, kiểm tra + chống phát lại hai lớp, ngân sách thời gian phát LoRa quyết định `T_signhold`, và danh mục kiểm thử phù hợp của firmware |
+| — | [docs/adr/README.vi.md](docs/adr/README.vi.md) | Mục lục các Bản ghi quyết định kiến trúc (ADR) (15 ADR; **bộ thuộc phần mềm đã chấp nhận 2026-06-27**, phần còn lại Đề xuất chờ phần cứng/vận hành) |
 
 Hình 1 từ thuyết minh (infographic khái niệm) được lưu tại
 [docs/assets/figure-1-concept-infographic.jpeg](docs/assets/figure-1-concept-infographic.jpeg) và được
