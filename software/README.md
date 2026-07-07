@@ -29,18 +29,22 @@ software/
     if4.py          #   IF-4 wire codec: authenticated SHOW frame + verify (doc 08 §3, doc 10)
     actuator.py     #   IF-4 edge-side refresh-or-blank driver (no "off" command)
     health.py       #   health monitor: derives {camera,radar}, time integrity, force-safe (FR-10/NFR-16/IF-5)
+    telemetry.py    #   IF-6 heartbeat + IF-7 audit-event emitter (fingerprinted; doc 08 §4, doc 02 §7)
   harness/          # host tooling — NOT shipped. Replaces only the sensor + sign ends.
     sensors.py      #   Level-A: scenario script -> IF-2 track events (+ gnss/self-test liveness)
     frames.py       #   Level-B: scenario -> detector output + doc 07 §3.1 nuisances
     sign.py         #   sign controller: decodes+verifies real IF-4 frames + dead-man's switch
-    runner.py       #   tick loop, health monitor, fault injection, oracle comparator
+    runner.py       #   tick loop, health monitor, telemetry, fault injection, oracle comparator
+    metrics.py      #   acceptance-evidence reducer: recall+Wilson, false-activation, latency (ADR-0007)
   scenarios/
     catalogue.py        #   SC-01..37 — Level-A executable spec (the state machine)
     perception_cases.py #   PC-01.. — Level-B perception cases (IF-1→IF-2)
     health_cases.py     #   HM-01.. — Level-C health-monitor unit cases
+    evidence_cases.py   #   EV-01.. — Level-D acceptance-evidence set (with ground-truth oracles)
   run_tests.py            # Level-A state-machine board
   run_perception_tests.py # Level-B perception board
   run_health_tests.py     # Level-C health-monitor board
+  run_metrics.py          # Level-D acceptance-evidence board (reducer unit tests + sample report)
 ```
 
 ## Run
@@ -49,16 +53,19 @@ software/
 python software/run_tests.py             # Level A — SC-01..37 state-machine board
 python software/run_perception_tests.py  # Level B — perception (IF-1→IF-2) board
 python software/run_health_tests.py      # Level C — health-monitor (FR-10/NFR-16/IF-5) board
+python software/run_metrics.py           # Level D — acceptance-evidence reducer + sample report
 micropython run_tests.py                 # from software/, on the MicroPython unix port
 ```
 
-All exit 0 when healthy and 1 on any surprise. **Level A** injects IF-2 events and tests the
-decision logic — now with the **real health monitor** in the loop deriving the sensor mode; **Level
-B** injects *detections* (image bboxes) and runs the **real** perception (ROI gating + tracker) that
-produces those events (doc 07 §2) — and closes the loop through the real state machine to the sign;
-**Level C** unit-tests the health monitor (`esw/health.py`) in isolation. The detector itself (a
-K230 `kmodel`) is a drop-in backend behind `Perception.step()`, so the perception pipeline is
-byte-identical in sim and on the board.
+Boards A–C exit 0 when healthy and 1 on any surprise; D exits 0 when the reducer unit tests pass
+(the report is informational). **Level A** injects IF-2 events and tests the decision logic — now
+with the **real health monitor** in the loop deriving the sensor mode and the **real telemetry
+emitter** producing the audit log; **Level B** injects *detections* (image bboxes) and runs the
+**real** perception (ROI gating + tracker) that produces those events (doc 07 §2) — and closes the
+loop through the real state machine to the sign; **Level C** unit-tests the health monitor
+(`esw/health.py`) in isolation; **Level D** reduces the IF-7 event log against ground-truth oracles
+into the doc 01 §5 acceptance metrics. The detector itself (a K230 `kmodel`) is a drop-in backend
+behind `Perception.step()`, so the perception pipeline is byte-identical in sim and on the board.
 
 ## The boards today
 
@@ -96,6 +103,18 @@ force-safe** (a critical self-test failure trips IF-5). The monitor derives the 
 health the state machine consumes, so the FULL/CAMERA-ONLY/RADAR-ONLY/NEITHER mode is computed,
 not injected. `T_sensor_timeout` defaults to 0 (react immediately, conservative) — tune it up for
 anti-flap; absolute-time hold-over across a multi-hour outage is field-deferred (NFR-16).
+
+**Level D — `run_metrics.py`: reducer unit tests + a sample acceptance report** (`exit 0` on the
+unit tests). The SUT now emits the **IF-6 heartbeat + IF-7 audit events** (`esw/telemetry.py`,
+each fingerprinted with cfg/model/calib/fw versions, R10); the offline **reducer** (`harness/
+metrics.py`) turns that event log + each scenario's ground-truth oracle into the doc 01 §5 metrics:
+**recall with a Wilson 95% lower bound**, **false activation** (per-100-scenarios *and* per-hour),
+and detection latency. The board pins the reducer math (Wilson, interval reconstruction, TP/FP/FN,
+rates) and prints a report over the EV-01..06 evidence set. **It is honestly tiered S (synthetic):**
+per the doc 01 §5 hard rule, recall from synthetic events is **not** a recall claim — the recall N
+must be **real captures**. The sample report makes the point visible: 4/4 synthetic positives is
+100% recall but only a **~51% Wilson lower bound** — the machinery is real and ready to ingest real
+staged/field captures; the *number* waits on them.
 
 ## Extending the board
 
