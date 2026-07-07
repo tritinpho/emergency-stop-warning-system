@@ -6,9 +6,9 @@
 # the sign assertion for this tick. Timers are evaluated as deadlines against
 # `now` -- no wall-clock is read inside here (determinism; doc 07 §8).
 #
-# EXECUTABLE SPEC (ADR-0015): behaviour is defined by the SC-01..30 oracles in
+# EXECUTABLE SPEC (ADR-0015): behaviour is defined by the SC-NN oracles in
 # scenarios/catalogue.py -- the code is correct when its sign/disposition-over-time
-# matches every oracle. All SC-01..30 are green (python run_tests.py -> exit 0).
+# matches every oracle. All are green (python run_tests.py -> exit 0).
 #
 # This is the SUT: byte-identical in sim and on the K230. MicroPython-safe subset.
 
@@ -75,6 +75,7 @@ class StateMachine:
         self.drift_degraded = False      # drift monitor has marked the unit degraded
         self.alarm_count = 0             # deduped alarm count (raise once + re-escalate)
         self.alarm_since = None          # when the current CRITICAL alarm was (re-)raised
+        self.alarm_acked = False         # operator ack'd the current alarm epoch (freezes re-escalate)
         self._now = 0.0                  # this tick's time, cached for _decision
         # track_id -> per-track record
         self.tracks = {}
@@ -125,10 +126,29 @@ class StateMachine:
         gate = cfg["speed_gate_kph"]
         roi_gate = cfg["roi_overlap_gate"]
 
+        # Operator acknowledgement (NFR-15, ADR-0011 §2): the operator acks the alarm they
+        # currently see, keyed by its alarm_count. An ack clears the LATCHED escalation (the
+        # memory of a past forced-clear / watchdog / sign-stuck event) and freezes re-escalation
+        # of this alarm epoch -- but never suppresses a condition-derived CRITICAL (a still-blind
+        # unit stays CRITICAL from mode), and a persistent fault re-raises the latch next tick.
+        # Epoch-scoped: acking N does not ack a later N+1 (a stale ack is ignored).
+        if (inputs.get("ack") is not None and self.alarm_count > 0
+                and inputs["ack"] == self.alarm_count):
+            self.alarm_acked = True
+            self.escalation = None
+
         # NEITHER sensor -> unconditional safe state (doc 02 §4 matrix bottom row);
         # CAMERA_ONLY / RADAR_ONLY are handled inline (BLIND-TO-NEW guard + alert severity).
         if self.mode == NEITHER:
             self.state = SAFE_STATE
+            # An override cannot lift the both-sensors-dead safe state, but it must never be
+            # silently dropped (FR-21): report why it did not apply. A malformed override
+            # surfaces its own reason; a well-formed one is rejected as safe-state-suppressed.
+            applied, rejected = self._eval_override(now, override)
+            if rejected is not None:
+                self.override_rejected = rejected
+            elif applied is not None:
+                self.override_rejected = "safe_state_neither"
             return self._decision("NONE")
 
         # Congestion pre-scan (R14, doc 02 §4): count stationary tracks across the WHOLE scene
@@ -178,6 +198,11 @@ class StateMachine:
                         and (now - tr["stationary_since"]) >= cfg["T_person_debounce"]):
                     tr["confirmed"] = True
             elif speed < gate:
+                # Seen stopped again -> it did not leave. Without this reset a single
+                # >gate blip (centroid jump / door-open / fused Doppler) would latch
+                # seen_leaving for good and a later genuine occlusion would fast-clear a
+                # still-present car instead of holding the warning (SC-31).
+                tr["seen_leaving"] = False
                 if tr["stationary_since"] is None:
                     tr["stationary_since"] = now
                 # RADAR_ONLY is BLIND-TO-NEW (ADR-0009 §B): radar alone cannot initiate a
@@ -352,18 +377,22 @@ class StateMachine:
             alert = _max_alert(alert, "DEGRADED")
         alert = _max_alert(alert, self.escalation)
 
-        # Alarm management (NFR-15, ADR-0011): a sustained CRITICAL raises ONE alarm (dedup),
-        # and -- with no operator ack modelled -- re-escalates once per _T_REESCALATE window,
-        # so the count climbs slowly rather than storming every tick.
+        # Alarm management (NFR-15, ADR-0011): a sustained CRITICAL raises ONE alarm (dedup) and,
+        # until the operator acks it (inputs["ack"], handled in tick()), re-escalates once per
+        # _T_REESCALATE window so the count climbs slowly rather than storming every tick. An ack
+        # freezes the climb for this epoch; when the epoch ends (alert drops then re-raises) it
+        # re-arms, so a fresh critical after an ack alarms again.
         if alert == "CRITICAL":
             if self.alarm_since is None:
                 self.alarm_count += 1
                 self.alarm_since = self._now
-            elif (self._now - self.alarm_since) >= _T_REESCALATE:
+                self.alarm_acked = False       # a freshly-raised alarm starts un-acked
+            elif not self.alarm_acked and (self._now - self.alarm_since) >= _T_REESCALATE:
                 self.alarm_count += 1
                 self.alarm_since = self._now
         else:
             self.alarm_since = None
+            self.alarm_acked = False            # epoch ends -> a new critical re-alarms afresh
 
         # OVERRIDDEN posture takes precedence (ADR-0010 §2); a drift-degraded unit or a
         # degraded sensing mode -> DEGRADED; otherwise NORMAL.

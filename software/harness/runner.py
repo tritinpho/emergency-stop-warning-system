@@ -6,7 +6,7 @@
 
 from esw.params import default_config
 from esw.state_machine import StateMachine, MESSAGE_STOPPED
-from harness.sensors import observations_at, health_at, override_at, ota_at, drift_at
+from harness.sensors import observations_at, health_at, override_at, ota_at, drift_at, ack_at
 from harness.sign import Sign
 
 TICK_DT = 0.1  # 10 Hz fixed-rate tick (ADR-0015)
@@ -57,7 +57,8 @@ def run_scenario(scenario):
         else:
             inputs = {"sign_status": sign_status,
                       "ota": ota_at(scenario, t),
-                      "drift": drift_at(scenario, t)}
+                      "drift": drift_at(scenario, t),
+                      "ack": ack_at(scenario, t)}
             decision = sm.tick(t, observations_at(scenario, t), health_at(scenario, t),
                                override_at(scenario, t), inputs)
 

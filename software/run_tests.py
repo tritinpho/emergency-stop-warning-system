@@ -22,7 +22,7 @@ def main():
     n_pass = n_xfail = n_todo = 0
     surprises = []
     print("")
-    print("ESW Level-A harness -- SC-01..30 scenario board")
+    print("ESW Level-A harness -- SC-01..32 scenario board")
     print("-" * 68)
     for sc in SCENARIOS:
         sid = sc["id"]
@@ -62,7 +62,7 @@ def main():
     if n_todo or n_xfail:
         print("harness OK -- implement a 'todo' or a red target to grow the green set.")
     else:
-        print("harness OK -- all SC-01..30 green.")
+        print("harness OK -- all {} scenarios green.".format(n_pass))
     return 0
 
 
