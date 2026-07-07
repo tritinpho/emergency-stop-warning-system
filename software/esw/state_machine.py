@@ -6,9 +6,9 @@
 # the sign assertion for this tick. Timers are evaluated as deadlines against
 # `now` -- no wall-clock is read inside here (determinism; doc 07 §8).
 #
-# EXECUTABLE SPEC (ADR-0015): behaviour is defined by the SC-01..30 oracles in
+# EXECUTABLE SPEC (ADR-0015): behaviour is defined by the SC-NN oracles in
 # scenarios/catalogue.py -- the code is correct when its sign/disposition-over-time
-# matches every oracle. All SC-01..30 are green (python run_tests.py -> exit 0).
+# matches every oracle. All are green (python run_tests.py -> exit 0).
 #
 # This is the SUT: byte-identical in sim and on the K230. MicroPython-safe subset.
 
@@ -129,6 +129,14 @@ class StateMachine:
         # CAMERA_ONLY / RADAR_ONLY are handled inline (BLIND-TO-NEW guard + alert severity).
         if self.mode == NEITHER:
             self.state = SAFE_STATE
+            # An override cannot lift the both-sensors-dead safe state, but it must never be
+            # silently dropped (FR-21): report why it did not apply. A malformed override
+            # surfaces its own reason; a well-formed one is rejected as safe-state-suppressed.
+            applied, rejected = self._eval_override(now, override)
+            if rejected is not None:
+                self.override_rejected = rejected
+            elif applied is not None:
+                self.override_rejected = "safe_state_neither"
             return self._decision("NONE")
 
         # Congestion pre-scan (R14, doc 02 §4): count stationary tracks across the WHOLE scene
@@ -178,6 +186,11 @@ class StateMachine:
                         and (now - tr["stationary_since"]) >= cfg["T_person_debounce"]):
                     tr["confirmed"] = True
             elif speed < gate:
+                # Seen stopped again -> it did not leave. Without this reset a single
+                # >gate blip (centroid jump / door-open / fused Doppler) would latch
+                # seen_leaving for good and a later genuine occlusion would fast-clear a
+                # still-present car instead of holding the warning (SC-31).
+                tr["seen_leaving"] = False
                 if tr["stationary_since"] is None:
                     tr["stationary_since"] = now
                 # RADAR_ONLY is BLIND-TO-NEW (ADR-0009 §B): radar alone cannot initiate a

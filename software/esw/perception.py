@@ -31,7 +31,8 @@
 #
 # Ships to the K230: MicroPython-safe subset.
 
-from esw.geometry import bbox_ground_point, footprint_box, footprint_projected, overlap_fraction
+from esw.geometry import (bbox_ground_point, footprint_box, footprint_projected,
+                          overlap_fraction, is_convex_ccw)
 
 # Class -> ground footprint (width_m, length_m). First-order sizes (doc 02 §4).
 _DEFAULT_FOOTPRINT = {
@@ -56,6 +57,11 @@ class Perception:
         # speed_window_s (speed baseline), speed_alpha (speed EMA).
         self.h = calib["H"]
         self.roi = calib["roi"]
+        # Fail loud at commissioning on a mis-surveyed ROI: a non-convex or clockwise
+        # polygon silently inverts every ROI gate (the dominant cry-wolf / miss risk).
+        if not is_convex_ccw(self.roi):
+            raise ValueError("ROI must be a convex, CCW ground polygon (>=3 points); "
+                             "a mis-wound ROI silently corrupts every gate (doc 02 4)")
         self.score_min = calib.get("score_min", 0.4)
         self.score_low = calib.get("score_low", 0.1)
         self.assoc_gate = calib.get("assoc_gate_m", 3.0)
@@ -119,8 +125,7 @@ class Perception:
 
     def _init_track(self, cand, now):
         return {"pos": cand["pos"], "vel": (0.0, 0.0), "ts": now, "cls": cand["cls"],
-                "speed": 0.0, "hist": [(now, cand["pos"])], "lost_since": None,
-                "bbox": cand["bbox"]}
+                "speed": 0.0, "hist": [(now, cand["pos"])], "bbox": cand["bbox"]}
 
     def _update_track(self, tid, cand, now):
         """Fold a matched detection into a track: windowed velocity + EMA speed."""
@@ -142,7 +147,6 @@ class Perception:
         tr["cls"] = cand["cls"]
         tr["bbox"] = cand["bbox"]
         tr["ts"] = now
-        tr["lost_since"] = None
 
     def step(self, detections, now):
         """One perception cycle. detections = [{cls, bbox:[x1,y1,x2,y2], score}].
@@ -194,9 +198,7 @@ class Perception:
             if tid in seen:
                 continue
             tr = self.tracks[tid]
-            if tr["lost_since"] is None:
-                tr["lost_since"] = now
-            if (now - tr["ts"]) > self.max_age:
+            if (now - tr["ts"]) > self.max_age:   # coasted past track_max_age_s -> retire the id
                 del self.tracks[tid]
 
         # Emit IF-2 events only for tracks actually detected this frame (sorted for a stable
@@ -206,7 +208,8 @@ class Perception:
         ids.sort()
         for tid in ids:
             tr = self.tracks[tid]
-            w, length = self.footprint.get(tr["cls"], self.footprint["car"])
+            w, length = self.footprint.get(
+                tr["cls"], _DEFAULT_FOOTPRINT.get(tr["cls"], _DEFAULT_FOOTPRINT["car"]))
             if self.footprint_mode == "projected":
                 fp = footprint_projected(self.h, tr["bbox"], length)
             else:

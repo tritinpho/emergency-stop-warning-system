@@ -33,10 +33,14 @@ def default_config():
 
 
 def clamp(name, value):
-    """Return (clamped_value, was_clamped). Unknown names pass through untouched."""
+    """Return (clamped_value, was_clamped). Unknown names pass through untouched.
+    A non-numeric value for a known name is out-of-bounds by definition: restore the
+    vetted default and report it clamped, rather than crash the config ingest (FR-20)."""
     spec = DEFAULTS.get(name)
     if spec is None:
         return value, False
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return spec["default"], True   # wrong type (incl. bool) -> default, flagged
     if value < spec["lo"]:
         return spec["lo"], True
     if value > spec["hi"]:
@@ -45,10 +49,17 @@ def clamp(name, value):
 
 
 def clamp_config(cfg):
-    """Apply FR-20 bounds to a whole config dict; return (clean_cfg, rejected_names)."""
+    """Apply FR-20 bounds to a whole config dict; return (clean_cfg, rejected_names).
+
+    An unknown/misspelled name is REJECTED (reported, default retained), never silently
+    kept as a dead key -- a typo'd safety parameter must not pass unnoticed with no
+    effect (fail-loud, FR-21). Known names are clamped to their [lo, hi]."""
     clean = default_config()
     rejected = []
     for name in cfg:
+        if name not in DEFAULTS:
+            rejected.append(name)          # unknown/misspelled -> fail loud, keep the default
+            continue
         value, was = clamp(name, cfg[name])
         clean[name] = value
         if was:

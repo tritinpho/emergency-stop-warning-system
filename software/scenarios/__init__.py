@@ -1,1 +1,2 @@
-# scenarios -- the SC-01..30 catalogue (doc 07 §5), the EXECUTABLE spec (ADR-0015).
+# scenarios -- the SC-NN catalogue (doc 07 §5 + review regressions), the EXECUTABLE
+# spec (ADR-0015).

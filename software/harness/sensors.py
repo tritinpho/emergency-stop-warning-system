@@ -6,6 +6,7 @@
 #   {"id","enter","leave","speed"(kph),"in_roi"(0..1),
 #    "leave_speed"(kph or None -> a confirmed exit vs a silent vanish),
 #    "exit_window"(s, how long it is seen moving before `leave`),
+#    "speed_windows"[[t0,t1,kph],...] mid-life speed overrides (a transient blip),
 #    "gaps"[[t0,t1],...] intervals it is occluded (present but unseen),
 #    "cls"}
 #
@@ -41,6 +42,10 @@ def observations_at(scenario, t):
         if not (camera_sees or radar_sees):
             continue  # present in the world, but neither channel can report it now
         speed = trk.get("speed", 0.0)
+        for sw in trk.get("speed_windows", []):
+            if sw[0] <= t < sw[1]:
+                speed = sw[2]    # scripted mid-life speed blip (centroid jump / door-open)
+                break
         leave_speed = trk.get("leave_speed", None)
         if leave_speed is not None and t >= trk["leave"] - trk.get("exit_window", 1.5):
             speed = leave_speed  # seen accelerating away -> a confirmed exit

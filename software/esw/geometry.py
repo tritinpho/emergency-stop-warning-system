@@ -65,6 +65,30 @@ def footprint_projected(h, bbox, length_m, depth_probe=0.35):
     return [bl, br, fr, fl]
 
 
+def is_convex_ccw(poly):
+    """True iff `poly` is a convex polygon wound COUNTER-CLOCKWISE -- the exact shape and
+    winding clip_polygon()/overlap_fraction() assume for the ROI. A mis-surveyed ROI (too
+    few points, non-convex, or clockwise) silently inverts or corrupts every ROI gate, so
+    callers validate at commissioning rather than trust it (doc 02 §4, calibration is
+    load-bearing). CCW = every consecutive turn is a left turn (cross product > 0)."""
+    n = len(poly)
+    if n < 3:
+        return False
+    got_pos = got_neg = False
+    for m in range(n):
+        ax, ay = poly[m]
+        bx, by = poly[(m + 1) % n]
+        cx, cy = poly[(m + 2) % n]
+        cross = (bx - ax) * (cy - by) - (by - ay) * (cx - bx)
+        if cross > 0.0:
+            got_pos = True
+        elif cross < 0.0:
+            got_neg = True
+        if got_pos and got_neg:
+            return False              # a mix of left/right turns -> non-convex
+    return got_pos and not got_neg    # all left turns -> convex CCW (reject CW / degenerate)
+
+
 def polygon_area(poly):
     """Absolute area of a polygon via the shoelace formula."""
     n = len(poly)

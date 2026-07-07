@@ -1,4 +1,5 @@
 # SC-01..30 -- the shared, ID'd scenario catalogue from doc 07 §5.
+# SC-31+ extend it with regression oracles found in code review (not in doc 07 §5).
 #
 # This IS the executable specification of the state machine (ADR-0015): the code
 # is correct when its sign-over-time matches every scenario's oracle. Each entry:
@@ -412,5 +413,26 @@ SCENARIOS = [
         "tracks": [{"id": "T1", "enter": 1.0, "leave": 30.0, "speed": 0.0, "in_roi": 1.0}],
         "checks": [{"t": 6.0, "alert": "CRITICAL", "alarm_count": 1},    # one deduped alarm
                    {"t": 18.0, "alarm_count": 2}],                       # unacked -> re-escalated once
+    },
+    {
+        "id": "SC-31", "status": "impl",
+        "title": "Transient >gate blip on a confirmed car, then occlusion -> still HELD (no false clear)",
+        "duration": 26.0,
+        # Regression for the seen_leaving latch: a confirmed stopped car reads one brief
+        # >gate blip while still in-ROI and camera-seen (a centroid jump / door-open /
+        # fused Doppler tick), stops again, then a genuine camera occlusion with radar
+        # still corroborating. The blip must NOT be remembered as an exit: the occlusion
+        # HOLDS the warning (WARN_HOLD -> CAMERA_OCCLUDED_DEGRADED), never a fast clear.
+        # Pre-fix this fast-cleared at occlusion onset (sign wrongly OFF).
+        "config_push": {"T_dwell": 3.0, "T_hold": 5.0, "T_occlusion": 8.0, "T_degraded_max": 60.0},
+        "tracks": [{"id": "T1", "enter": 1.0, "leave": 40.0, "speed": 0.0, "in_roi": 1.0,
+                    "radar_visible": True,
+                    "speed_windows": [[8.0, 8.3, 5.0]],   # brief >gate blip, still present
+                    "gaps": [[12.0, 40.0]]}],             # genuine occlusion after the blip
+        "checks": [{"t": 7.0, "on": True, "state": "WARN_ON"},                    # confirmed
+                   {"t": 8.2, "on": True},                                        # blip, still present
+                   {"t": 11.0, "on": True, "state": "WARN_ON"},                   # stopped again, seen
+                   {"t": 16.0, "on": True, "state": "WARN_HOLD"},                 # occluded < T_occlusion
+                   {"t": 22.0, "on": True, "state": "CAMERA_OCCLUDED_DEGRADED"}], # held, bounded
     },
 ]
