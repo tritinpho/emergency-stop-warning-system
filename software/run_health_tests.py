@@ -8,10 +8,17 @@
 # Exit 0 when every HM case matches its oracle; 1 otherwise. Complements run_tests.py (the
 # Level-A closed-loop side, SC-35/36/37) and run_perception_tests.py.
 
-import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Put software/ on the import path on both CPython and MicroPython. mpy's `os` has no
+# `os.path`, so derive this script's directory from __file__ by hand -- uniform across
+# runtimes, no host-only branch, so `micropython <board>.py` runs too (ADR-0015 D3).
+_here = __file__
+_cut = _here.rfind("/")
+_bs = _here.rfind("\\")
+if _bs > _cut:
+    _cut = _bs
+sys.path.insert(0, _here[:_cut] if _cut >= 0 else ".")
 
 from esw.health import HealthMonitor
 from esw.params import default_config

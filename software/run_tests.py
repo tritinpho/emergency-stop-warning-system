@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Level-A harness entrypoint: run the SC-01..30 board.
+# Level-A harness entrypoint: run the SC-xx scenario board.
 #
 #   python software/run_tests.py            (from the repo root)
 #   python run_tests.py                     (from software/)
@@ -9,10 +9,17 @@
 # "xfail" scenario still fails for its stated reason. A surprise (an impl fail or
 # an xfail that started passing) exits 1 -- an impl regression, or "flip xfail->impl".
 
-import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Put software/ on the import path on both CPython and MicroPython. mpy's `os` has no
+# `os.path`, so derive this script's directory from __file__ by hand -- uniform across
+# runtimes, no host-only branch, so `micropython <board>.py` runs too (ADR-0015 D3).
+_here = __file__
+_cut = _here.rfind("/")
+_bs = _here.rfind("\\")
+if _bs > _cut:
+    _cut = _bs
+sys.path.insert(0, _here[:_cut] if _cut >= 0 else ".")
 
 from scenarios.catalogue import SCENARIOS
 from harness.runner import run_scenario, evaluate
@@ -22,7 +29,7 @@ def main():
     n_pass = n_xfail = n_todo = 0
     surprises = []
     print("")
-    print("ESW Level-A harness -- SC-01..32 scenario board")
+    print("ESW Level-A harness -- SC scenario board")
     print("-" * 68)
     for sc in SCENARIOS:
         sid = sc["id"]

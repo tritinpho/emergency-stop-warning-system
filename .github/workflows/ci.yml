@@ -1,0 +1,66 @@
+name: ESW software CI
+
+# Two gates for the ESW software (docs/07, ADR-0015):
+#   * cpython     -- the logic gate: all four scenario boards (Level A/B/C/D) plus the
+#                    MicroPython-safety AST lint on esw/ and the esw smoke, on CPython.
+#   * micropython -- the runtime-portability gate: the SHIPPED esw/ subset actually
+#                    LOADS AND RUNS under the real MicroPython unix port, proving the
+#                    ADR-0015 D3 "one byte-identical codebase, host + K230" claim rather
+#                    than only AST-asserting it. The K230 runs CanMV/MicroPython, not
+#                    CPython, so a green CPython board is necessary but NOT sufficient.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cpython:
+    name: CPython boards + MP-safety lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: MicroPython-safety gate (AST lint on esw/)
+        run: python software/tools/mp_safe_check.py software/esw
+      - name: Level-A -- state machine (SC-01..38)
+        run: python software/run_tests.py
+      - name: Level-B -- perception IF-1->IF-2 (PC-01..11)
+        run: python software/run_perception_tests.py
+      - name: Level-C -- health monitor (HM-01..06)
+        run: python software/run_health_tests.py
+      - name: Level-D -- acceptance-evidence reducer (EV-01..06)
+        run: python software/run_metrics.py
+      - name: esw smoke -- perception + geometry
+        run: python software/tools/mpy_smoke.py
+
+  micropython:
+    name: Shipped esw/ under MicroPython unix port
+    runs-on: ubuntu-latest
+    # Pinned to the exact image validated locally: v1.28.0 ==
+    # micropython/unix@sha256:6dffcbec834582741cc7a0eddcbb8e3704862c2f970dc9bf712023aff11615e0
+    env:
+      MPY_IMAGE: micropython/unix:v1.28.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pull the MicroPython unix port
+        run: docker pull "$MPY_IMAGE"
+      - name: Level-A state machine under MicroPython
+        run: >
+          docker run --rm -v "$PWD":/repo -w /repo/software
+          --entrypoint micropython "$MPY_IMAGE" run_tests.py
+      - name: Level-C health monitor under MicroPython
+        run: >
+          docker run --rm -v "$PWD":/repo -w /repo/software
+          --entrypoint micropython "$MPY_IMAGE" run_health_tests.py
+      - name: esw smoke (perception + geometry) under MicroPython
+        run: >
+          docker run --rm -v "$PWD":/repo -w /repo/software
+          --entrypoint micropython "$MPY_IMAGE" tools/mpy_smoke.py
