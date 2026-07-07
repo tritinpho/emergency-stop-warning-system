@@ -2,14 +2,14 @@
 
 This is **workstream #1** from the build plan: the event-level ("Level A") simulation
 harness ([doc 07 §2](../docs/07-simulation-methodology.md)) driving the **real** decision
-state machine as the system under test (SUT), scored against the **SC-01..30** scenario
+state machine as the system under test (SUT), scored against the **SC-01..34** scenario
 oracles ([doc 07 §5](../docs/07-simulation-methodology.md)). A second board adds the
 **Level-B** perception stage (IF-1→IF-2) — the real ROI-gating + tracking pipeline driven by
 scripted *detections* (with doc 07 §3.1 detector nuisances) — scored against **PC-01..11**.
 
 It embodies the three build decisions in **[ADR-0015](../docs/adr/ADR-0015-state-machine-implementation-strategy.md)**:
 
-1. **The SC-01..30 oracles are the executable spec.** The state machine is correct when
+1. **The SC-01..34 oracles are the executable spec.** The state machine is correct when
    its sign-over-time matches every scenario's oracle. TDD against the board.
 2. **Fixed-rate tick execution.** `StateMachine.tick(now, observations, health)` is called
    every cycle (10 Hz in the harness); timers are deadlines against `now`, no wall-clock is
@@ -26,13 +26,15 @@ software/
     state_machine.py#   the decision state machine (doc 02 §4)
     perception.py   #   IF-1→IF-2 pipeline: ROI gating + ByteTrack-lite tracker (ADR-0003)
     geometry.py     #   homography + ROI-overlap + first-order & projected footprints
+    if4.py          #   IF-4 wire codec: authenticated SHOW frame + verify (doc 08 §3, doc 10)
+    actuator.py     #   IF-4 edge-side refresh-or-blank driver (no "off" command)
   harness/          # host tooling — NOT shipped. Replaces only the sensor + sign ends.
     sensors.py      #   Level-A: scenario script -> IF-2 track events
     frames.py       #   Level-B: scenario -> detector output + doc 07 §3.1 nuisances
-    sign.py         #   synthetic sign controller + dead-man's switch (IF-4)
+    sign.py         #   sign controller: decodes+verifies real IF-4 frames + dead-man's switch
     runner.py       #   tick loop, fault injection, oracle comparator
   scenarios/
-    catalogue.py        #   SC-01..30 — Level-A executable spec (the state machine)
+    catalogue.py        #   SC-01..34 — Level-A executable spec (the state machine)
     perception_cases.py #   PC-01.. — Level-B perception cases (IF-1→IF-2)
   run_tests.py            # Level-A state-machine board
   run_perception_tests.py # Level-B perception board
@@ -41,7 +43,7 @@ software/
 ## Run
 
 ```
-python software/run_tests.py             # Level A — SC-01..30 state-machine board
+python software/run_tests.py             # Level A — SC-01..34 state-machine board
 python software/run_perception_tests.py  # Level B — perception (IF-1→IF-2) board
 micropython run_tests.py                 # from software/, on the MicroPython unix port
 ```
@@ -54,15 +56,18 @@ real state machine to the sign. The detector itself (a K230 `kmodel`) is a drop-
 
 ## The boards today
 
-**Level A — `run_tests.py`: 30 passing · 0 red · 0 pending** (`exit 0`). The full SC-01..30
+**Level A — `run_tests.py`: 34 passing · 0 red · 0 pending** (`exit 0`). The full SC-01..34
 catalogue: the happy path, dwell / creep / cold-start, pass-through, the set-based occlusion
 policy (`WARN_HOLD → CAMERA_OCCLUDED_DEGRADED → T_degraded_max` forced clear, incl. the
 weak-(b) stale-ON guard), the FULL / CAMERA-ONLY / RADAR-ONLY / NEITHER sensor-mode matrix
 (BLIND-TO-NEW), the watchdog, congestion suppression, pedestrian presence-onset, the
 motorcycle small-RCS case, warm reboot, operator override (force-on / force-off / mute,
 out-of-policy clamp), OTA-deferral, calibration-drift, sign-stuck → SAFE_STATE, alarm dedup /
-re-escalate, and the three fail-safe blank paths (kill SM / kill box / cut link → sign blanks
-≤ `T_signhold`).
+re-escalate, the three fail-safe blank paths (kill SM / kill box / cut link → sign blanks
+≤ `T_signhold`), and the **IF-4 auth path** (SC-33/34: forged and replayed `SHOW` frames are
+rejected — an attacker on the link can neither light nor sustain the sign). The state machine's
+sign assertions now drive the **real `esw/if4` frame codec** through the actuator to the
+controller, so the board verifies the exact bytes the ESP32 firmware will (doc 10).
 
 **Level B — `run_perception_tests.py`: 11 passing + closed loop** (`exit 0`). PC-01..05 cover
 the pipeline plumbing (ROI overlap, track continuity, speed). PC-06..11 harden it against the
@@ -101,8 +106,10 @@ under YOLO load on the K230 and confirm it stays well inside `T_assert_refresh` 
 
 ## Deliberately not here (yet)
 
-The real detector / `kmodel` (a drop-in backend behind `Perception.step()`), camera↔radar
-fusion (blocked on the RQ-H1 radar procurement), and the concrete IF-4 wire encoding — all
-deferred to their phase ([doc 07 §2](../docs/07-simulation-methodology.md), the readiness
-review). Level B injects scripted *detections*, not rendered camera frames; the harness models
-sensors and the sign; it does **not** model the RF link.
+The real detector / `kmodel` (a drop-in backend behind `Perception.step()`) and camera↔radar
+fusion (blocked on the RQ-H1 radar procurement) are deferred to their phase
+([doc 07 §2](../docs/07-simulation-methodology.md), the readiness review). The concrete IF-4 wire
+encoding **now exists** (`esw/if4.py` + `esw/actuator.py`, doc 10); what remains deferred is the
+**RF link itself** — Level B injects scripted *detections*, not rendered camera frames, and the
+harness models the sensors and the sign controller but **not** the LoRa PHY (airtime / range /
+duty are the [ADR-0014](../docs/adr/ADR-0014-sign-link-bearer.md) bench tests).

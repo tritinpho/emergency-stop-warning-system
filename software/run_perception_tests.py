@@ -16,12 +16,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from scenarios.perception_cases import CASES, CALIB
 from esw.perception import Perception
 from esw.params import default_config
-from esw.state_machine import StateMachine, MESSAGE_STOPPED
+from esw.state_machine import StateMachine
+from esw.actuator import Actuator
+from esw import if4
 from harness.frames import detections_at
 from harness.sign import Sign
 
 TICK_DT = 0.1
 ROI_GATE = default_config()["roi_overlap_gate"]
+_KEY = b"esw-if4-shared-secret-v1-0123456789"
 
 
 def _run(case):
@@ -92,16 +95,19 @@ def _closed_loop(case):
     """End-to-end Level B: scripted detections -> REAL perception -> REAL state machine ->
     sign. Returns the sign on/off state at each tick."""
     perc = Perception(case.get("calib", CALIB))
-    sm = StateMachine(default_config())
-    sign = Sign(default_config())
+    cfg = default_config()
+    sm = StateMachine(cfg)
+    actuator = Actuator(_KEY, if4.cfg_fingerprint(cfg))    # real IF-4 refresh path
+    sign = Sign(cfg, _KEY)
     steps = int(case["duration"] / TICK_DT) + 1
     on_at = {}
     for i in range(steps):
         t = round(i * TICK_DT, 3)
         decision = sm.tick(t, perc.step(detections_at(case, t), t),
                            {"camera": True, "radar": True})
-        if decision.get("assertion") == "SHOW":
-            sign.refresh(t, decision.get("message_id", MESSAGE_STOPPED))
+        frame = actuator.step(t, decision)
+        if frame is not None:
+            sign.receive(t, frame)
         on_at[t] = sign.update(t)
     return on_at
 

@@ -1,15 +1,25 @@
 # Scenario runner + oracle comparator (doc 07 §2, §4).
 #
-# Drives the real esw StateMachine at a fixed tick, models the actuator refresh
-# and the sign dead-man's switch, injects faults, then scores the recorded
-# sign-state timeline against the scenario's oracle checkpoints.
+# Drives the real esw StateMachine at a fixed tick, runs the real IF-4 actuator
+# (esw.actuator) to emit authenticated refresh frames, and feeds them to the sign
+# dead-man's switch (harness.sign, which decodes + verifies the SAME esw.if4 bytes the
+# ESP32 firmware will). It injects faults + forged/replayed frames, then scores the
+# recorded sign-state timeline against the scenario's oracle checkpoints.
 
 from esw.params import default_config
-from esw.state_machine import StateMachine, MESSAGE_STOPPED
+from esw.state_machine import StateMachine
+from esw.actuator import Actuator
+from esw import if4
 from harness.sensors import observations_at, health_at, override_at, ota_at, drift_at, ack_at
 from harness.sign import Sign
 
 TICK_DT = 0.1  # 10 Hz fixed-rate tick (ADR-0015)
+
+# Per-unit shared secret for IF-4 auth (ADR-0012). Real deployments provision this
+# out-of-band per unit and rotate it; these are test vectors. _WRONG_KEY stands in for an
+# attacker who can transmit on the link but does not hold the key.
+_KEY = b"esw-if4-shared-secret-v1-0123456789"
+_WRONG_KEY = b"attacker-without-the-shared-secret!"
 
 
 def _merge(base, over):
@@ -19,16 +29,30 @@ def _merge(base, over):
     return out
 
 
+def _attacker_frame(kind, t, cfg_ver, last_frame):
+    """Build an injected hostile frame for the security scenarios (SC-33/34)."""
+    if kind == "forged":
+        # Well-formed SHOW but signed with the wrong key -> auth_tag fails verify().
+        return if4.encode_show(_WRONG_KEY, if4.MSG_ID_STOPPED, 1, 1, cfg_ver, if4.to_ms(t))
+    if kind == "replay":
+        # Re-inject a genuine frame captured earlier -> stale ts / low seq -> rejected.
+        return last_frame
+    return None
+
+
 def run_scenario(scenario):
-    """Run one scenario; return the sign-on timeline as a list of (t, on)."""
+    """Run one scenario; return the per-tick timeline (sign state + disposition)."""
     cfg = _merge(default_config(), scenario.get("config_push", {}))
-    sm = StateMachine(cfg)                       # SUT gets the (possibly bad) pushed config
-    sign = Sign(default_config(),                # the sign uses in-bounds safety constants
+    cfg_ver = if4.cfg_fingerprint(cfg)
+    sm = StateMachine(cfg)                        # SUT gets the (possibly bad) pushed config
+    actuator = Actuator(_KEY, cfg_ver)            # edge-side IF-4 driver (refresh-or-blank)
+    sign = Sign(default_config(), _KEY,           # controller uses in-bounds safety constants
                 latch=scenario.get("sign_latch", False),
                 can_turn_off=not scenario.get("sign_stuck", False))
 
     killed_sm = box_dead = link_cut = rebooted = False
-    sign_status = False                          # IF-3 status read-back (one tick delayed)
+    sign_status = False                           # IF-3 status read-back (one tick delayed)
+    last_frame = None                             # last genuine frame emitted (for replay tests)
     timeline = []
     steps = int(scenario["duration"] / TICK_DT) + 1
     for i in range(steps):
@@ -36,12 +60,13 @@ def run_scenario(scenario):
         sm_down = False
         for f in scenario.get("faults", []):
             kind = f["kind"]
-            if kind == "reboot":                 # warm reboot: SM dead in downtime, then fresh
+            if kind == "reboot":                  # warm reboot: SM dead in downtime, then fresh
                 down = f.get("downtime", 2.0)
                 if f["t"] <= t < f["t"] + down:
                     sm_down = True
                 elif t >= f["t"] + down and not rebooted:
-                    sm = StateMachine(cfg)        # restart comes up IDLE -> full re-confirm
+                    sm = StateMachine(cfg)         # restart comes up IDLE -> full re-confirm
+                    actuator = Actuator(_KEY, cfg_ver)  # fresh edge: seq resets (anti-replay reconnect)
                     rebooted = True
             elif t >= f["t"]:
                 if kind == "kill_sm":
@@ -53,7 +78,7 @@ def run_scenario(scenario):
         sign.link_up = not link_cut
 
         if killed_sm or sm_down:
-            decision = {"assertion": "NONE"}     # SM process dead / rebooting -> nothing asserted
+            decision = {"assertion": "NONE"}      # SM process dead / rebooting -> nothing asserted
         else:
             inputs = {"sign_status": sign_status,
                       "ota": ota_at(scenario, t),
@@ -62,11 +87,29 @@ def run_scenario(scenario):
             decision = sm.tick(t, observations_at(scenario, t), health_at(scenario, t),
                                override_at(scenario, t), inputs)
 
-        if (not box_dead) and decision.get("assertion") == "SHOW":
-            # Actuator refreshes at >= T_assert_refresh; ticking (0.1s) is well inside it.
-            sign.refresh(t, decision.get("message_id", MESSAGE_STOPPED))
+        # The edge emits an authenticated refresh iff it is alive and asserting SHOW. A dead
+        # box (box_dead) sends nothing; a killed/rebooting SM asserts NONE, so the actuator
+        # sends nothing -> the sign blanks in every hard-failure case (RQ-H2). Refreshing
+        # every 0.1 s tick is well inside T_assert_refresh; a real edge uses that timer.
+        frame = None
+        if not box_dead:
+            frame = actuator.step(t, decision)
+        if frame is not None:
+            last_frame = frame
 
-        sign_status = sign.update(t)             # read-back fed to the next tick (IF-3)
+        # Injected hostile frames (SC-33/34): the attacker transmits directly at the sign.
+        for inj in scenario.get("inject_frames", []):
+            if "from" in inj:
+                fire = inj["from"] <= t < inj["to"]
+            else:
+                fire = inj["t"] <= t < inj["t"] + TICK_DT
+            if fire:
+                sign.receive(t, _attacker_frame(inj.get("kind"), t, cfg_ver, last_frame))
+
+        if frame is not None:
+            sign.receive(t, frame)                # genuine refresh delivered last -> it wins the tick
+
+        sign_status = sign.update(t)              # read-back fed to the next tick (IF-3)
         timeline.append({
             "t": t,
             "on": sign_status,
@@ -78,6 +121,7 @@ def run_scenario(scenario):
             "override_rejected": decision.get("override_rejected"),
             "ota_deferred": decision.get("ota_deferred"),
             "alarm_count": decision.get("alarm_count"),
+            "rejects": sign.rejects,
         })
     return timeline
 

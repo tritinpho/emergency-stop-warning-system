@@ -456,4 +456,38 @@ SCENARIOS = [
                    {"t": 24.0, "alarm_count": 2},                       # ack froze it (no climb at 22)
                    {"t": 29.0, "alarm_count": 3}],                      # recover+re-die -> re-armed, stale ack ignored
     },
+    {
+        "id": "SC-33", "status": "impl",
+        "title": "IF-4 auth: forged SHOW frames are inert (cannot initiate or sustain the sign)",
+        "duration": 18.0,
+        # An attacker floods the sign link with well-formed SHOW frames signed with a key it
+        # does not hold (bad auth_tag), interleaved with a genuine incident. The forged frames
+        # must neither jump-start a dark sign (t=2, dwelling) nor hold it after a real clear
+        # (t=16). The genuine warning at t=8 proves the frame path is live -- so OFF here is
+        # rejection, not absence (ICD §3, ADR-0012, RQ-H2).
+        "config_push": {"T_dwell": 3.0, "T_hold": 5.0},
+        "inject_frames": [{"kind": "forged", "from": 0.5, "to": 18.0}],
+        "tracks": [{"id": "T1", "enter": 1.0, "leave": 10.0, "speed": 0.0,
+                    "in_roi": 1.0, "leave_speed": 12.0}],
+        "checks": [{"t": 2.0, "on": False},    # dwelling: forged frames cannot initiate
+                   {"t": 8.0, "on": True},     # genuine warning up (proves the path is live)
+                   {"t": 16.0, "on": False}],  # cleared: forged frames cannot sustain
+    },
+    {
+        "id": "SC-34", "status": "impl",
+        "title": "IF-4 anti-replay: a captured genuine SHOW, replayed after clear, cannot resurrect the sign",
+        "duration": 20.0,
+        # A real incident lights the sign, then clears. The attacker replays a genuine SHOW
+        # frame captured during the ON period. Its timestamp is now stale (outside the freshness
+        # window) and its seq is below the controller's high-water mark -> rejected. The sign
+        # stays OFF: a recording of an earlier valid heartbeat cannot light the sign later
+        # (ICD §3, ADR-0012).
+        "config_push": {"T_dwell": 3.0, "T_hold": 5.0},
+        "inject_frames": [{"kind": "replay", "t": 15.0}],
+        "tracks": [{"id": "T1", "enter": 1.0, "leave": 10.0, "speed": 0.0,
+                    "in_roi": 1.0, "leave_speed": 12.0}],
+        "checks": [{"t": 8.0, "on": True},     # genuine warning up
+                   {"t": 14.0, "on": False},   # cleared before the replay
+                   {"t": 16.0, "on": False}],  # replay at t=15 rejected -> stays OFF
+    },
 ]

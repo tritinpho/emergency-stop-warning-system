@@ -98,6 +98,12 @@ authenticated* assertion arrives within `T_signhold`; otherwise **blank**. "Vali
 `seq`/`nonce`/`ts` within the replay window. Therefore: SM crash → edge stops refreshing → blank; edge box
 dead → blank; link cut/jammed → blank; forged/replayed `SHOW` → rejected (auth/replay) → blank.
 
+**Firmware realization & reference implementation.** The concrete 29-byte frame layout, the verify
+algorithm, the two-guard anti-replay, the key/time requirements, and the firmware conformance tests are
+specified in [doc 10 — sign-controller firmware spec](10-if4-sign-controller-firmware-spec.md); the
+executable reference is `software/esw/if4.py` (codec + `verify()`) and `software/harness/sign.py` (the
+controller model), tested by SC-21/22/23 (hard-failure blank) and SC-33/34 (forged / replay reject).
+
 **Timing** is governed by [doc 02 §7a](02-system-architecture.md#7-interfaces--contracts-initial): `T_assert_refresh`
 ≤ ¼·`T_signhold`; `T_signhold` is simultaneously the max stale-ON after a hard failure and the min gap that
 blanks a valid warning, so it is tuned against the **field link's** loss/latency (over-distance validation is

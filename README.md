@@ -5,7 +5,7 @@
 > *"Nghiên cứu giải pháp cảnh báo tự động cho làn dừng xe khẩn cấp để giảm thiểu tai nạn giao thông"*
 > — Trường Đại học Quản lý và Công nghệ TP.HCM, Khoa Công nghệ. Chủ nhiệm: ThS. Phó Trí Tín.
 
-> 🇻🇳 **Phiên bản tiếng Việt (bản dịch đầy đủ):** [README.vi.md](README.vi.md) — toàn bộ tài liệu 00–09 và các ADR đều có bản `.vi.md` song song.
+> 🇻🇳 **Phiên bản tiếng Việt (bản dịch đầy đủ):** [README.vi.md](README.vi.md) — toàn bộ tài liệu 00–10 và các ADR đều có bản `.vi.md` song song.
 
 ---
 
@@ -41,7 +41,8 @@ triangles) to **active, automatic warning** — the central thesis of the propos
 | 07 | [docs/07-simulation-methodology.md](docs/07-simulation-methodology.md) | **Simulation & validation methodology** (Phase-2 frozen) — harness, synthetic-sensor model, ground-truth oracle, the ID'd scenario catalogue, pre-registered pass criteria |
 | 08 | [docs/08-interface-control-document.md](docs/08-interface-control-document.md) | **Interface Control Document v1** — concrete interface inventory, message schemas, the authenticated sign-link protocol, config/OTA/override contracts |
 | 09 | [docs/09-software-hardware-handoff.md](docs/09-software-hardware-handoff.md) | **Software → Hardware requirements & interface handoff** — what software requires of the hardware/firmware part choices (RQ-H1..H7), and the cross-team decisions gating the still-*Proposed* ADRs |
-| — | [docs/adr/README.md](docs/adr/README.md) | Architecture Decision Records index (13 ADRs; **software-owned set accepted 2026-06-27**, the rest Proposed pending hardware/ops) |
+| 10 | [docs/10-if4-sign-controller-firmware-spec.md](docs/10-if4-sign-controller-firmware-spec.md) | **IF-4 sign-controller firmware spec (RQ-H2)** — the ESP32 dead-man's-switch firmware handoff: the authenticated 29-byte `SHOW` frame, verify + two-guard anti-replay, the LoRa airtime budget that sets `T_signhold`, and the firmware conformance checklist |
+| — | [docs/adr/README.md](docs/adr/README.md) | Architecture Decision Records index (15 ADRs; **software-owned set accepted 2026-06-27**, the rest Proposed pending hardware/ops) |
 
 Figure 1 from the proposal (the concept infographic) is preserved at
 [docs/assets/figure-1-concept-infographic.jpeg](docs/assets/figure-1-concept-infographic.jpeg) and is
