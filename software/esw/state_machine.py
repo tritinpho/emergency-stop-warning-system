@@ -73,6 +73,7 @@ class StateMachine:
         self.ota_deferred = False        # an OTA/restart is deferred behind an active warning
         self.drift_since = None          # onset of a calibration-drift residual (debounce)
         self.drift_degraded = False      # drift monitor has marked the unit degraded
+        self.time_degraded = False       # health monitor reports absolute time untrustworthy (NFR-16)
         self.alarm_count = 0             # deduped alarm count (raise once + re-escalate)
         self.alarm_since = None          # when the current CRITICAL alarm was (re-)raised
         self.alarm_acked = False         # operator ack'd the current alarm epoch (freezes re-escalate)
@@ -122,6 +123,13 @@ class StateMachine:
         else:
             self.drift_since = None
             self.drift_degraded = False
+
+        # Time integrity (NFR-16): the health monitor reports whether absolute time is
+        # trustworthy (health["time_valid"], derived from GNSS/PPS). Losing it degrades AUDIT
+        # timestamps and inter-sensor fusion -> the unit goes DEGRADED + alert, but it must NOT
+        # blank a live warning: a stopped vehicle is still a hazard when the clock drifts. (The
+        # independent force-safe on a critical fault is the health monitor's own path, IF-5.)
+        self.time_degraded = not health.get("time_valid", True)
         cfg = self.cfg
         gate = cfg["speed_gate_kph"]
         roi_gate = cfg["roi_overlap_gate"]
@@ -373,7 +381,7 @@ class StateMachine:
             alert = "DEGRADED"
         else:  # RADAR_ONLY or NEITHER
             alert = "CRITICAL"
-        if self.state == CAMERA_OCCLUDED_DEGRADED or self.drift_degraded:
+        if self.state == CAMERA_OCCLUDED_DEGRADED or self.drift_degraded or self.time_degraded:
             alert = _max_alert(alert, "DEGRADED")
         alert = _max_alert(alert, self.escalation)
 
@@ -398,7 +406,7 @@ class StateMachine:
         # degraded sensing mode -> DEGRADED; otherwise NORMAL.
         if self.override_active:
             posture = "OVERRIDDEN"
-        elif self.mode != FULL or self.drift_degraded:
+        elif self.mode != FULL or self.drift_degraded or self.time_degraded:
             posture = "DEGRADED"
         else:
             posture = "NORMAL"

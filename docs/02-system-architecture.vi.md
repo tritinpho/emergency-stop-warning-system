@@ -468,6 +468,8 @@ ngoài* bảng này.
 | `T_signhold` | hằng số có giới hạn | 2 s | **≤ 3 s** | khoảng cơ-chế-tự-ngắt-an-toàn ([ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)); một giá trị lớn vô hiệu hóa an-toàn-khi-sự-cố |
 | `T_assert_refresh` | hằng số có giới hạn | 0.5 s | **≤ ¼·`T_signhold`** | phải nằm dưới `T_signhold` đủ nhiều (kiểm soát chập chờn) |
 | `T_activate` | hằng số có giới hạn | ≤ 2 s | **≤ 2 s** | NFR-01 (phần phụ trợ LED) |
+| `T_sensor_timeout` | hằng số có giới hạn | 0 s | **0–2 s** | bộ giám sát sức khỏe: một cảm biến bị coi là HỎNG sau khoảng này nếu không có dữ liệu mới (FR-10); mặc định 0 = phản ứng tức thì (bảo thủ), tăng lên để chống chớp-tắt |
+| `T_time_holdover` | hằng số có giới hạn | 0.5 s | **0–5 s** | bộ giám sát sức khỏe: thời gian tuyệt đối còn hợp lệ trong khoảng này sau khi mất GNSS/PPS (NFR-16); khả năng duy trì nhiều giờ thực tế để lại cho hiện trường |
 | dung sai trôi | hằng số có giới hạn (theo từng địa điểm lúc nghiệm thu) | theo từng địa điểm | trong giới hạn bao đã khảo sát | ngưỡng bộ-giám-sát-trôi (§4, R15) |
 
 **Quy tắc:** các chốt chặn trọng yếu an toàn (`T_watchdog`, `T_signhold`, `T_assert_refresh`, `T_degraded_max`,

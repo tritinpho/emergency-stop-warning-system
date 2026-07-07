@@ -2,14 +2,14 @@
 
 This is **workstream #1** from the build plan: the event-level ("Level A") simulation
 harness ([doc 07 §2](../docs/07-simulation-methodology.md)) driving the **real** decision
-state machine as the system under test (SUT), scored against the **SC-01..34** scenario
+state machine as the system under test (SUT), scored against the **SC-01..37** scenario
 oracles ([doc 07 §5](../docs/07-simulation-methodology.md)). A second board adds the
 **Level-B** perception stage (IF-1→IF-2) — the real ROI-gating + tracking pipeline driven by
 scripted *detections* (with doc 07 §3.1 detector nuisances) — scored against **PC-01..11**.
 
 It embodies the three build decisions in **[ADR-0015](../docs/adr/ADR-0015-state-machine-implementation-strategy.md)**:
 
-1. **The SC-01..34 oracles are the executable spec.** The state machine is correct when
+1. **The SC-01..37 oracles are the executable spec.** The state machine is correct when
    its sign-over-time matches every scenario's oracle. TDD against the board.
 2. **Fixed-rate tick execution.** `StateMachine.tick(now, observations, health)` is called
    every cycle (10 Hz in the harness); timers are deadlines against `now`, no wall-clock is
@@ -28,35 +28,41 @@ software/
     geometry.py     #   homography + ROI-overlap + first-order & projected footprints
     if4.py          #   IF-4 wire codec: authenticated SHOW frame + verify (doc 08 §3, doc 10)
     actuator.py     #   IF-4 edge-side refresh-or-blank driver (no "off" command)
+    health.py       #   health monitor: derives {camera,radar}, time integrity, force-safe (FR-10/NFR-16/IF-5)
   harness/          # host tooling — NOT shipped. Replaces only the sensor + sign ends.
-    sensors.py      #   Level-A: scenario script -> IF-2 track events
+    sensors.py      #   Level-A: scenario script -> IF-2 track events (+ gnss/self-test liveness)
     frames.py       #   Level-B: scenario -> detector output + doc 07 §3.1 nuisances
     sign.py         #   sign controller: decodes+verifies real IF-4 frames + dead-man's switch
-    runner.py       #   tick loop, fault injection, oracle comparator
+    runner.py       #   tick loop, health monitor, fault injection, oracle comparator
   scenarios/
-    catalogue.py        #   SC-01..34 — Level-A executable spec (the state machine)
+    catalogue.py        #   SC-01..37 — Level-A executable spec (the state machine)
     perception_cases.py #   PC-01.. — Level-B perception cases (IF-1→IF-2)
+    health_cases.py     #   HM-01.. — Level-C health-monitor unit cases
   run_tests.py            # Level-A state-machine board
   run_perception_tests.py # Level-B perception board
+  run_health_tests.py     # Level-C health-monitor board
 ```
 
 ## Run
 
 ```
-python software/run_tests.py             # Level A — SC-01..34 state-machine board
+python software/run_tests.py             # Level A — SC-01..37 state-machine board
 python software/run_perception_tests.py  # Level B — perception (IF-1→IF-2) board
+python software/run_health_tests.py      # Level C — health-monitor (FR-10/NFR-16/IF-5) board
 micropython run_tests.py                 # from software/, on the MicroPython unix port
 ```
 
-Both exit 0 when healthy and 1 on any surprise. **Level A** injects IF-2 events and tests the
-decision logic; **Level B** injects *detections* (image bboxes) and runs the **real** perception
-(ROI gating + tracker) that produces those events (doc 07 §2) — and closes the loop through the
-real state machine to the sign. The detector itself (a K230 `kmodel`) is a drop-in backend behind
-`Perception.step()`, so the perception pipeline is byte-identical in sim and on the board.
+All exit 0 when healthy and 1 on any surprise. **Level A** injects IF-2 events and tests the
+decision logic — now with the **real health monitor** in the loop deriving the sensor mode; **Level
+B** injects *detections* (image bboxes) and runs the **real** perception (ROI gating + tracker) that
+produces those events (doc 07 §2) — and closes the loop through the real state machine to the sign;
+**Level C** unit-tests the health monitor (`esw/health.py`) in isolation. The detector itself (a
+K230 `kmodel`) is a drop-in backend behind `Perception.step()`, so the perception pipeline is
+byte-identical in sim and on the board.
 
 ## The boards today
 
-**Level A — `run_tests.py`: 34 passing · 0 red · 0 pending** (`exit 0`). The full SC-01..34
+**Level A — `run_tests.py`: 37 passing · 0 red · 0 pending** (`exit 0`). The full SC-01..37
 catalogue: the happy path, dwell / creep / cold-start, pass-through, the set-based occlusion
 policy (`WARN_HOLD → CAMERA_OCCLUDED_DEGRADED → T_degraded_max` forced clear, incl. the
 weak-(b) stale-ON guard), the FULL / CAMERA-ONLY / RADAR-ONLY / NEITHER sensor-mode matrix
@@ -64,10 +70,13 @@ weak-(b) stale-ON guard), the FULL / CAMERA-ONLY / RADAR-ONLY / NEITHER sensor-m
 motorcycle small-RCS case, warm reboot, operator override (force-on / force-off / mute,
 out-of-policy clamp), OTA-deferral, calibration-drift, sign-stuck → SAFE_STATE, alarm dedup /
 re-escalate, the three fail-safe blank paths (kill SM / kill box / cut link → sign blanks
-≤ `T_signhold`), and the **IF-4 auth path** (SC-33/34: forged and replayed `SHOW` frames are
-rejected — an attacker on the link can neither light nor sustain the sign). The state machine's
-sign assertions now drive the **real `esw/if4` frame codec** through the actuator to the
-controller, so the board verifies the exact bytes the ESP32 firmware will (doc 10).
+≤ `T_signhold`), the **IF-4 auth path** (SC-33/34: forged and replayed `SHOW` frames are
+rejected — an attacker on the link can neither light nor sustain the sign), and the **health
+monitor in the loop** (SC-35 derived-health debounce, SC-36 GNSS/PPS loss → DEGRADED-not-blanked,
+SC-37 independent force-safe blanks the sign despite `SHOW`). The state machine's sign assertions
+now drive the **real `esw/if4` frame codec** through the actuator to the controller, so the board
+verifies the exact bytes the ESP32 firmware will (doc 10); the sensor mode is now **derived** by
+the real health monitor, not injected.
 
 **Level B — `run_perception_tests.py`: 11 passing + closed loop** (`exit 0`). PC-01..05 cover
 the pipeline plumbing (ROI overlap, track continuity, speed). PC-06..11 harden it against the
@@ -78,6 +87,15 @@ reading — raw frame-differencing would report ~16 km/h on a stopped car), a br
 stable), a **low-confidence dip** (ByteTrack two-stage recovery), and a **perspective footprint**
 that reads ROI overlap faithfully where the first-order box would cry-wolf (0.42 vs 0.58 at a
 0.50 gate). The closed loop runs detections → real perception → real state machine → sign.
+
+**Level C — `run_health_tests.py`: 6 passing** (`exit 0`). HM-01..06 unit-test the health monitor
+(`esw/health.py`) in isolation: sensor liveness with a **debounce** (a brief dropout doesn't flap
+the mode; a sustained loss reports the sensor DOWN), radar-dead-from-boot, **time integrity**
+(GNSS/PPS loss → `time_valid` false past the hold-over, re-lock → valid), and the **independent
+force-safe** (a critical self-test failure trips IF-5). The monitor derives the `{camera, radar}`
+health the state machine consumes, so the FULL/CAMERA-ONLY/RADAR-ONLY/NEITHER mode is computed,
+not injected. `T_sensor_timeout` defaults to 0 (react immediately, conservative) — tune it up for
+anti-flap; absolute-time hold-over across a multi-hour outage is field-deferred (NFR-16).
 
 ## Extending the board
 

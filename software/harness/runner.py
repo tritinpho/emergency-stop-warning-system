@@ -9,8 +9,10 @@
 from esw.params import default_config
 from esw.state_machine import StateMachine
 from esw.actuator import Actuator
+from esw.health import HealthMonitor
 from esw import if4
-from harness.sensors import observations_at, health_at, override_at, ota_at, drift_at, ack_at
+from harness.sensors import (observations_at, health_at, override_at, ota_at, drift_at, ack_at,
+                             gnss_at, selftest_at)
 from harness.sign import Sign
 
 TICK_DT = 0.1  # 10 Hz fixed-rate tick (ADR-0015)
@@ -45,6 +47,7 @@ def run_scenario(scenario):
     cfg = _merge(default_config(), scenario.get("config_push", {}))
     cfg_ver = if4.cfg_fingerprint(cfg)
     sm = StateMachine(cfg)                        # SUT gets the (possibly bad) pushed config
+    monitor = HealthMonitor(sm.cfg)               # derives health/time/force-safe (shares clamped cfg)
     actuator = Actuator(_KEY, cfg_ver)            # edge-side IF-4 driver (refresh-or-blank)
     sign = Sign(default_config(), _KEY,           # controller uses in-bounds safety constants
                 latch=scenario.get("sign_latch", False),
@@ -66,6 +69,7 @@ def run_scenario(scenario):
                     sm_down = True
                 elif t >= f["t"] + down and not rebooted:
                     sm = StateMachine(cfg)         # restart comes up IDLE -> full re-confirm
+                    monitor = HealthMonitor(sm.cfg)     # fresh box: health monitor restarts too
                     actuator = Actuator(_KEY, cfg_ver)  # fresh edge: seq resets (anti-replay reconnect)
                     rebooted = True
             elif t >= f["t"]:
@@ -77,14 +81,23 @@ def run_scenario(scenario):
                     link_cut = True
         sign.link_up = not link_cut
 
+        force_safe = False
+        hm_status = None
         if killed_sm or sm_down:
             decision = {"assertion": "NONE"}      # SM process dead / rebooting -> nothing asserted
         else:
+            # Health monitor runs BEFORE the SM: it derives {camera, radar} (so the sensor mode is
+            # DERIVED, not injected), judges time integrity, and owns the independent force-safe.
+            hm = monitor.step(t, health_at(scenario, t), gnss_at(scenario, t),
+                              selftest_at(scenario, t))
+            force_safe = hm["force_safe"]          # IF-5 independent force-safe authority
+            hm_status = hm["status"]
+            health = {"camera": hm["camera"], "radar": hm["radar"], "time_valid": hm["time_valid"]}
             inputs = {"sign_status": sign_status,
                       "ota": ota_at(scenario, t),
                       "drift": drift_at(scenario, t),
                       "ack": ack_at(scenario, t)}
-            decision = sm.tick(t, observations_at(scenario, t), health_at(scenario, t),
+            decision = sm.tick(t, observations_at(scenario, t), health,
                                override_at(scenario, t), inputs)
 
         # The edge emits an authenticated refresh iff it is alive and asserting SHOW. A dead
@@ -92,7 +105,7 @@ def run_scenario(scenario):
         # sends nothing -> the sign blanks in every hard-failure case (RQ-H2). Refreshing
         # every 0.1 s tick is well inside T_assert_refresh; a real edge uses that timer.
         frame = None
-        if not box_dead:
+        if not box_dead and not force_safe:       # a health-monitor force-safe (IF-5) inhibits the refresh
             frame = actuator.step(t, decision)
         if frame is not None:
             last_frame = frame
@@ -122,6 +135,8 @@ def run_scenario(scenario):
             "ota_deferred": decision.get("ota_deferred"),
             "alarm_count": decision.get("alarm_count"),
             "rejects": sign.rejects,
+            "hm_status": hm_status,
+            "force_safe": force_safe,
         })
     return timeline
 
@@ -147,7 +162,7 @@ def sign_on_at(timeline, t):
 # doc 07 §4 scores disposition correctness (degraded/clear/safe-state), not just
 # the sign -- e.g. SC-25/26/27 must prove mode/alert, not merely that ON matches.
 _DISPOSITION_KEYS = ("state", "posture", "mode", "alert", "override", "override_rejected",
-                     "ota_deferred", "alarm_count")
+                     "ota_deferred", "alarm_count", "hm_status")
 
 
 def evaluate(scenario, timeline):
