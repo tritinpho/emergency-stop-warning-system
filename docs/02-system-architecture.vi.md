@@ -356,6 +356,17 @@ vết đứng yên trải khắp các làn thông xe) và **chặn hoặc đổi
 là một kịch bản chấp nhận tường minh ([tài liệu 01 §5](01-requirements.vi.md#5-chỉ-số-đánh-giá--tiêu-chí-nghiệm-thu))
 và một rủi ro được theo dõi ([tài liệu 04 R14](04-risk-and-safety.vi.md#1-bảng-đăng-ký-rủi-ro)). Hai hệ quả phải được nêu rõ, không che giấu: (1) chặn cảnh báo trong một đám kẹt xe là một **khoảng trống phạm vi bao phủ có chủ đích trong một điều kiện nguy-hiểm-hàng-đầu _có tên gọi_** ("mật độ giao thông cao", [tài liệu 00 §1](00-context-and-glossary.vi.md)), nên nó được ghi nhận như một **giới hạn của sự bảo vệ** ([tài liệu 04 §0](04-risk-and-safety.vi.md)), chứ không chỉ là một biện pháp kiểm soát kích hoạt sai; (2) việc *đổi-thông-điệp* tiền giả định tồn tại một **thông báo tuân thủ QCVN 41 thứ hai** — nếu không có, chỉ có ức chế là khả dụng ([ADR-0004](adr/ADR-0004-warning-actuator-integration.vi.md)).
 
+Một hệ quả thứ ba, tinh tế hơn, nằm ở **ranh giới giữa chặn-và-xóa**: nếu một đám kẹt xe kết thúc không phải
+bằng cách từng xe *rời đi* (một lần thoát ra được xác nhận) mà bằng cách toàn cảnh **biến mất trong một nhịp
+(tick)** (một hiện tượng giả của bộ phát hiện / một lần chớp mất toàn cảnh), thì vết lề đã-xác-nhận-nhưng-bị-chặn
+sẽ, ngay trong nhịp đó, vừa thấy việc chặn được gỡ bỏ *vừa* bước vào lần giữ-mất-vết — **nháy sáng biển báo một
+chốc** cho một sự xác nhận mà nó chưa bao giờ được tin đủ để hiển thị. Bởi vì lần giữ tồn tại để bảo toàn một
+cảnh báo *đang hiển thị* mà ở đây lại không có, một vết như vậy (đã biến mất, **không có thoát ra được xác nhận,
+không có đối chứng**) được **xóa lặng lẽ**, không giữ — sự nghi ngờ vốn dẫn đến việc chặn được mang vào quyết định
+xóa; một lần che khuất **được-radar-đối-chứng** thì không bị ảnh hưởng (bằng chứng hiện diện độc lập vẫn giữ cảnh
+báo và, khi đám kẹt xe tan, hiển thị nó một cách đúng đắn). Xem
+[ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md), được ghim bởi **SC-38**.
+
 **Khởi động lại nóng trong khi một cảnh báo đang BẬT — một sự tái-phơi-nhiễm mà quy tắc xe-có-mặt-khi-khởi-động nguội không bao trùm.** Quy tắc xe-có-mặt-khi-khởi-động (coi một xe có mặt lúc khởi động là một vết mới, chạy đủ dwell) được viết cho khởi động *nguội*. Một **lần khởi động lại ngoài kế hoạch** (chớp nguồn, sập-rồi-khởi-động-lại) *trong khi một cảnh báo đang BẬT* thì khác: cơ chế tự ngắt an toàn làm trống biển báo đúng cách trong thời gian ngừng, nhưng khi khởi động lại chiếc xe vẫn-đang-dừng phải phục vụ lại trọn vẹn `T_dwell` trước khi cảnh báo quay lại — một **cửa sổ phơi-nhiễm-không-được-cảnh-báo mới cho một chiếc xe vốn đã được bảo vệ** ([tài liệu 01 §4](01-requirements.vi.md#4-bố-trí-cảnh-báo--phép-tính-mà-đề-xuất-bỏ-sót)). Các lần OTA/khởi động lại theo kế hoạch được hoãn khi một cảnh báo đang hoạt động (FR-21); các lần ngoài kế hoạch thì không, nên sự tái-phơi-nhiễm này là một phần dư đã được nêu. Một cờ *cảnh-báo-đang-hoạt-động-lúc-tắt* được lưu lại có thể rút ngắn việc xác nhận lại cho một chiếc xe vẫn ở cùng vị trí ROI khi khởi động lại — **một câu hỏi an toàn còn mở** cần giải quyết tường minh trong thiết kế chi tiết ([tài liệu 04 §5 Q7](04-risk-and-safety.vi.md#5-các-câu-hỏi-an-toàn-còn-mở-cho-nhóm)): rút ngắn việc xác nhận lại đánh đổi cửa sổ tái-phơi-nhiễm với khả năng **kẹt-BẬT trên một chiếc xe thực ra đã rời đi trong lúc ngừng**, nên không được làm một cách mù quáng.
 
 ## 5. Luồng dữ liệu lúc chạy (đường thuận lợi)

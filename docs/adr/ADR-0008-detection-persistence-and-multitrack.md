@@ -53,6 +53,24 @@ The state machine operates over the **set of confirmed-stopped tracks inside the
    - with **no corroboration from any sensor**, the track is retained only for the brief `T_hold`
      hysteresis (default 10 s) and then moved to clearing — but clearing a *possibly-still-present*
      hazard is logged and escalated as a **low-confidence clear** event, never a silent one.
+   - **Congestion carry-over (refined 2026-07-07).** The one exception to the `T_hold` hold above is a
+     track that was under **congestion suppression** (R14,
+     [doc 02 §4](../02-system-architecture.md#4-the-detectionwarning-state-machine)) the last time it
+     was seen. A track confirmed *only while the shoulder warning was suppressed* never earned an
+     un-suppressed assertion, so there is **no shown warning to hold**: holding it would **flash a
+     `WARN_HOLD` the instant suppression lifts** — which happens on the very tick a jam clears by the
+     tracks *vanishing together without an exit* — a cry-wolf built on exactly the shoulder-vs-through
+     ROI geometry R14 already distrusts. Such a track, vanishing with **no confirmed exit and no
+     corroboration**, is therefore **cleared quietly** (no hold, no assertion; `WARN_ON → CLEARING →
+     IDLE`): the suppression's distrust **carries into the clear decision**. **Radar-corroborated
+     occlusion is unaffected** — that is the bullet above: independent presence evidence still holds
+     the warning and, once the jam clears, correctly shows it. The realistic jam-dissipation — each
+     vehicle **seen accelerating away** (a confirmed exit) — fast-clears and never reaches this path;
+     only a *simultaneous loss of the whole scene without an exit* (a detector artifact / global blink)
+     does. Residual cost: a genuine breakdown that blinks out of **both** channels at that instant must
+     re-serve `T_dwell` on re-acquisition — a **bounded** re-warn latency, incurred only inside the
+     coverage gap R14 already accepts
+     ([doc 04 §0](../04-risk-and-safety.md#0-limits-of-protection-residual-hazards)). Pinned by **SC-38**.
 4. **Watchdog fails toward clear, loudly.** `T_watchdog` bounds any activation that has had *no* fresh
    confirmation or corroboration from *any* channel; on expiry the warning clears **and raises a
    fault** (the logic may be wedged — [ADR-0005](ADR-0005-fail-safe-and-system-safety.md)). Radar
@@ -126,7 +144,8 @@ strengthening the ADR-0001 case and giving ADR-0007 a concrete thing to validate
 ## Consequences
 
 - **Easier:** correct behaviour under occlusion and multiple vehicles; fast clear on genuine
-  departure; no silent clears.
+  departure; no silent clears; and **no cry-wolf flash** when a congestion-suppressed track is lost
+  by *vanish* rather than a confirmed exit (the congestion carry-over above, SC-38).
 - **Harder:** a track-set lifecycle and a defined ROI exit boundary to implement and test; a hard
   dependency on real radar corroboration — including radar **azimuth/lane discrimination** good enough
   to attribute a return to the *shoulder* ROI rather than the adjacent through lane at the monitored
