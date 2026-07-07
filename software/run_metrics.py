@@ -10,10 +10,17 @@
 # Exit 0 when the reducer unit tests pass; 1 otherwise. The report itself is informational --
 # proving the pipeline is ready to ingest real staged/field captures.
 
-import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Put software/ on the import path on both CPython and MicroPython. mpy's `os` has no
+# `os.path`, so derive this script's directory from __file__ by hand -- uniform across
+# runtimes, no host-only branch, so `micropython <board>.py` runs too (ADR-0015 D3).
+_here = __file__
+_cut = _here.rfind("/")
+_bs = _here.rfind("\\")
+if _bs > _cut:
+    _cut = _bs
+sys.path.insert(0, _here[:_cut] if _cut >= 0 else ".")
 
 from harness import metrics
 from harness.runner import run_scenario

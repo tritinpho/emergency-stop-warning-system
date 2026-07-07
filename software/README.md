@@ -50,12 +50,20 @@ software/
 ## Run
 
 ```
-python software/run_tests.py             # Level A — SC-01..37 state-machine board
+python software/run_tests.py             # Level A — SC-01..38 state-machine board
 python software/run_perception_tests.py  # Level B — perception (IF-1→IF-2) board
 python software/run_health_tests.py      # Level C — health-monitor (FR-10/NFR-16/IF-5) board
 python software/run_metrics.py           # Level D — acceptance-evidence reducer + sample report
-micropython run_tests.py                 # from software/, on the MicroPython unix port
+python software/tools/mp_safe_check.py software/esw   # MicroPython-safety AST lint on esw/
+python software/tools/mpy_smoke.py        # esw smoke: perception + geometry
+
+# The shipped esw/ subset also RUNS under the real MicroPython unix port (not just CPython):
+cd software && micropython run_tests.py && micropython run_health_tests.py && micropython tools/mpy_smoke.py
 ```
+
+Both are enforced in CI on every push/PR ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)): a
+**cpython** job runs all four boards + the AST lint + the smoke, and a **micropython** job runs the
+shipped subset under `micropython/unix:v1.28.0` — see the *MicroPython / K230 note* below.
 
 Boards A–C exit 0 when healthy and 1 on any surprise; D exits 0 when the reducer unit tests pass
 (the report is informational). **Level A** injects IF-2 events and tests the decision logic — now
@@ -69,7 +77,7 @@ behind `Perception.step()`, so the perception pipeline is byte-identical in sim 
 
 ## The boards today
 
-**Level A — `run_tests.py`: 37 passing · 0 red · 0 pending** (`exit 0`). The full SC-01..37
+**Level A — `run_tests.py`: 38 passing · 0 red · 0 pending** (`exit 0`). The full SC-01..38
 catalogue: the happy path, dwell / creep / cold-start, pass-through, the set-based occlusion
 policy (`WARN_HOLD → CAMERA_OCCLUDED_DEGRADED → T_degraded_max` forced clear, incl. the
 weak-(b) stale-ON guard), the FULL / CAMERA-ONLY / RADAR-ONLY / NEITHER sensor-mode matrix
@@ -136,10 +144,20 @@ a case can prove a nuisance never causes a false confirmation and a real track i
 ## MicroPython / K230 note
 
 `esw/` sticks to the MicroPython-safe subset (no `enum`/`dataclasses`/`typing`, no host-only
-stdlib) so the SUT is one codebase in sim and on the K230. Before committing hard to
-MicroPython for the safety loop, run the **timing spike**: measure GC-pause / loop-jitter
-under YOLO load on the K230 and confirm it stays well inside `T_assert_refresh` (0.5 s) and
-`T_signhold` (2 s). See [ADR-0015](../docs/adr/ADR-0015-state-machine-implementation-strategy.md).
+stdlib) so the SUT is one codebase in sim and on the K230. CI enforces this two ways
+(`.github/workflows/ci.yml`): `tools/mp_safe_check.py` **AST-lints** esw/ for out-of-subset
+constructs, and — the stronger check — the Level-A and Level-C boards plus `tools/mpy_smoke.py`
+(perception + geometry) actually **run under the MicroPython unix port** (`micropython/unix:v1.28.0`),
+so all nine shipped modules are proven to load and run under real MicroPython semantics, not just
+parse clean. (This surfaced a real bug the AST lint could never catch: the board entrypoints used
+`os.path`, which MicroPython's `os` does not provide — so `micropython run_tests.py` had never
+actually run until the bootstrap was made mpy-safe.) A green CPython board is necessary but **not
+sufficient** — the K230 runs CanMV/MicroPython, not CPython.
+
+Still deferred to the hardware: the **timing spike** — measure GC-pause / loop-jitter under YOLO
+load on the K230 and confirm it stays well inside `T_assert_refresh` (0.5 s) and `T_signhold` (2 s).
+That needs the board; the CI mpy run proves *portability*, the spike proves *timing*.
+See [ADR-0015](../docs/adr/ADR-0015-state-machine-implementation-strategy.md).
 
 ## Deliberately not here (yet)
 
