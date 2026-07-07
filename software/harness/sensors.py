@@ -123,6 +123,25 @@ def drift_at(scenario, t):
     return False
 
 
+def gnss_at(scenario, t):
+    """GNSS/PPS lock state at tick t for the health monitor (NFR-16): False while a
+    `gnss_loss` window is scripted, True (locked) otherwise."""
+    for w in scenario.get("gnss_loss", []):
+        if w[0] <= t < w[1]:
+            return False
+    return True
+
+
+def selftest_at(scenario, t):
+    """Critical health self-test result at tick t (FR-10): False while an `hm_fault` window
+    is scripted (a compute/memory/link/sign self-check failure), which trips the health
+    monitor's independent force-safe (IF-5). True (passing) otherwise."""
+    for w in scenario.get("hm_fault", []):
+        if w[0] <= t < w[1]:
+            return False
+    return True
+
+
 def ack_at(scenario, t):
     """The operator's most-recent acknowledgement as of tick t: the alarm_count value the
     operator has acked (None if none) -- IF-10, ADR-0011 §2. The SUT scopes it to the epoch

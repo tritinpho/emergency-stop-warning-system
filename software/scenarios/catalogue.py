@@ -490,4 +490,57 @@ SCENARIOS = [
                    {"t": 14.0, "on": False},   # cleared before the replay
                    {"t": 16.0, "on": False}],  # replay at t=15 rejected -> stays OFF
     },
+    {
+        "id": "SC-35", "status": "impl",
+        "title": "Health monitor derives sensor health: a brief camera blink doesn't flap the mode; a sustained loss does",
+        "duration": 24.0,
+        # The sensor mode is now DERIVED by the health monitor, not injected. A confirmed warning
+        # under FULL: the camera blinks off for 0.3 s (< T_sensor_timeout) -> the monitor debounces
+        # it, so the mode stays FULL with no spurious RADAR_ONLY / alert flap. From t=14 the camera
+        # is lost for good -> past T_sensor_timeout the monitor reports it DOWN and the mode goes
+        # RADAR_ONLY (bounded camera-unverified hold). T_sensor_timeout raised to 1 s to make the
+        # debounce observable (the SUT default is 0 = react immediately).
+        "config_push": {"T_dwell": 3.0, "T_hold": 5.0, "T_occlusion": 8.0,
+                        "T_degraded_max": 30.0, "T_sensor_timeout": 1.0},
+        "health_events": [{"t": 8.7, "health": {"camera": False, "radar": True}},   # 0.3 s blink...
+                          {"t": 9.0, "health": {"camera": True, "radar": True}},    # ...ends (debounced)
+                          {"t": 14.0, "health": {"camera": False, "radar": True}}], # sustained loss
+        "tracks": [{"id": "T1", "enter": 1.0, "leave": 40.0, "speed": 0.0,
+                    "in_roi": 1.0, "radar_visible": True}],
+        "checks": [{"t": 6.0, "on": True, "mode": "FULL"},                  # healthy warning
+                   {"t": 9.2, "on": True, "mode": "FULL"},                  # blink debounced -> no flap
+                   {"t": 16.0, "on": True, "mode": "RADAR_ONLY"}],          # sustained loss -> derived DOWN
+    },
+    {
+        "id": "SC-36", "status": "impl",
+        "title": "Time integrity: GNSS/PPS loss -> DEGRADED posture + alert, but the warning stays ON (NFR-16)",
+        "duration": 20.0,
+        # A confirmed warning under FULL health. GNSS/PPS lock is lost from t=9; past T_time_holdover
+        # the health monitor reports time_valid False. Absolute-time loss degrades audit timestamps
+        # and inter-sensor fusion -> posture DEGRADED + alert -- but it must NOT blank the warning: a
+        # stopped vehicle is still a hazard when the clock drifts. (Blanking on a *critical* fault is
+        # the monitor's independent force-safe, IF-5 -- a different trigger, SC-37.)
+        "config_push": {"T_dwell": 3.0, "T_time_holdover": 0.5},
+        "gnss_loss": [[9.0, 20.0]],
+        "tracks": [{"id": "T1", "enter": 1.0, "leave": 30.0, "speed": 0.0, "in_roi": 1.0}],
+        "checks": [{"t": 6.0, "on": True, "posture": "NORMAL", "alert": "NONE"},        # healthy warning
+                   {"t": 12.0, "on": True, "posture": "DEGRADED", "alert": "DEGRADED"}], # time invalid -> degraded, still ON
+    },
+    {
+        "id": "SC-37", "status": "impl",
+        "title": "Health monitor independent force-safe (IF-5): a critical self-test fault blanks the sign despite SHOW",
+        "duration": 20.0,
+        # A confirmed warning is ON and the state machine keeps asserting SHOW under FULL health. A
+        # CRITICAL health self-test then fails (compute / memory / link / sign check, FR-10). The
+        # monitor's INDEPENDENT force-safe path (IF-5, ADR-0009 §A third layer) inhibits the refresh
+        # -> the sign blanks within T_signhold, WITHOUT routing through the (possibly wedged) state
+        # machine, and reports FORCE_SAFE. When the self-test recovers, the refresh resumes and the
+        # still-present hazard re-warns -- proving the SM never stopped asserting (independence).
+        "config_push": {"T_dwell": 3.0},
+        "hm_fault": [[9.0, 13.0]],
+        "tracks": [{"id": "T1", "enter": 1.0, "leave": 30.0, "speed": 0.0, "in_roi": 1.0}],
+        "checks": [{"t": 6.0, "on": True, "hm_status": "OK"},                # healthy warning
+                   {"t": 11.0, "on": False, "hm_status": "FORCE_SAFE"},      # forced safe (independent of SM)
+                   {"t": 16.0, "on": True, "hm_status": "OK"}],              # recovered -> refresh resumes -> re-warns
+    },
 ]

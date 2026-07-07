@@ -477,6 +477,8 @@ tunable *outside* this table.
 | `T_signhold` | bounded constant | 2 s | **≤ 3 s** | dead-man's-switch window ([ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)); a large value defeats fail-safe |
 | `T_assert_refresh` | bounded constant | 0.5 s | **≤ ¼·`T_signhold`** | must stay well below `T_signhold` (flap control) |
 | `T_activate` | bounded constant | ≤ 2 s | **≤ 2 s** | NFR-01 (LED backend) |
+| `T_sensor_timeout` | bounded constant | 0 s | **0–2 s** | health monitor: a sensor is DOWN after this long with no fresh data (FR-10); default 0 = react immediately (conservative), tune up for anti-flap |
+| `T_time_holdover` | bounded constant | 0.5 s | **0–5 s** | health monitor: absolute time stays valid this long after GNSS/PPS loss (NFR-16); real multi-hour hold-over is field-deferred |
 | drift tolerance | bounded constant (per-site at commissioning) | per-site | within surveyed envelope | drift-monitor threshold (§4, R15) |
 
 **Rule:** the safety-critical backstops (`T_watchdog`, `T_signhold`, `T_assert_refresh`, `T_degraded_max`,

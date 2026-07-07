@@ -22,6 +22,13 @@ DEFAULTS = {
     "T_signhold":       {"default": 2.0,    "lo": 0.0,  "hi": 3.0},      # <= 3 s dead-man's window
     "T_assert_refresh": {"default": 0.5,    "lo": 0.0,  "hi": 0.75},     # <= 1/4 * T_signhold
     "T_activate":       {"default": 2.0,    "lo": 0.0,  "hi": 2.0},      # <= 2 s (NFR-01, LED)
+    "T_sensor_timeout": {"default": 0.0,    "lo": 0.0,  "hi": 2.0},      # health monitor: sensor DOWN after
+    #                                                                      this long with no fresh data (FR-10).
+    #                                                                      Default 0 = react immediately (safe,
+    #                                                                      conservative); tune up for anti-flap.
+    "T_time_holdover":  {"default": 0.5,    "lo": 0.0,  "hi": 5.0},      # NFR-16: absolute time stays valid
+    #                                                                      this long after GNSS/PPS loss (bench;
+    #                                                                      real multi-hour hold-over field-deferred)
 }
 
 
