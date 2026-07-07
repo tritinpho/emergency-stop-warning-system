@@ -95,7 +95,7 @@ class StateMachine:
     def _new_track(self, now, speed):
         return {"stationary_since": None, "confirmed": False, "absent_since": None,
                 "degraded_since": None, "stale_now": False, "seen_leaving": False,
-                "last_speed": speed}
+                "suppressed_last_seen": False, "last_speed": speed}
 
     def tick(self, now, observations, health=None, override=None, inputs=None):
         """One fixed-rate cycle. Returns a decision dict: {assertion: "SHOW"|"NONE",
@@ -195,6 +195,7 @@ class StateMachine:
             tr["degraded_since"] = None    # camera re-acquired -> leave any degraded hold
             tr["last_speed"] = speed
             tr["stale_now"] = o.get("stale", False)  # frozen/repeated frame -> not fresh evidence
+            tr["suppressed_last_seen"] = congestion  # was the shoulder warning R14-suppressed when last seen?
             if cls == "person":
                 # Pedestrian presence-onset (FR-08, ADR-0003): a stranded occupant typically
                 # MOVES, so the stationarity gate would miss them -> confirm on debounced
@@ -223,9 +224,10 @@ class StateMachine:
                 if tr["confirmed"]:
                     tr["seen_leaving"] = True  # moving while confirmed = observed exit
 
-        # Camera-absent confirmed tracks -> the four clearing paths (ADR-0009 §C), none
-        # silent, none unbounded: confirmed exit (fast); no corroboration -> T_hold ->
-        # loud clear; corroborated occlusion -> WARN_HOLD until T_occlusion then
+        # Camera-absent confirmed tracks -> the clearing paths (ADR-0009 §C), none silent,
+        # none unbounded: confirmed exit (fast); no corroboration -> T_hold -> loud clear
+        # (or, if it was R14-suppressed when last seen, a quiet clear -- no assert to hold,
+        # SC-38); corroborated occlusion -> WARN_HOLD until T_occlusion then
         # CAMERA_OCCLUDED_DEGRADED, itself bounded by T_degraded_max -> forced loud clear.
         for tid in list(self.tracks.keys()):
             tr = self.tracks[tid]
@@ -251,7 +253,16 @@ class StateMachine:
                 # else: within T_occlusion -> corroboration renews the hold (WARN_HOLD)
             else:
                 tr["degraded_since"] = None
-                if absent >= cfg["T_hold"]:
+                if tr["suppressed_last_seen"]:
+                    # Congestion carry-over (R14, doc 02 §4 / ADR-0008): a track confirmed only
+                    # while the shoulder warning was SUPPRESSED never earned an un-suppressed
+                    # assertion. Vanishing with no confirmed exit and no radar corroboration,
+                    # there is no shown warning to hold -- holding it would flash a WARN_HOLD the
+                    # instant suppression lifts (cry-wolf on the very geometry R14 distrusts). The
+                    # same distrust that suppressed the assert clears it quietly (SC-38). Radar-
+                    # corroborated occlusion is unaffected (handled above): real presence holds.
+                    del self.tracks[tid]                   # suppressed + lost, uncorroborated -> quiet clear
+                elif absent >= cfg["T_hold"]:
                     del self.tracks[tid]                   # lost all corroboration -> loud clear
 
         present = held = degraded = fresh = False

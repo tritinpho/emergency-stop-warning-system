@@ -30,10 +30,11 @@ EVIDENCE = [
         # gap, not a miss -- doc 01 §5 "must not false-trigger"; whether it is field-sound rests on the
         # criterion-(b) radar gate, field-deferred.)
         # The jam persists for the whole observation window (leave > duration) -> suppressed
-        # throughout, so no warning is ever asserted. (Deliberately avoids the degenerate case
-        # where all four vehicles vanish on the same tick without a confirmed exit, which would
-        # briefly flash a WARN_HOLD as suppression lifts -- a fail-safe-direction edge behaviour,
-        # not the suppression claim this case evidences.)
+        # throughout, so this case stays a clean STEADY-STATE suppression claim. The separate
+        # degenerate case -- all four vehicles vanishing on ONE tick with no confirmed exit -- is now a
+        # DEFINED quiet-clear in the SM: the suppressed track never earned an assertion to hold, so it
+        # clears without a WARN_HOLD flash (ADR-0008 congestion carry-over, pinned by SC-38). It is no
+        # longer an edge behaviour to script around.
         "config_push": {"T_dwell": 3.0},
         "tracks": [{"id": "T-SH", "enter": 1.0, "leave": 20.0, "speed": 0.0, "in_roi": 1.0},
                    {"id": "T-L1", "enter": 1.0, "leave": 20.0, "speed": 0.0, "in_roi": 0.1},

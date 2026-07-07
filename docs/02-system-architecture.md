@@ -354,6 +354,16 @@ not merely a false-trigger control; (2) *re-messaging* presupposes a **second QC
 message** exists — if it does not, only suppression is available
 ([ADR-0004](adr/ADR-0004-warning-actuator-integration.md)).
 
+A third, subtler consequence lives at the **suppression↔clearing boundary**: if a jam ends not by each
+vehicle *departing* (a confirmed exit) but by the whole scene **vanishing on one tick** (a detector
+artifact / global blink), the confirmed-but-suppressed shoulder track would, on that same tick, see
+suppression lift *and* enter the lost-track hold — briefly **flashing the sign** for a confirmation it
+was never trusted enough to show. Because the hold exists to preserve a *shown* warning and there is
+none, such a track (vanished, **no confirmed exit, no corroboration**) is **cleared quietly**, not held
+— the suppression's distrust carries into the clear decision; a **radar-corroborated** occlusion is
+unaffected (independent presence evidence still holds the warning and, jam cleared, correctly shows it).
+See [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md), pinned by **SC-38**.
+
 **Warm reboot during an active warning — a re-exposure the cold boot-present rule does not cover.** The
 boot-present rule (treat a vehicle present at startup as a new track, run full dwell) is written for a
 *cold* start. An **unplanned reboot** (power blip, crash-restart) *while a warning is ON* is different:

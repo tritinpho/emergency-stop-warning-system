@@ -543,4 +543,30 @@ SCENARIOS = [
                    {"t": 11.0, "on": False, "hm_status": "FORCE_SAFE"},      # forced safe (independent of SM)
                    {"t": 16.0, "on": True, "hm_status": "OK"}],              # recovered -> refresh resumes -> re-warns
     },
+    {
+        "id": "SC-38", "status": "impl",
+        "title": "Congestion clears by vanish (no confirmed exit) -> suppressed track quiet-clears, no WARN_HOLD flash",
+        "duration": 18.0,
+        # SC-11's jam, but the WHOLE scene vanishes on ONE tick (leave=10, no leave_speed) --
+        # a detector artifact / global blink, NOT the realistic per-vehicle confirmed exit. On
+        # that tick congestion lifts (< _CONGESTION_MIN_TRACKS) AND the confirmed-but-SUPPRESSED
+        # shoulder track goes absent with no confirmed exit and no radar corroboration. Pre-fix
+        # it entered WARN_HOLD and the sign FLASHED for the whole T_hold window the instant
+        # suppression lifted -- a cry-wolf built on a confirmation we never trusted enough to
+        # show (R14 is a distrust of shoulder-vs-through ROI geometry in a jam). A track that
+        # was suppressed when last seen never earned an un-suppressed assertion, so there is no
+        # shown warning to hold: it QUIET-CLEARS (WARN_ON -> CLEARING -> IDLE, sign stays OFF).
+        # Suppression state carries into the hold/clear decision (ADR-0008, doc 02 §4). A
+        # radar-corroborated occlusion is unaffected -- independent presence evidence still holds
+        # (SC-06/31); the realistic jam-dissipation via confirmed exits fast-clears (SC-01).
+        "config_push": {"T_dwell": 3.0, "T_hold": 5.0},
+        "tracks": [{"id": "T-SH", "enter": 1.0, "leave": 10.0, "speed": 0.0, "in_roi": 1.0},
+                   {"id": "T-L1", "enter": 1.0, "leave": 10.0, "speed": 0.0, "in_roi": 0.1},
+                   {"id": "T-L2", "enter": 1.0, "leave": 10.0, "speed": 0.0, "in_roi": 0.1},
+                   {"id": "T-L3", "enter": 1.0, "leave": 10.0, "speed": 0.0, "in_roi": 0.1}],
+        "checks": [{"t": 8.0, "on": False, "state": "WARN_ON"},   # jam: shoulder confirmed but suppressed (as SC-11)
+                   {"t": 10.5, "on": False, "state": "IDLE"},     # vanished w/o exit -> quiet clear, NO flash
+                   {"t": 13.0, "on": False},                      # still dark across the whole former T_hold window
+                   {"t": 15.0, "on": False, "state": "IDLE"}],    # settled, never asserted
+    },
 ]
