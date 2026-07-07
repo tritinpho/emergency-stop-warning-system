@@ -10,6 +10,7 @@ from esw.params import default_config
 from esw.state_machine import StateMachine
 from esw.actuator import Actuator
 from esw.health import HealthMonitor
+from esw.telemetry import Telemetry
 from esw import if4
 from harness.sensors import (observations_at, health_at, override_at, ota_at, drift_at, ack_at,
                              gnss_at, selftest_at)
@@ -22,6 +23,13 @@ TICK_DT = 0.1  # 10 Hz fixed-rate tick (ADR-0015)
 # attacker who can transmit on the link but does not hold the key.
 _KEY = b"esw-if4-shared-secret-v1-0123456789"
 _WRONG_KEY = b"attacker-without-the-shared-secret!"
+
+# Audit fingerprint stubs for the sim (doc 02 §7). cfg_ver is computed per run from the real
+# config; fw/model/calib are placeholders until those artifacts exist on the K230.
+_SITE_ID = "bench-01"
+_FW_VER = "sim-fw"
+_MODEL_VER = "sim-model"
+_CALIB_VER = "sim-calib"
 
 
 def _merge(base, over):
@@ -48,6 +56,8 @@ def run_scenario(scenario):
     cfg_ver = if4.cfg_fingerprint(cfg)
     sm = StateMachine(cfg)                        # SUT gets the (possibly bad) pushed config
     monitor = HealthMonitor(sm.cfg)               # derives health/time/force-safe (shares clamped cfg)
+    telem = Telemetry(_SITE_ID, {"fw_ver": _FW_VER, "cfg_ver": cfg_ver,
+                                 "model_ver": _MODEL_VER, "calib_ver": _CALIB_VER})  # IF-6/IF-7 audit
     actuator = Actuator(_KEY, cfg_ver)            # edge-side IF-4 driver (refresh-or-blank)
     sign = Sign(default_config(), _KEY,           # controller uses in-bounds safety constants
                 latch=scenario.get("sign_latch", False),
@@ -123,9 +133,18 @@ def run_scenario(scenario):
             sign.receive(t, frame)                # genuine refresh delivered last -> it wins the tick
 
         sign_status = sign.update(t)              # read-back fed to the next tick (IF-3)
+
+        # IF-6/IF-7 telemetry: the edge logs audit events + heartbeats WHILE IT IS ALIVE. A dead
+        # box emits nothing -- missing heartbeats are how the TMC detects the outage -- so telemetry
+        # is gated on box-alive, not on force-safe (a force-safed but live edge still logs the clear).
+        if not (box_dead or killed_sm or sm_down):
+            events = telem.step(t, decision, hm_status, sign_status)
+        else:
+            events = []
         timeline.append({
             "t": t,
             "on": sign_status,
+            "events": events,
             "state": decision.get("state"),
             "posture": decision.get("posture"),
             "mode": decision.get("mode"),
