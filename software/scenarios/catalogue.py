@@ -435,4 +435,25 @@ SCENARIOS = [
                    {"t": 16.0, "on": True, "state": "WARN_HOLD"},                 # occluded < T_occlusion
                    {"t": 22.0, "on": True, "state": "CAMERA_OCCLUDED_DEGRADED"}], # held, bounded
     },
+    {
+        "id": "SC-32", "status": "impl",
+        "title": "Operator-ack: dedup -> re-escalate -> ack freezes -> epoch re-arms",
+        "duration": 30.0,
+        # Completes the ADR-0011 §2 alarm ladder: the ack half that stops re-escalation.
+        # Both sensors die (t=2) -> sustained CRITICAL. One deduped alarm (count 1), then an
+        # unacked re-escalation to 2 at _T_REESCALATE. The operator ACKS count 2 (t=13): the
+        # count now FREEZES -- without the ack it would climb to 3 at t=22. Sensors then recover
+        # (t=25 -> alert clears, epoch ends) and die again (t=27): a NEW critical re-arms to 3,
+        # proving the ack was epoch-scoped, not a permanent mute (the stale count-2 ack is
+        # ignored against alarm 3).
+        "health_events": [{"t": 2.0, "health": {"camera": False, "radar": False}},
+                          {"t": 25.0, "health": {"camera": True, "radar": True}},
+                          {"t": 27.0, "health": {"camera": False, "radar": False}}],
+        "acks": [{"t": 13.0, "count": 2}],
+        "tracks": [{"id": "T1", "enter": 1.0, "leave": 40.0, "speed": 0.0, "in_roi": 1.0}],
+        "checks": [{"t": 6.0, "alert": "CRITICAL", "alarm_count": 1},   # one deduped alarm
+                   {"t": 18.0, "alarm_count": 2},                       # re-escalated (12), then acked (13)
+                   {"t": 24.0, "alarm_count": 2},                       # ack froze it (no climb at 22)
+                   {"t": 29.0, "alarm_count": 3}],                      # recover+re-die -> re-armed, stale ack ignored
+    },
 ]

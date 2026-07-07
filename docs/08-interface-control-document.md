@@ -43,7 +43,7 @@ to first integration** (Phase 4) — see [§7](#7-frozen-in-v1-vs-deferred-to-in
 | **IF-7** | Edge → TMC / audit | out | no | MQTT/TLS | **store-and-forward, ordered, durable** |
 | **IF-8** | TMC → Edge (config) | in | yes (content) | HTTPS / MQTT, **signed** | request + ack; **unit enforces §7a bounds** |
 | **IF-9** | TMC → Edge (OTA) | in | yes (content) | HTTPS, **signed** | staged; **deferred while warning active** |
-| **IF-10** | TMC → Edge (override) | in | **yes** | **same hardened channel as IF-8/9**, authenticated | edge-mediated, **refreshed (non-latching)**, auto-expiry |
+| **IF-10** | TMC → Edge (override + ack) | in | **yes** | **same hardened channel as IF-8/9**, authenticated | edge-mediated, **refreshed (non-latching)**, auto-expiry; also the operator **ack** (`alarm_seq`) that freezes alarm re-escalation |
 
 The **safety loop is IF-1→IF-2→IF-3→IF-4** and runs edge-local; IF-6..IF-10 are oversight and **never in
 the safety path** (NFR-06, [ADR-0002](adr/ADR-0002-edge-vs-cloud-processing.md)). A TMC outage cannot make
@@ -161,11 +161,12 @@ Payload = the **site-tunable subset**; the unit **enforces the full §7a bounds*
 Rides the **same hardened channel** as IF-8/9 ([ADR-0010](adr/ADR-0010-operator-override-and-manual-control.md), [ADR-0012](adr/ADR-0012-security-and-threat-model.md)):
 
 ```
-{ command: force_on|force_off|mute, message_id?, reason_code, operator_id,
-  expiry (≤ T_override_max), auth }
+{ command: force_on|force_off|mute|ack, message_id?, reason_code, operator_id,
+  expiry (≤ T_override_max), alarm_seq?, auth }
 ```
 - **Force-on** is asserted by the **same refreshed-`SHOW` heartbeat**, refreshed **by the edge box locally** — never latched over the WAN; the dead-man's switch still blanks it on box-kill / link-cut / expiry.
 - **Force-off / mute** carries a **mandatory auto-expiry**; while active the heartbeat posture is **OVERRIDDEN** (not "healthy"), and it **re-escalates** if it outlives its window.
+- **Ack** acknowledges the alarm the operator currently sees, keyed by its `alarm_seq` (the surfaced `alarm_count`): it **clears a latched escalation** and **freezes re-escalation** of that alarm epoch. It **never suppresses a condition-derived CRITICAL** (a still-blind unit stays critical), a **persistent** fault re-raises next tick, and it is **epoch-scoped** — a stale ack (wrong `alarm_seq`) is ignored ([ADR-0011 §2](adr/ADR-0011-operator-concept-and-alarm-management.md)).
 - Out-of-policy overrides (expiry > ceiling, unknown `message_id`, no `reason_code`) are **rejected/clamped** at the unit (FR-20 mechanism).
 - Override acts **only on the sign output** — perception, fusion, the state machine, and the audit log keep running, so an override is always reconstructable.
 

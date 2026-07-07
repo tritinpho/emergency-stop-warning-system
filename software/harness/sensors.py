@@ -121,3 +121,16 @@ def drift_at(scenario, t):
         if w[0] <= t < w[1]:
             return True
     return False
+
+
+def ack_at(scenario, t):
+    """The operator's most-recent acknowledgement as of tick t: the alarm_count value the
+    operator has acked (None if none) -- IF-10, ADR-0011 §2. The SUT scopes it to the epoch
+    (acking N does not ack N+1), so the harness only latches the last count the operator sent.
+
+    A scenario ack: {"t": seconds, "count": alarm_count-being-acked}."""
+    cur = None
+    for a in scenario.get("acks", []):
+        if a.get("t", 0.0) <= t:
+            cur = a.get("count")
+    return cur

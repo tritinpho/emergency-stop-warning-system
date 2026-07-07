@@ -134,9 +134,13 @@ raises, dedups, and re-escalates on non-ack).
 2. [ ] Specify **alarm dedup, prioritization, rate-limiting, and re-escalation-on-non-ack**; add the
        OVERRIDDEN/degraded postures to the heartbeat surfacing
        ([doc 02 §7](../02-system-architecture.md#7-interfaces--contracts-initial)).
-3. [ ] Add **alarm-unacknowledged / alarm-flood** to the FMEA + fault-injection set
+3. [x] Add **alarm-unacknowledged / alarm-flood** to the FMEA + fault-injection set
        ([doc 04 §2](../04-risk-and-safety.md#2-fmea-lite-failure-mode--effect--detection--response), R17)
-       and verify a critical escalation re-escalates if unacknowledged.
+       and verify a critical escalation re-escalates if unacknowledged. **Wired:** dedup +
+       re-escalate-on-non-ack **and** the operator **ack** (IF-10 `command: ack`, keyed by
+       `alarm_seq`) that clears a latched escalation and freezes re-escalation, epoch-scoped so a
+       persistent fault re-raises and a fresh critical re-arms. Verified by **SC-30** (dedup +
+       re-escalate) and **SC-32** (ack freeze → epoch re-arm) on the Level-A board.
 4. [ ] Put **response-path staffing, hours, and escalation tiers** into the **operator agreement**
        (with the R10 roles/liability clause); flag sites that cannot staff it as a siting constraint.
 5. [ ] Set **provisional** response-time and alarm-rate numbers; schedule their **field calibration**

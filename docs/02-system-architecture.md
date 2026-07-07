@@ -432,7 +432,7 @@ and report to the same TMC.
 | Detection event | Perception → State machine | `{track_id, class, bbox/range, speed, in_roi, ts}` |
 | Sign command | State machine → Actuator | `SHOW(message_id) | CLEAR | STATUS?` returns `{state, lamp_ok, ts}` |
 | Sign assertion (link) | Edge box → Sign controller | refreshed `SHOW(message_id)` every `T_assert_refresh` (authenticated); controller blanks on loss within `T_signhold`; **own reliability/latency/energy/auth budget** over the ≥ DSD link ([ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)) |
-| Heartbeat | Health monitor → TMC | `{site_id, fw_ver, cfg_ver, model_ver, calib_ver, subsystem_health[], state, ts}` at fixed cadence |
+| Heartbeat | Health monitor → TMC | `{site_id, fw_ver, cfg_ver, model_ver, calib_ver, subsystem_health[], state, posture, alert, alarm_seq, ts}` at fixed cadence; `alarm_seq` is the value the operator acks over IF-10 ([ADR-0011 §2](adr/ADR-0011-operator-concept-and-alarm-management.md)) |
 | Activation/clear event | State machine → TMC/audit | `{site_id, type, evidence_ref?, cfg_ver, model_ver, calib_ver, ts}` (store-and-forward) |
 | Config | TMC → Roadside | `{roi_polygon, T_dwell, T_hold, T_occlusion, T_person_debounce, speed_gate, message_set, T_override_max}` (signed) — site-tunable subset; the **full safety-parameter surface and its FR-20 bounds are §7a** |
 | OTA | TMC → Roadside | signed image + version + rollback token |
