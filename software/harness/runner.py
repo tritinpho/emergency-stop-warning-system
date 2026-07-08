@@ -15,6 +15,7 @@ from esw import if4
 from harness.sensors import (observations_at, health_at, override_at, ota_at, drift_at, ack_at,
                              gnss_at, selftest_at)
 from harness.sign import Sign
+from harness.commands import CommandFeed
 
 TICK_DT = 0.1  # 10 Hz fixed-rate tick (ADR-0015)
 
@@ -23,6 +24,13 @@ TICK_DT = 0.1  # 10 Hz fixed-rate tick (ADR-0015)
 # attacker who can transmit on the link but does not hold the key.
 _KEY = b"esw-if4-shared-secret-v1-0123456789"
 _WRONG_KEY = b"attacker-without-the-shared-secret!"
+
+# The IF-8/9/10 command channel uses its OWN per-unit secret -- a separate hardened channel from
+# the sign link (ADR-0012). _WRONG_CMD_KEY is an attacker who can transmit on the uplink but holds
+# no command key; the replay window is how fresh a command's timestamp must be to be accepted.
+_CMD_KEY = b"esw-cmd-shared-secret-v1-0123456789"
+_WRONG_CMD_KEY = b"attacker-has-no-command-channel-key"
+_CMD_REPLAY_WINDOW_MS = 5000
 
 # Audit fingerprint stubs for the sim (doc 02 §7). cfg_ver is computed per run from the real
 # config; fw/model/calib are placeholders until those artifacts exist on the K230.
@@ -50,8 +58,13 @@ def _attacker_frame(kind, t, cfg_ver, last_frame):
     return None
 
 
-def run_scenario(scenario):
-    """Run one scenario; return the per-tick timeline (sign state + disposition)."""
+def run_scenario(scenario, outbox=None):
+    """Run one scenario; return the per-tick timeline (sign state + disposition).
+
+    If `outbox` (an esw.sink.Outbox) is passed, every emitted IF-6/IF-7 record is teed into it
+    each tick -- durably stored, then forwarded when the uplink is up -- so a run can be scored
+    off the durable evidence log instead of the in-memory timeline (Level-E). Default None leaves
+    the loop byte-for-byte unchanged, so boards A-D are unaffected."""
     cfg = _merge(default_config(), scenario.get("config_push", {}))
     cfg_ver = if4.cfg_fingerprint(cfg)
     sm = StateMachine(cfg)                        # SUT gets the (possibly bad) pushed config
@@ -62,6 +75,13 @@ def run_scenario(scenario):
     sign = Sign(default_config(), _KEY,           # controller uses in-bounds safety constants
                 latch=scenario.get("sign_latch", False),
                 can_turn_off=not scenario.get("sign_stuck", False))
+
+    # Opt-in authenticated command channel (IF-8/9/10): when a scenario sets `auth_commands`, the
+    # override / OTA / ack the SM consumes come ONLY from verified command frames (forged/replayed
+    # ones are rejected upstream). Default off -> the plain injectors run, so SC-01..38 are unchanged.
+    feed = None
+    if scenario.get("auth_commands", False):
+        feed = CommandFeed(scenario, _CMD_KEY, _WRONG_CMD_KEY, _CMD_REPLAY_WINDOW_MS, TICK_DT)
 
     killed_sm = box_dead = link_cut = rebooted = False
     sign_status = False                           # IF-3 status read-back (one tick delayed)
@@ -103,12 +123,17 @@ def run_scenario(scenario):
             force_safe = hm["force_safe"]          # IF-5 independent force-safe authority
             hm_status = hm["status"]
             health = {"camera": hm["camera"], "radar": hm["radar"], "time_valid": hm["time_valid"]}
+            if feed is not None:
+                ov, ota_flag, ack_val = feed.step(t)   # authenticated IF-8/9/10 (verified commands only)
+            else:
+                ov = override_at(scenario, t)
+                ota_flag = ota_at(scenario, t)
+                ack_val = ack_at(scenario, t)
             inputs = {"sign_status": sign_status,
-                      "ota": ota_at(scenario, t),
+                      "ota": ota_flag,
                       "drift": drift_at(scenario, t),
-                      "ack": ack_at(scenario, t)}
-            decision = sm.tick(t, observations_at(scenario, t), health,
-                               override_at(scenario, t), inputs)
+                      "ack": ack_val}
+            decision = sm.tick(t, observations_at(scenario, t), health, ov, inputs)
 
         # The edge emits an authenticated refresh iff it is alive and asserting SHOW. A dead
         # box (box_dead) sends nothing; a killed/rebooting SM asserts NONE, so the actuator
@@ -141,6 +166,15 @@ def run_scenario(scenario):
             events = telem.step(t, decision, hm_status, sign_status)
         else:
             events = []
+
+        # Optional durable evidence sink (Level-E). Tee the SAME records the reducer consumes into
+        # the store-and-forward outbox: durable-append first, then forward on the uplink. Gating is
+        # already done above -- a dead box produced no events, so nothing is stored (the log gap is
+        # the outage). The sim collapses the sign link and the oversight uplink into one `link_cut`.
+        if outbox is not None:
+            outbox.record(events)
+            outbox.pump(not link_cut)
+
         timeline.append({
             "t": t,
             "on": sign_status,
@@ -154,6 +188,8 @@ def run_scenario(scenario):
             "ota_deferred": decision.get("ota_deferred"),
             "alarm_count": decision.get("alarm_count"),
             "rejects": sign.rejects,
+            "cmd_rejects": feed.rejects if feed is not None else 0,
+            "cmd_last_reject": feed.last_reject if feed is not None else None,
             "hm_status": hm_status,
             "force_safe": force_safe,
         })
@@ -181,7 +217,7 @@ def sign_on_at(timeline, t):
 # doc 07 §4 scores disposition correctness (degraded/clear/safe-state), not just
 # the sign -- e.g. SC-25/26/27 must prove mode/alert, not merely that ON matches.
 _DISPOSITION_KEYS = ("state", "posture", "mode", "alert", "override", "override_rejected",
-                     "ota_deferred", "alarm_count", "hm_status")
+                     "ota_deferred", "alarm_count", "hm_status", "cmd_rejects", "cmd_last_reject")
 
 
 def evaluate(scenario, timeline):

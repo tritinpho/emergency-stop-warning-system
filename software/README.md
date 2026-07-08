@@ -2,14 +2,14 @@
 
 This is **workstream #1** from the build plan: the event-level ("Level A") simulation
 harness ([doc 07 §2](../docs/07-simulation-methodology.md)) driving the **real** decision
-state machine as the system under test (SUT), scored against the **SC-01..37** scenario
+state machine as the system under test (SUT), scored against the **SC-01..38** scenario
 oracles ([doc 07 §5](../docs/07-simulation-methodology.md)). A second board adds the
 **Level-B** perception stage (IF-1→IF-2) — the real ROI-gating + tracking pipeline driven by
 scripted *detections* (with doc 07 §3.1 detector nuisances) — scored against **PC-01..11**.
 
 It embodies the three build decisions in **[ADR-0015](../docs/adr/ADR-0015-state-machine-implementation-strategy.md)**:
 
-1. **The SC-01..37 oracles are the executable spec.** The state machine is correct when
+1. **The SC-01..38 oracles are the executable spec.** The state machine is correct when
    its sign-over-time matches every scenario's oracle. TDD against the board.
 2. **Fixed-rate tick execution.** `StateMachine.tick(now, observations, health)` is called
    every cycle (10 Hz in the harness); timers are deadlines against `now`, no wall-clock is
@@ -30,21 +30,29 @@ software/
     actuator.py     #   IF-4 edge-side refresh-or-blank driver (no "off" command)
     health.py       #   health monitor: derives {camera,radar}, time integrity, force-safe (FR-10/NFR-16/IF-5)
     telemetry.py    #   IF-6 heartbeat + IF-7 audit-event emitter (fingerprinted; doc 08 §4, doc 02 §7)
+    sink.py         #   durable evidence outbox: store-and-forward IF-6/IF-7 records (ADR-0007, doc 08 §4)
+    crypto.py       #   shared HMAC-SHA256 + constant-time compare (both hardened channels; ADR-0012)
+    command.py      #   IF-8/9/10 auth command channel: verify override/OTA/ack (doc 08 §5, ADR-0012)
   harness/          # host tooling — NOT shipped. Replaces only the sensor + sign ends.
     sensors.py      #   Level-A: scenario script -> IF-2 track events (+ gnss/self-test liveness)
     frames.py       #   Level-B: scenario -> detector output + doc 07 §3.1 nuisances
     sign.py         #   sign controller: decodes+verifies real IF-4 frames + dead-man's switch
     runner.py       #   tick loop, health monitor, telemetry, fault injection, oracle comparator
     metrics.py      #   acceptance-evidence reducer: recall+Wilson, false-activation, latency (ADR-0007)
+    store.py        #   Level-E: file-backed durable store + fake uplink for the evidence outbox
+    commands.py     #   Level-F: scenario commands -> authenticated IF-8/9/10 frames (+ forged/replay)
   scenarios/
-    catalogue.py        #   SC-01..37 — Level-A executable spec (the state machine)
+    catalogue.py        #   SC-01..38 — Level-A executable spec (the state machine)
     perception_cases.py #   PC-01.. — Level-B perception cases (IF-1→IF-2)
     health_cases.py     #   HM-01.. — Level-C health-monitor unit cases
     evidence_cases.py   #   EV-01.. — Level-D acceptance-evidence set (with ground-truth oracles)
+    command_cases.py    #   CMD-01.. — Level-F authenticated-command cases (IF-8/9/10)
   run_tests.py            # Level-A state-machine board
   run_perception_tests.py # Level-B perception board
   run_health_tests.py     # Level-C health-monitor board
   run_metrics.py          # Level-D acceptance-evidence board (reducer unit tests + sample report)
+  run_sink_tests.py       # Level-E durable-evidence-outbox board (store-and-forward, at-least-once)
+  run_command_tests.py    # Level-F authenticated command-channel board (IF-8/9/10 override/OTA/ack)
 ```
 
 ## Run
@@ -54,26 +62,32 @@ python software/run_tests.py             # Level A — SC-01..38 state-machine b
 python software/run_perception_tests.py  # Level B — perception (IF-1→IF-2) board
 python software/run_health_tests.py      # Level C — health-monitor (FR-10/NFR-16/IF-5) board
 python software/run_metrics.py           # Level D — acceptance-evidence reducer + sample report
+python software/run_sink_tests.py        # Level E — durable evidence outbox (store-and-forward)
+python software/run_command_tests.py     # Level F — authenticated command channel (IF-8/9/10)
 python software/tools/mp_safe_check.py software/esw   # MicroPython-safety AST lint on esw/
-python software/tools/mpy_smoke.py        # esw smoke: perception + geometry
+python software/tools/mpy_smoke.py        # esw smoke: perception + geometry + sink + command
 
 # The shipped esw/ subset also RUNS under the real MicroPython unix port (not just CPython):
 cd software && micropython run_tests.py && micropython run_health_tests.py && micropython tools/mpy_smoke.py
 ```
 
 Both are enforced in CI on every push/PR ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)): a
-**cpython** job runs all four boards + the AST lint + the smoke, and a **micropython** job runs the
+**cpython** job runs all six boards + the AST lint + the smoke, and a **micropython** job runs the
 shipped subset under `micropython/unix:v1.28.0` — see the *MicroPython / K230 note* below.
 
-Boards A–C exit 0 when healthy and 1 on any surprise; D exits 0 when the reducer unit tests pass
+Boards A–C, E, and F exit 0 when healthy and 1 on any surprise; D exits 0 when the reducer unit tests pass
 (the report is informational). **Level A** injects IF-2 events and tests the decision logic — now
 with the **real health monitor** in the loop deriving the sensor mode and the **real telemetry
 emitter** producing the audit log; **Level B** injects *detections* (image bboxes) and runs the
 **real** perception (ROI gating + tracker) that produces those events (doc 07 §2) — and closes the
 loop through the real state machine to the sign; **Level C** unit-tests the health monitor
 (`esw/health.py`) in isolation; **Level D** reduces the IF-7 event log against ground-truth oracles
-into the doc 01 §5 acceptance metrics. The detector itself (a K230 `kmodel`) is a drop-in backend
-behind `Perception.step()`, so the perception pipeline is byte-identical in sim and on the board.
+into the doc 01 §5 acceptance metrics; **Level E** proves the durable evidence outbox (`esw/sink.py`)
+persists that IF-7 log, survives reboot, and forwards it at-least-once — so the metrics can be reduced
+from a durable artifact, not just in-process; **Level F** proves the authenticated IF-8/9/10 command
+channel — a forged, replayed, or stale override / OTA / ack is rejected before it reaches the state
+machine. The detector itself (a K230 `kmodel`) is a drop-in backend behind `Perception.step()`, so the
+perception pipeline is byte-identical in sim and on the board.
 
 ## The boards today
 
@@ -124,6 +138,29 @@ must be **real captures**. The sample report makes the point visible: 4/4 synthe
 100% recall but only a **~51% Wilson lower bound** — the machinery is real and ready to ingest real
 staged/field captures; the *number* waits on them.
 
+**Level E — `run_sink_tests.py`: 6 passing** (`exit 0`). SK-01..06 exercise the durable evidence
+outbox (`esw/sink.py`) over the host file store (`harness/store.py`): records **survive an
+object-loss reboot** with the seq cursor intact (SK-01), a **flaky link** loses nothing and delivers
+in order (SK-02), an **uplink outage** buffers then resumes from the watermark with no re-send
+(SK-03), a **crash between send and ack** re-sends so the contract is **at-least-once** — the consumer
+dedups by seq, never a silent loss (SK-04), the acceptance metrics reduced from the **durable log**
+are **identical** to the in-process path (SK-05, the faithful-conduit proof), and a **dead box** logs
+nothing so the gap in the log is the outage (SK-06). The store-and-forward *policy* ships in `esw/`;
+the durable store and the oversight uplink are drop-in backends (a host file + a fake link here;
+flash + MQTT on the K230). This surfaced one honest fix: the audit record stamped `cfg_ver` as raw
+`bytes`, so any durable/wire serializer must encode it (the store hex-encodes it) — a future cleanup
+could have telemetry stamp a hex fingerprint so the record is natively wire-safe.
+
+**Level F — `run_command_tests.py`: 8 passing** (`exit 0`). CMD-01..08 drive the authenticated
+IF-8/9/10 command channel (`esw/command.py`) through the real loop — the receive-side twin of the
+IF-4 sign-link. A **valid** override lights an otherwise-dark sign, a valid OTA request defers behind
+an active warning, and a valid operator ack freezes alarm re-escalation (the positive controls); their
+**forged** (wrong-key → `auth`), **replayed** (seq ≤ watermark → `replay`), and **stale** (ts outside
+the freshness window → `stale`) counterparts are rejected upstream and change nothing — so an attacker
+who can transmit on the uplink can neither force the sign, trigger a restart, nor silence the operator
+escalation (NFR-09 / NFR-15). The auth is the same HMAC + two-guard anti-replay as IF-4 (shared
+`esw/crypto.py`); the command *policy* ships in `esw/`, the wire transport is a drop-in backend.
+
 ## Extending the board
 
 The catalogue is the spec: to add a behaviour, author its scenario (timeline + oracle) in
@@ -147,8 +184,8 @@ a case can prove a nuisance never causes a false confirmation and a real track i
 stdlib) so the SUT is one codebase in sim and on the K230. CI enforces this two ways
 (`.github/workflows/ci.yml`): `tools/mp_safe_check.py` **AST-lints** esw/ for out-of-subset
 constructs, and — the stronger check — the Level-A and Level-C boards plus `tools/mpy_smoke.py`
-(perception + geometry) actually **run under the MicroPython unix port** (`micropython/unix:v1.28.0`),
-so all nine shipped modules are proven to load and run under real MicroPython semantics, not just
+(perception + geometry + sink + command) actually **run under the MicroPython unix port** (`micropython/unix:v1.28.0`),
+so all twelve shipped modules are proven to load and run under real MicroPython semantics, not just
 parse clean. (This surfaced a real bug the AST lint could never catch: the board entrypoints used
 `os.path`, which MicroPython's `os` does not provide — so `micropython run_tests.py` had never
 actually run until the bootstrap was made mpy-safe.) A green CPython board is necessary but **not
@@ -167,4 +204,9 @@ fusion (blocked on the RQ-H1 radar procurement) are deferred to their phase
 encoding **now exists** (`esw/if4.py` + `esw/actuator.py`, doc 10); what remains deferred is the
 **RF link itself** — Level B injects scripted *detections*, not rendered camera frames, and the
 harness models the sensors and the sign controller but **not** the LoRa PHY (airtime / range /
-duty are the [ADR-0014](../docs/adr/ADR-0014-sign-link-bearer.md) bench tests).
+duty are the [ADR-0014](../docs/adr/ADR-0014-sign-link-bearer.md) bench tests). The durable evidence
+**outbox** (`esw/sink.py`) and the authenticated **IF-8/9/10 command channel** (`esw/command.py`,
+override / OTA / ack) likewise now exist, but the real **transport bindings** are still drop-in
+backends — telemetry forwards to a fake uplink (the reducer runs offline over the durable log),
+commands arrive as harness-built frames rather than over a live MQTT/HTTPS link, and runtime
+config-push (IF-8) beyond the boot config is not yet wired.
