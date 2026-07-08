@@ -176,6 +176,8 @@ Rides the **same hardened channel** as IF-8/9 ([ADR-0010](adr/ADR-0010-operator-
 - Out-of-policy overrides (expiry > ceiling, unknown `message_id`, no `reason_code`) are **rejected/clamped** at the unit (FR-20 mechanism).
 - Override acts **only on the sign output** — perception, fusion, the state machine, and the audit log keep running, so an override is always reconstructable.
 
+**Reference implementation** (the "one hardened channel" in code): [`esw/command.py`](../software/esw/command.py) encodes/verifies an authenticated command frame — `version | ctype | seq | nonce | ts | plen | payload | HMAC-tag` — with the **same** HMAC + two-guard anti-replay (seq strictly-monotonic in-session + `ts` within a freshness window cross-session) as the IF-4 sign-link ([`esw/if4.py`](../software/esw/if4.py)), both over the shared [`esw/crypto.py`](../software/esw/crypto.py). The `CommandReceiver` is **fail-loud**: a forged / replayed / stale frame is rejected and never reaches the state machine (Level-F board [`run_command_tests.py`](../software/run_command_tests.py), CMD-01..08). The wire transport is a drop-in backend — in the harness, commands arrive as built frames rather than over a live MQTT/HTTPS link.
+
 ---
 
 ## 6. Cross-cutting contracts

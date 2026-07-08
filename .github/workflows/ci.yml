@@ -1,7 +1,7 @@
 name: ESW software CI
 
 # Two gates for the ESW software (docs/07, ADR-0015):
-#   * cpython     -- the logic gate: all five scenario boards (Level A/B/C/D/E) plus the
+#   * cpython     -- the logic gate: all six scenario boards (Level A/B/C/D/E/F) plus the
 #                    MicroPython-safety AST lint on esw/ and the esw smoke, on CPython.
 #   * micropython -- the runtime-portability gate: the SHIPPED esw/ subset actually
 #                    LOADS AND RUNS under the real MicroPython unix port, proving the
@@ -40,7 +40,9 @@ jobs:
         run: python software/run_metrics.py
       - name: Level-E -- durable evidence outbox (SK-01..06)
         run: python software/run_sink_tests.py
-      - name: esw smoke -- perception + geometry + sink
+      - name: Level-F -- authenticated command channel (CMD-01..08)
+        run: python software/run_command_tests.py
+      - name: esw smoke -- perception + geometry + sink + command
         run: python software/tools/mpy_smoke.py
 
   micropython:

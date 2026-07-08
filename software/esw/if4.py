@@ -16,6 +16,10 @@ try:
 except ImportError:                 # MicroPython ports that only expose uhashlib
     import uhashlib as hashlib
 
+# The HMAC + constant-time compare + 4-byte coercion are SHARED with the IF-8/9/10 command
+# channel -- one tested crypto primitive for both hardened channels (esw/crypto.py, ADR-0012).
+from esw.crypto import hmac_sha256 as _hmac_sha256, ct_equal as _ct_equal, as4 as _as4
+
 # Wire layout (big-endian). Compact ON PURPOSE: LoRa time-on-air scales with payload
 # bytes and IF-4 airtime is duty-cycle-bound (ADR-0014), so these sizes ARE the airtime
 # input for doc 10's budget -- freezing the layout here freezes that calculation.
@@ -39,27 +43,6 @@ def message_id_to_text(mid):
     return _MSG_ID_TEXT.get(mid, "UNKNOWN")
 
 
-def _hmac_sha256(key, msg):
-    # Standard HMAC (RFC 2104) over sha256 -- hand-rolled because MicroPython has no hmac.
-    block = 64
-    if len(key) > block:
-        key = hashlib.sha256(key).digest()
-    k = bytearray(block)
-    i = 0
-    while i < len(key):
-        k[i] = key[i]
-        i += 1
-    ipad = bytearray(block)
-    opad = bytearray(block)
-    i = 0
-    while i < block:
-        ipad[i] = k[i] ^ 0x36
-        opad[i] = k[i] ^ 0x5c
-        i += 1
-    inner = hashlib.sha256(bytes(ipad) + msg).digest()
-    return hashlib.sha256(bytes(opad) + inner).digest()
-
-
 def cfg_fingerprint(cfg):
     # 4-byte fingerprint of the active safety config (R10 audit / cfg_ver). Canonical
     # "name=value;" over sorted keys so the hash is stable regardless of dict order.
@@ -73,20 +56,6 @@ def cfg_fingerprint(cfg):
         s = s + n + "=" + str(cfg[n]) + ";"
         i += 1
     return hashlib.sha256(s.encode("utf-8")).digest()[:4]
-
-
-def _as4(b):
-    # Coerce a nonce/cfg_ver field (int or bytes-like) to exactly 4 bytes.
-    if isinstance(b, int):
-        return (b & 0xffffffff).to_bytes(4, "big")
-    out = bytearray(4)
-    i = 0
-    n = len(b)
-    while i < 4:
-        if i < n:
-            out[i] = b[i]
-        i += 1
-    return bytes(out)
 
 
 def encode_show(key, message_id, seq, nonce, cfg_ver, ts_ms):
@@ -105,18 +74,6 @@ def encode_show(key, message_id, seq, nonce, cfg_ver, ts_ms):
 
 def _bad(reason):
     return {"ok": False, "reason": reason, "message_id": 0, "seq": 0}
-
-
-def _ct_equal(a, b):
-    # Length-fixed, no early exit -- don't leak an auth-tag oracle by timing.
-    if len(a) != len(b):
-        return False
-    diff = 0
-    i = 0
-    while i < len(a):
-        diff |= a[i] ^ b[i]
-        i += 1
-    return diff == 0
 
 
 def verify(key, frame, last_seq, now_ms, replay_window_ms):

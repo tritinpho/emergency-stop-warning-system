@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # MicroPython smoke test for the SHIPPED esw/ modules that the Level-A/C boards do NOT
-# import -- perception.py, geometry.py, and sink.py (Level A scripts IF-2 events directly and
-# reduces in-process, so those never load under `micropython run_tests.py`). This closes the mpy
-# coverage gap: it imports every esw module and exercises the IF-1->IF-2 perception path, the
-# geometry primitives, and the durable outbox policy, so CI proves all ten shipped modules load
-# and run under MicroPython, not just parse clean (mp_safe_check.py) or run under CPython.
+# import -- perception.py, geometry.py, sink.py, and command.py (Level A scripts IF-2 events
+# directly and reduces in-process, so those never load under `micropython run_tests.py`; crypto.py
+# IS covered transitively, since if4.py imports it). This closes the mpy coverage gap: it imports
+# every esw module and exercises the IF-1->IF-2 perception path, the geometry primitives, the
+# durable outbox policy, and the authenticated command codec, so CI proves all twelve shipped
+# modules load and run under MicroPython, not just parse clean (mp_safe_check.py) or run on CPython.
 #
 #   python software/tools/mpy_smoke.py       # CPython
 #   micropython tools/mpy_smoke.py           # from software/, MicroPython unix port
@@ -36,10 +37,12 @@ else:
 sys.path.insert(0, _swdir if _swdir != "" else ".")
 
 # Every shipped esw module must at least LOAD under MicroPython.
-from esw import state_machine, params, actuator, if4, health, telemetry, perception, geometry, sink
+from esw import (state_machine, params, actuator, if4, health, telemetry, perception, geometry,
+                 sink, crypto, command)
 from esw.geometry import bbox_ground_point, footprint_box, overlap_fraction, is_convex_ccw
 from esw.perception import Perception
 from esw.sink import Outbox
+from esw.command import CommandReceiver, encode_command, verify_command, CMD_OVERRIDE
 
 _fails = []
 
@@ -152,9 +155,27 @@ check("outbox backlog clears", _ob.pending() == 0)
 _ob2 = Outbox(_ms, _ln)                 # reboot: fresh outbox over the same store
 check("outbox next_seq resumes after reboot", _ob2.next_seq() == 2)
 
+
+# --- command channel (authenticated IF-8/9/10) --------------------------------
+# The auth codec + receiver must load + run on-target: encode -> verify round-trips (JSON payload
+# decoded only after auth); a wrong-key frame fails auth; a replayed seq is rejected. (Full
+# behavioural coverage is the host Level-F board; this proves the shipped module runs under mpy.)
+_ck = b"smoke-cmd-key-0000000000000000000000"
+_wk = b"smoke-wrong-key-000000000000000000000"
+_win = 5000
+_cf = encode_command(_ck, CMD_OVERRIDE, 1, 1, 10000, {"action": "force_on", "reason": "x"})
+_cr = verify_command(_ck, _cf, None, 10000, _win)
+check("command verify ok + JSON payload decoded", _cr["ok"] and _cr["payload"]["action"] == "force_on")
+_forged = encode_command(_wk, CMD_OVERRIDE, 2, 2, 10000, {})
+check("forged command fails auth", verify_command(_ck, _forged, None, 10000, _win)["reason"] == "auth")
+_rx = CommandReceiver(_ck, _win)
+_okc = _rx.submit(_cf, 10000)["ok"]
+_rep = _rx.submit(_cf, 10010)["ok"]                 # same seq re-submitted -> anti-replay
+check("receiver accepts then rejects a replay", _okc and (not _rep) and _rx.rejects == 1)
+
 print("-" * 60)
 if _fails:
     print("mpy_smoke: %d CHECK(S) FAILED" % len(_fails))
     sys.exit(1)
-print("mpy_smoke OK -- all esw modules load; perception + geometry + sink run under this runtime.")
+print("mpy_smoke OK -- all esw modules load; perception + geometry + sink + command run here.")
 sys.exit(0)
