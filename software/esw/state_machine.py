@@ -12,7 +12,7 @@
 #
 # This is the SUT: byte-identical in sim and on the K230. MicroPython-safe subset.
 
-from esw.params import default_config, clamp_config
+from esw.params import default_config, clamp_config, clamp_update
 
 # Warning-lifecycle states (doc 02 §4 diagram).
 IDLE = "IDLE"
@@ -66,6 +66,7 @@ class StateMachine:
         self.state = IDLE
         self.mode = FULL
         self.escalation = None        # latched max-severity escalation (e.g. forced clear)
+        self.config_rejected = None   # latched fail-loud report of the last runtime config push (FR-21)
         self.override_active = None    # applied operator override this tick (IF-10, ADR-0010)
         self.override_rejected = None  # reason an override was rejected/clamped, if any
         self.warn_evidence_since = None  # last tick a warning had FRESH evidence (watchdog)
@@ -97,6 +98,15 @@ class StateMachine:
                 "degraded_since": None, "stale_now": False, "seen_leaving": False,
                 "suppressed_last_seen": False, "last_speed": speed}
 
+    def apply_config(self, partial):
+        """Merge a runtime IF-8 config push into the LIVE config (clamp_update: §7a-clamped, with
+        the bounded safety backstops refused as boot-only). Latches the fail-loud rejected/adjusted
+        set for the decision report (FR-21). Mutates self.cfg in place so shared readers stay valid."""
+        accepted, rejected = clamp_update(partial)
+        for name in accepted:
+            self.cfg[name] = accepted[name]
+        self.config_rejected = rejected if rejected else None
+
     def tick(self, now, observations, health=None, override=None, inputs=None):
         """One fixed-rate cycle. Returns a decision dict: {assertion: "SHOW"|"NONE",
         message_id, state, posture, mode, alert, override, override_rejected, ota_deferred,
@@ -111,6 +121,15 @@ class StateMachine:
         self.override_rejected = None
         self.ota_deferred = False
         self.mode = self._mode(health)
+
+        # Runtime config push (IF-8): an authenticated TMC config command reconfigures the RUNNING
+        # unit. clamp_update enforces the §7a bounds AND refuses the boot-only safety backstops, so
+        # no live push (or a compromised uplink) can move the dead-man's-switch window / watchdog /
+        # degraded-hold ceiling (ADR-0012 R16). Applied BEFORE this tick reads cfg, so it governs
+        # from now on; fail-loud refused/clamped names latch in config_rejected (FR-21).
+        cp = inputs.get("config_push")
+        if cp:
+            self.apply_config(cp)
 
         # Calibration-drift monitor (FR-10, R15): a reference-point residual over tolerance
         # (injected here as inputs["drift"]) for longer than the debounce marks the unit
@@ -425,4 +444,5 @@ class StateMachine:
                 "state": self.state, "mode": self.mode, "posture": posture,
                 "alert": alert, "override": self.override_active,
                 "override_rejected": self.override_rejected,
-                "ota_deferred": self.ota_deferred, "alarm_count": self.alarm_count}
+                "ota_deferred": self.ota_deferred, "alarm_count": self.alarm_count,
+                "config_rejected": self.config_rejected}

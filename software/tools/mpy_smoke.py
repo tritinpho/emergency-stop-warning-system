@@ -173,6 +173,18 @@ _okc = _rx.submit(_cf, 10000)["ok"]
 _rep = _rx.submit(_cf, 10010)["ok"]                 # same seq re-submitted -> anti-replay
 check("receiver accepts then rejects a replay", _okc and (not _rep) and _rx.rejects == 1)
 
+
+# --- runtime config push (IF-8: params.clamp_update / StateMachine.apply_config) ---------------
+# The runtime-config path runs only in Level-F (host-only), so cover it here so real mpy exercises
+# it: a runtime param clamps to its bound, a bounded backstop and an unknown name are refused.
+_acc, _rej = params.clamp_update({"T_dwell": 99.0, "T_signhold": 0.5, "bogus": 1})
+check("clamp_update clamps a runtime param to bound", _acc.get("T_dwell") == 10.0 and ("T_dwell" in _rej))
+check("clamp_update refuses a bounded backstop (boot-only)", ("T_signhold" not in _acc) and ("T_signhold" in _rej))
+check("clamp_update refuses an unknown name", ("bogus" not in _acc) and ("bogus" in _rej))
+_csm = state_machine.StateMachine()
+_csm.apply_config({"T_dwell": 3.0, "T_watchdog": 1.0})
+check("apply_config applies runtime, keeps backstop", _csm.cfg["T_dwell"] == 3.0 and _csm.cfg["T_watchdog"] == 30.0)
+
 print("-" * 60)
 if _fails:
     print("mpy_smoke: %d CHECK(S) FAILED" % len(_fails))

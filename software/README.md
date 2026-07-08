@@ -151,15 +151,20 @@ flash + MQTT on the K230). This surfaced one honest fix: the audit record stampe
 `bytes`, so any durable/wire serializer must encode it (the store hex-encodes it) — a future cleanup
 could have telemetry stamp a hex fingerprint so the record is natively wire-safe.
 
-**Level F — `run_command_tests.py`: 8 passing** (`exit 0`). CMD-01..08 drive the authenticated
+**Level F — `run_command_tests.py`: 12 passing** (`exit 0`). CMD-01..12 drive the authenticated
 IF-8/9/10 command channel (`esw/command.py`) through the real loop — the receive-side twin of the
 IF-4 sign-link. A **valid** override lights an otherwise-dark sign, a valid OTA request defers behind
-an active warning, and a valid operator ack freezes alarm re-escalation (the positive controls); their
-**forged** (wrong-key → `auth`), **replayed** (seq ≤ watermark → `replay`), and **stale** (ts outside
-the freshness window → `stale`) counterparts are rejected upstream and change nothing — so an attacker
-who can transmit on the uplink can neither force the sign, trigger a restart, nor silence the operator
-escalation (NFR-09 / NFR-15). The auth is the same HMAC + two-guard anti-replay as IF-4 (shared
-`esw/crypto.py`); the command *policy* ships in `esw/`, the wire transport is a drop-in backend.
+an active warning, a valid operator ack freezes alarm re-escalation, and a valid **config-push**
+retunes the live unit (CMD-09: `T_dwell` 5→3 s makes a parked car confirm earlier) — the positive
+controls; their **forged** (wrong-key → `auth`), **replayed** (seq ≤ watermark → `replay`), and
+**stale** (ts outside the freshness window → `stale`) counterparts are rejected upstream and change
+nothing, so an attacker who can transmit can neither force the sign, trigger a restart, silence the
+operator escalation (NFR-09 / NFR-15), nor reconfigure the unit. The **IF-8 config** path adds two
+guards on top of auth: an out-of-§7a value is clamped and reported fail-loud (CMD-10, FR-20/21), and
+the bounded safety backstops (`T_signhold` / `T_watchdog` / `T_degraded_max` / …) are **boot-only** —
+a runtime push to one is refused (CMD-11), so no live reconfiguration can move a fail-safe invariant.
+The auth is the same HMAC + two-guard anti-replay as IF-4 (shared `esw/crypto.py`); the command
+*policy* ships in `esw/`, the wire transport is a drop-in backend.
 
 ## Extending the board
 
@@ -206,7 +211,7 @@ encoding **now exists** (`esw/if4.py` + `esw/actuator.py`, doc 10); what remains
 harness models the sensors and the sign controller but **not** the LoRa PHY (airtime / range /
 duty are the [ADR-0014](../docs/adr/ADR-0014-sign-link-bearer.md) bench tests). The durable evidence
 **outbox** (`esw/sink.py`) and the authenticated **IF-8/9/10 command channel** (`esw/command.py`,
-override / OTA / ack) likewise now exist, but the real **transport bindings** are still drop-in
-backends — telemetry forwards to a fake uplink (the reducer runs offline over the durable log),
-commands arrive as harness-built frames rather than over a live MQTT/HTTPS link, and runtime
-config-push (IF-8) beyond the boot config is not yet wired.
+override / OTA / ack / config) likewise now exist — including **runtime config-push** (IF-8:
+§7a-clamped, fail-loud, safety backstops boot-only) — but the real **transport bindings** are still
+drop-in backends: telemetry forwards to a fake uplink (the reducer runs offline over the durable log),
+and commands arrive as harness-built frames rather than over a live MQTT/HTTPS link.
