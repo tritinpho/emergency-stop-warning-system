@@ -50,8 +50,13 @@ def _attacker_frame(kind, t, cfg_ver, last_frame):
     return None
 
 
-def run_scenario(scenario):
-    """Run one scenario; return the per-tick timeline (sign state + disposition)."""
+def run_scenario(scenario, outbox=None):
+    """Run one scenario; return the per-tick timeline (sign state + disposition).
+
+    If `outbox` (an esw.sink.Outbox) is passed, every emitted IF-6/IF-7 record is teed into it
+    each tick -- durably stored, then forwarded when the uplink is up -- so a run can be scored
+    off the durable evidence log instead of the in-memory timeline (Level-E). Default None leaves
+    the loop byte-for-byte unchanged, so boards A-D are unaffected."""
     cfg = _merge(default_config(), scenario.get("config_push", {}))
     cfg_ver = if4.cfg_fingerprint(cfg)
     sm = StateMachine(cfg)                        # SUT gets the (possibly bad) pushed config
@@ -141,6 +146,15 @@ def run_scenario(scenario):
             events = telem.step(t, decision, hm_status, sign_status)
         else:
             events = []
+
+        # Optional durable evidence sink (Level-E). Tee the SAME records the reducer consumes into
+        # the store-and-forward outbox: durable-append first, then forward on the uplink. Gating is
+        # already done above -- a dead box produced no events, so nothing is stored (the log gap is
+        # the outage). The sim collapses the sign link and the oversight uplink into one `link_cut`.
+        if outbox is not None:
+            outbox.record(events)
+            outbox.pump(not link_cut)
+
         timeline.append({
             "t": t,
             "on": sign_status,
