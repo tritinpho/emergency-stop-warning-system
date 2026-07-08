@@ -155,7 +155,7 @@ Payload = the **site-tunable subset**; the unit **enforces the full §7a bounds*
   speed_gate, message_set, T_override_max, sig }
 ```
 - **Signed**; the unit verifies signature, then **range-checks every parameter against [doc 02 §7a](02-system-architecture.md#7-interfaces--contracts-initial)** — out-of-bounds → **reject/clamp, keep last-good, alert** (FR-20, R16). Signing stops tampering; the bounds check stops operator error.
-- Staged/validated like an update; the safety **backstops** (`T_watchdog`/`T_signhold`/`T_assert_refresh`/`T_degraded_max`/`T_activate`) are bounded constants with hard ceilings per §7a and are **not** freely pushable to values that disable their invariant.
+- Staged/validated like an update; the safety **backstops** (`T_watchdog`/`T_signhold`/`T_assert_refresh`/`T_degraded_max`/`T_activate`) are bounded constants set only at **provisioning/boot** — a *runtime* config push to one is **refused outright** (boot-only, gated by `esw/params.RUNTIME_TUNABLE` in [`clamp_update`](../software/esw/params.py)), so no live reconfiguration or compromised uplink can move a fail-safe invariant even to an in-bounds value. Only the site-tunable subset above is runtime-mutable, each still §7a-clamped and fail-loud (`esw/state_machine.apply_config`, Level-F CMD-09..12).
 
 ### IF-9 — OTA (signed + rollback)
 ```

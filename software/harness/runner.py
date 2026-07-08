@@ -124,15 +124,17 @@ def run_scenario(scenario, outbox=None):
             hm_status = hm["status"]
             health = {"camera": hm["camera"], "radar": hm["radar"], "time_valid": hm["time_valid"]}
             if feed is not None:
-                ov, ota_flag, ack_val = feed.step(t)   # authenticated IF-8/9/10 (verified commands only)
+                ov, ota_flag, ack_val, cfg_push = feed.step(t)   # authenticated IF-8/9/10 (verified only)
             else:
                 ov = override_at(scenario, t)
                 ota_flag = ota_at(scenario, t)
                 ack_val = ack_at(scenario, t)
+                cfg_push = None
             inputs = {"sign_status": sign_status,
                       "ota": ota_flag,
                       "drift": drift_at(scenario, t),
-                      "ack": ack_val}
+                      "ack": ack_val,
+                      "config_push": cfg_push}
             decision = sm.tick(t, observations_at(scenario, t), health, ov, inputs)
 
         # The edge emits an authenticated refresh iff it is alive and asserting SHOW. A dead
@@ -186,6 +188,7 @@ def run_scenario(scenario, outbox=None):
             "override": decision.get("override"),
             "override_rejected": decision.get("override_rejected"),
             "ota_deferred": decision.get("ota_deferred"),
+            "config_rejected": decision.get("config_rejected"),
             "alarm_count": decision.get("alarm_count"),
             "rejects": sign.rejects,
             "cmd_rejects": feed.rejects if feed is not None else 0,
@@ -217,7 +220,8 @@ def sign_on_at(timeline, t):
 # doc 07 §4 scores disposition correctness (degraded/clear/safe-state), not just
 # the sign -- e.g. SC-25/26/27 must prove mode/alert, not merely that ON matches.
 _DISPOSITION_KEYS = ("state", "posture", "mode", "alert", "override", "override_rejected",
-                     "ota_deferred", "alarm_count", "hm_status", "cmd_rejects", "cmd_last_reject")
+                     "ota_deferred", "config_rejected", "alarm_count", "hm_status",
+                     "cmd_rejects", "cmd_last_reject")
 
 
 def evaluate(scenario, timeline):

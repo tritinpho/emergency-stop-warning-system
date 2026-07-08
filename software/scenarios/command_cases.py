@@ -88,4 +88,38 @@ COMMAND_CASES = [
         "checks": [{"t": 18.0, "alarm_count": 2},
                    {"t": 24.0, "alarm_count": 3, "cmd_last_reject": "auth"}],  # not frozen; forged ack caught
     },
+    {
+        "id": "CMD-09", "status": "impl",
+        "title": "Valid config-push (T_dwell 5->3) takes effect on the live unit (IF-8)",
+        "duration": 8.0, "auth_commands": True,
+        # Car parked from t=0.5. Default dwell 5 -> confirm 5.5; the pushed dwell 3 -> confirm 3.5.
+        "tracks": [{"id": "T1", "enter": 0.5, "leave": 40.0, "speed": 0.0, "in_roi": 1.0}],
+        "commands": [{"t": 1.0, "ctype": "config", "payload": {"T_dwell": 3.0}}],
+        "checks": [{"t": 2.0, "on": False},                                     # before the shortened dwell
+                   {"t": 5.0, "on": True, "config_rejected": None}],            # confirmed early (would be off at 5.0 under dwell 5)
+    },
+    {
+        "id": "CMD-10", "status": "impl",
+        "title": "Config-push out of §7a bounds is clamped + reported (FR-20/21)",
+        "duration": 6.0, "auth_commands": True, "tracks": [],
+        "commands": [{"t": 2.0, "ctype": "config", "payload": {"T_dwell": 99.0}}],  # hi 10 -> clamp + flag
+        "checks": [{"t": 3.0, "config_rejected": ["T_dwell"]}],
+    },
+    {
+        "id": "CMD-11", "status": "impl",
+        "title": "Config-push to a bounded backstop is refused (T_signhold boot-only)",
+        "duration": 6.0, "auth_commands": True, "tracks": [],
+        # T_signhold is the dead-man's-switch window -- NOT in RUNTIME_TUNABLE, so a live push is
+        # refused (kept last-good), never clamped-and-applied: no reconfiguration can move a backstop.
+        "commands": [{"t": 2.0, "ctype": "config", "payload": {"T_signhold": 0.5}}],
+        "checks": [{"t": 3.0, "config_rejected": ["T_signhold"]}],
+    },
+    {
+        "id": "CMD-12", "status": "impl",
+        "title": "Forged config-push cannot reconfigure the unit (auth)",
+        "duration": 6.0, "auth_commands": True, "tracks": [],
+        "inject_commands": [{"t": 2.0, "kind": "forged", "ctype": "config", "payload": {"T_dwell": 3.0}}],
+        "checks": [{"t": 3.0, "config_rejected": None,                          # never applied
+                    "cmd_rejects": 1, "cmd_last_reject": "auth"}],
+    },
 ]

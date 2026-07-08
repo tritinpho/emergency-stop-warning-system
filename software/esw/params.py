@@ -32,6 +32,16 @@ DEFAULTS = {
 }
 
 
+# The site-tunable subset (ICD IF-8): ONLY these may change on a RUNNING unit via a config push.
+# Everything else in DEFAULTS is a bounded SAFETY BACKSTOP -- set at provisioning/boot and never
+# retunable at runtime, so no live reconfiguration (or a compromised uplink) can move the
+# dead-man's-switch window, the watchdog, the degraded-hold ceiling, the refresh cadence, or the
+# activation bound (ADR-0012 R16 unsafe-config; FR-20). Boot config (clamp_config) still clamps
+# these to §7a; runtime config (clamp_update) refuses them outright.
+RUNTIME_TUNABLE = ("T_dwell", "T_hold", "T_occlusion", "T_person_debounce",
+                   "speed_gate_kph", "T_override_max", "roi_overlap_gate")
+
+
 def default_config():
     cfg = {}
     for name in DEFAULTS:
@@ -72,3 +82,31 @@ def clamp_config(cfg):
         if was:
             rejected.append(name)
     return clean, rejected
+
+
+def clamp_update(partial):
+    """Apply a runtime IF-8 config push to a RUNNING unit. Returns (accepted, rejected):
+    `accepted` = {name: clamped_value} to merge into the live config; `rejected` = names refused
+    or adjusted (fail-loud, FR-21). REFUSED and kept last-good: an unknown/misspelled name, a
+    wrong-type value, and -- the runtime safety stance -- any bounded-constant backstop (boot-only,
+    not in RUNTIME_TUNABLE). A runtime-tunable name is clamped into its §7a [lo, hi] and applied
+    (a clamp is still reported). Unlike clamp_config (boot), an untouched field is never reset to
+    its default -- a partial push changes only what it names."""
+    accepted = {}
+    rejected = []
+    for name in partial:
+        if name not in DEFAULTS:
+            rejected.append(name)              # unknown/misspelled -> refuse, keep last-good
+            continue
+        if name not in RUNTIME_TUNABLE:
+            rejected.append(name)              # bounded backstop -> boot-only, refuse at runtime
+            continue
+        value = partial[name]
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            rejected.append(name)              # wrong type -> refuse, keep last-good
+            continue
+        clamped, was = clamp(name, value)
+        accepted[name] = clamped
+        if was:
+            rejected.append(name)              # out of §7a bounds -> clamp + apply + flag
+    return accepted, rejected

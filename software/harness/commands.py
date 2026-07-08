@@ -43,6 +43,7 @@ class CommandFeed:
         self._override = None
         self._ota = False
         self._ack = None
+        self._config_once = None            # a verified config push is EDGE-triggered: applied one tick
         self._last_genuine_frame = None
         # Attacker frames carry a high seq so they clear the anti-replay seq guard and actually
         # exercise auth / freshness (a rejected frame never advances the receiver watermark anyway).
@@ -57,7 +58,9 @@ class CommandFeed:
         for inj in self._inject:
             if inj["t"] <= now < inj["t"] + self._dt:
                 self._apply(self._rx.submit(self._attacker_frame(inj, now), to_ms(now)))
-        return self._override, self._ota, self._ack
+        config_once = self._config_once      # deliver a fresh config push once, then clear it
+        self._config_once = None
+        return self._override, self._ota, self._ack, config_once
 
     def _attacker_frame(self, inj, now):
         kind = inj.get("kind")
@@ -83,6 +86,8 @@ class CommandFeed:
             self._ack = payload.get("count")
         elif ct == command.CMD_OTA:
             self._ota = True                # latched, matching sensors.ota_at
+        elif ct == command.CMD_CONFIG:
+            self._config_once = payload     # a partial IF-8 config push; the SM clamps/refuses it
 
     @property
     def rejects(self):
