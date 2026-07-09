@@ -27,6 +27,26 @@
 
 ---
 
+## 1a. Hòa giải baseline ACLAB ELMS ([ADR-0016](adr/ADR-0016-repo-consolidation-and-perception-source.vi.md))
+
+Nguyên mẫu K230 đã kiểm thử trên thiết bị của đội phần cứng nay được **đưa vào** kho này
+([`firmware/k230-detector/`](../firmware/k230-detector/README.md)) và hòa giải với các yêu cầu ở trên:
+
+| Baseline của họ | Yêu cầu | Xử lý |
+|---|---|---|
+| Bộ nhận diện K230 YOLOv8n ~30 FPS | **RQ-H4** điện toán biên | ✅ tiếp nhận làm **nguồn tri giác IF-2** qua `software/esw/k230_adapter.py`; ~30 FPS trả lời một phần RQ-H4 (độ trễ NFR-01 đầy đủ + ngân sách điện mặt trời vẫn chờ bench). Hậu xử lý tăng tốc bằng C `aidemo` của họ cũng trả lời một phần câu hỏi định thời D3 của [ADR-0015](adr/ADR-0015-state-machine-implementation-strategy.vi.md). |
+| `kmodel` một-lớp `"vehicle"` tùy chỉnh | tập lớp bộ nhận diện | → **COCO đa lớp** (car / truck / bus / **person**), để giữ khởi phát hiện diện người đi bộ (SC-12) + footprint theo lớp. ACLAB ELMS mang mô hình đa lớp. |
+| **Chốt** `LED:ON/OFF` qua Wi-Fi + MQTT CoreIoT | **RQ-H2** bộ điều khiển biển báo thông minh (IF-4) | ❌ **bị thay thế** bởi cơ chế tự ngắt an toàn IF-4 ([`firmware/sign-controller`](../firmware/sign-controller/README.md)); loại chốt khỏi đường an toàn — một thay đổi hành-vi-firmware (ESP32 vốn đã ở đúng điểm đặt cơ chế), không phải thiết kế lại. |
+| MQTT CoreIoT trong đường điều khiển | cục bộ tại biên ([ADR-0002](adr/ADR-0002-edge-vs-cloud-processing.vi.md)) | → **chỉ telemetry IF-6 / IF-7**; không bao giờ mang `SHOW`/`CLEAR`. Nhịp tim bị thiếu là cách TMC thấy sự cố. |
+| Đồng bộ thời gian từ đám mây cho Ngày/Đêm | **RQ-H5** GNSS/PPS | Gợi ý Ngày/Đêm chấp nhận được; **thời gian kiểm toán vẫn GNSS/PPS** (NFR-16). |
+| Mật khẩu Wi-Fi + token CoreIoT hardcode (đã công khai) | vệ sinh bảo mật ([ADR-0012](adr/ADR-0012-security-and-threat-model.vi.md)) | **xoay vòng + chuyển vào config**; làm sạch bản đã đưa vào. |
+
+**Tóm lại:** lớp tri giác được tiếp nhận trọn vẹn sau các giao diện của ta; hành vi duy nhất ACLAB ELMS phải
+*thay đổi* là đường liên kết biển báo (**RQ-H2 → IF-4**). Mọi thứ khác đều có tính cộng thêm. Radar vẫn vắng mặt
+ở cả hai kho (**RQ-H1** không đổi).
+
+---
+
 ## 2. Các giao diện được đóng băng *chung* (phần mềm đề xuất, phần cứng cùng ký)
 
 Phần mềm đã đơn phương đóng băng các giao diện **nội bộ** — **IF-2** (tri giác → máy trạng thái) và **IF-3** (máy trạng thái ↔ lớp trừu tượng cơ cấu chấp hành). Các giao diện sau đây là **chia sẻ** và phải được thống nhất với phần cứng trước khi đóng băng; lược đồ nằm trong [ICD (tài liệu 08)](08-interface-control-document.vi.md):

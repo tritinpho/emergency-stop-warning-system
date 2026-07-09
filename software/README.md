@@ -53,6 +53,7 @@ software/
   run_metrics.py          # Level-D acceptance-evidence board (reducer unit tests + sample report)
   run_sink_tests.py       # Level-E durable-evidence-outbox board (store-and-forward, at-least-once)
   run_command_tests.py    # Level-F authenticated command-channel board (IF-8/9/10 override/OTA/ack)
+  run_integration_tests.py # Level-G merged K230 pipeline (raw YOLO -> adapter -> perception -> SM -> sign, ADR-0016)
 ```
 
 ## Run
@@ -64,15 +65,16 @@ python software/run_health_tests.py      # Level C — health-monitor (FR-10/NFR
 python software/run_metrics.py           # Level D — acceptance-evidence reducer + sample report
 python software/run_sink_tests.py        # Level E — durable evidence outbox (store-and-forward)
 python software/run_command_tests.py     # Level F — authenticated command channel (IF-8/9/10)
+python software/run_integration_tests.py # Level G — merged K230 pipeline (adapter→perception→SM→sign)
 python software/tools/mp_safe_check.py software/esw   # MicroPython-safety AST lint on esw/
-python software/tools/mpy_smoke.py        # esw smoke: perception + geometry + sink + command
+python software/tools/mpy_smoke.py        # esw smoke: perception + geometry + sink + command + adapter
 
 # The shipped esw/ subset also RUNS under the real MicroPython unix port (not just CPython):
 cd software && micropython run_tests.py && micropython run_health_tests.py && micropython tools/mpy_smoke.py
 ```
 
 Both are enforced in CI on every push/PR ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)): a
-**cpython** job runs all six boards + the AST lint + the smoke, and a **micropython** job runs the
+**cpython** job runs all seven boards + the AST lint + the smoke, and a **micropython** job runs the
 shipped subset under `micropython/unix:v1.28.0` — see the *MicroPython / K230 note* below.
 
 Boards A–C, E, and F exit 0 when healthy and 1 on any surprise; D exits 0 when the reducer unit tests pass

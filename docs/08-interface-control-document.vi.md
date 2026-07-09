@@ -111,9 +111,24 @@ kiểm chứng qua khoảng cách xa là **bị hoãn sang hiện trường**, [
 CLEAR chủ động + đọc-lại trạng thái*, với một BẬT-cũ dư = chu kỳ lệnh của người vận hành; NFR-01 được **định mức**
 cho phần phụ trợ đó ([ADR-0004](adr/ADR-0004-warning-actuator-integration.vi.md), [ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)).
 
+**Hòa giải baseline ACLAB ELMS ([ADR-0016](adr/ADR-0016-repo-consolidation-and-perception-source.vi.md)).**
+Đường biển báo hiện tại của đội phần cứng — một lệnh `LED:ON`/`LED:OFF` bị ESP32 **chốt** qua Wi-Fi/TCP và một
+broker MQTT CoreIoT ([`firmware/k230-detector/esp32-legacy/`](../firmware/k230-detector/README.md)) — **không
+tuân thủ IF-4**: không làm mới, không làm trống theo `T_signhold`, không xác thực, và định tuyến tín hiệu
+an-toàn-tới-hạn qua một **broker đám mây** (vi phạm quy tắc cục bộ tại biên,
+[ADR-0002](adr/ADR-0002-edge-vs-cloud-processing.vi.md)). Nó **bị thay thế** bởi cơ chế tự ngắt an toàn
+[`firmware/sign-controller`](../firmware/sign-controller/README.md). ESP32 vốn đã nằm đúng chỗ đặt cơ chế này,
+nên đây là thay đổi hành-vi-firmware, không phải thiết kế lại (RQ-H2, [tài liệu 09 §1a](09-software-hardware-handoff.vi.md)).
+
 ---
 
 ## 4. Các giao diện Biên → TMC (IF-6, IF-7) — không trọng yếu, lưu-và-chuyển
+
+> Liên kết **CoreIoT MQTT** của ACLAB ELMS (ThingsBoard) là kênh mang cụ thể cho **IF-6/IF-7 ở đây** — chỉ
+> telemetry giám sát, và bị **hạ cấp khỏi đường điều-khiển-biển-báo** ([ADR-0016](adr/ADR-0016-repo-consolidation-and-perception-source.vi.md)):
+> một nhịp tim bị thiếu là cách TMC phát hiện sự cố, nhưng MQTT **không bao giờ** mang lệnh `SHOW`/`CLEAR`
+> (đó là IF-4). Việc chuyển chế độ Ngày/Đêm của họ chấp nhận được như một gợi ý từ telemetry, nhưng **thời gian
+> tuyệt đối cho kiểm toán vẫn là GNSS/PPS** (RQ-H5 / NFR-16), không đồng bộ từ đám mây.
 
 ### IF-6 — Nhịp tim
 Nhịp cố định; mang theo tình trạng **và tư thế** để một thiết bị suy giảm không bao giờ có thể trông như khỏe mạnh:

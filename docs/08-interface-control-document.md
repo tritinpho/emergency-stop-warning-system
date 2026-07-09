@@ -113,9 +113,24 @@ blanks a valid warning, so it is tuned against the **field link's** loss/latency
 active CLEAR + status read-back*, with a residual stale-ON = the operator command cycle; NFR-01 is
 **qualified** for that backend ([ADR-0004](adr/ADR-0004-warning-actuator-integration.md), [ADR-0009 §A](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)).
 
+**ACLAB ELMS baseline reconciliation ([ADR-0016](adr/ADR-0016-repo-consolidation-and-perception-source.md)).**
+The hardware team's current sign path — a `LED:ON`/`LED:OFF` command **latched** by the ESP32 over Wi-Fi/TCP
+and a CoreIoT MQTT broker ([`firmware/k230-detector/esp32-legacy/`](../firmware/k230-detector/README.md)) — is
+**not IF-4-conformant**: no refresh, no `T_signhold` blank, no authentication, and it routes the
+safety-critical signal through a **cloud broker** (violating the edge-local rule,
+[ADR-0002](adr/ADR-0002-edge-vs-cloud-processing.md)). It is **superseded** by the
+[`firmware/sign-controller`](../firmware/sign-controller/README.md) dead-man's switch. The ESP32 already sits
+where the switch belongs, so this is a firmware-behaviour change, not a redesign (RQ-H2, [doc 09 §1a](09-software-hardware-handoff.md)).
+
 ---
 
 ## 4. Edge → TMC interfaces (IF-6, IF-7) — non-critical, store-and-forward
+
+> The ACLAB ELMS **CoreIoT MQTT** link (ThingsBoard) is the concrete bearer for **IF-6/IF-7 here** — oversight
+> telemetry only, and explicitly **demoted out of the sign-control path** ([ADR-0016](adr/ADR-0016-repo-consolidation-and-perception-source.md)):
+> a missing heartbeat is how the TMC detects an outage, but MQTT **never** carries a `SHOW`/`CLEAR` command
+> (that is IF-4). Their Day/Night model switch is fine as a telemetry-driven hint, but **absolute time for
+> audit stays GNSS/PPS** (RQ-H5 / NFR-16), not cloud-synced.
 
 ### IF-6 — Heartbeat
 Fixed cadence; carries health **and posture** so a degraded unit can never look healthy:

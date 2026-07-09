@@ -43,7 +43,7 @@ phản quang do tài xế đặt) sang **cảnh báo chủ động, tự động
 | 09 | [docs/09-software-hardware-handoff.vi.md](docs/09-software-hardware-handoff.vi.md) | **Bàn giao yêu cầu & giao diện Phần mềm → Phần cứng** — những gì phần mềm cần ở lựa chọn linh kiện phần cứng/firmware (RQ-H1..H7), và các quyết định liên-đội đang chặn các ADR còn ở trạng thái Đề xuất |
 | 10 | [docs/10-if4-sign-controller-firmware-spec.vi.md](docs/10-if4-sign-controller-firmware-spec.vi.md) | **Đặc tả firmware bộ điều khiển biển báo IF-4 (RQ-H2)** — bàn giao firmware cơ chế tự ngắt an toàn cho ESP32: khung `SHOW` 29 byte được xác thực, kiểm tra + chống phát lại hai lớp, ngân sách thời gian phát LoRa quyết định `T_signhold`, và danh mục kiểm thử phù hợp của firmware |
 | 11 | [docs/11-dev-environment-setup.vi.md](docs/11-dev-environment-setup.vi.md) | **Sổ tay thiết lập môi trường lập trình** — bộ công cụ cho ba môi trường xây dựng: camera AI K230 (CanMV/MicroPython + phép đo D3 của ADR-0015), server giám sát CoreIOT (kiểm tra nhanh đường lên IF-6/7), và bộ điều khiển biển báo ESP32 YoloUno (PlatformIO + bench theo tài liệu 10) |
-| — | [docs/adr/README.vi.md](docs/adr/README.vi.md) | Mục lục các Bản ghi quyết định kiến trúc (ADR) (15 ADR; **bộ thuộc phần mềm đã chấp nhận 2026-06-27**, phần còn lại Đề xuất chờ phần cứng/vận hành) |
+| — | [docs/adr/README.vi.md](docs/adr/README.vi.md) | Mục lục các Bản ghi quyết định kiến trúc (ADR) (16 ADR; **bộ thuộc phần mềm đã chấp nhận**, phần còn lại Đề xuất chờ phần cứng/vận hành) |
 
 Hình 1 từ thuyết minh (infographic khái niệm) được lưu tại
 [docs/assets/figure-1-concept-infographic.jpeg](docs/assets/figure-1-concept-infographic.jpeg) và được
@@ -140,10 +140,37 @@ Một danh sách đầy đủ hơn nằm ở cuối [tài liệu 01](docs/01-req
 
 ## Trạng thái
 
-**Đề xuất.** Đây là các sản phẩm ở giai đoạn thiết kế nhằm biến thuyết minh đã được phê duyệt thành một
-kế hoạch có thể xây dựng được. Chưa có gì ở đây được xây dựng. Các ADR được đánh dấu *Đề xuất* cho đến
-khi nhóm dự án chấp nhận chúng.
+**Giai đoạn thiết kế + mô phỏng — đang xây dựng, chưa triển khai.** Các sản phẩm tài liệu (docs 00–11,
+16 ADR) biến thuyết minh đã được phê duyệt thành một kế hoạch có thể xây dựng được, và những luồng công
+việc xây dựng đầu tiên nay đã hình thành trên nền đó:
+
+- **Phần mềm vòng lặp an toàn** ([`software/`](software/README.md)) — máy trạng thái quyết định, khối
+  nhận thức (ROI-gating + bộ theo dõi), giám sát sức khỏe, telemetry, hộp thư lưu bền, và các bộ mã hóa
+  kênh lệnh / liên kết biển báo có xác thực đều đã được hiện thực và đạt (xanh) trên sáu bảng mô phỏng
+  (Level A–F) dưới CPython; riêng tập con `esw/` được nạp lên K230 còn được chứng minh chạy dưới
+  **runtime MicroPython thật** trong CI.
+- **Firmware bộ điều khiển biển báo ESP32** ([`firmware/sign-controller/`](firmware/sign-controller/README.md))
+  — bộ khung cơ chế tự ngắt an toàn IF-4 (lõi xác thực, chống phát lại hai lớp, kênh mang LoRa) **biên
+  dịch xanh** trên định nghĩa bo mạch YoloUno và vượt qua các vector tuân thủ lúc khởi động.
+- **Lớp tri giác K230** ([`firmware/k230-detector/`](firmware/k230-detector/README.md)) — bộ nhận diện
+  **đã kiểm thử trên thiết bị** của nhóm phần cứng ACLAB ELMS (YOLOv8n ~30 FPS, `kmodel` ngày/đêm, công
+  cụ web cấu hình ROI, bộ lọc nhiễu) được đưa vào theo
+  [ADR-0016](docs/adr/ADR-0016-repo-consolidation-and-perception-source.vi.md) làm backend thật sau điểm
+  giáp ranh tri giác của ta. Chốt biển báo `LED:ON/OFF` qua MQTT của họ bị cơ chế tự ngắt an toàn IF-4 thay thế.
+- **Giám sát CoreIOT** — một bài kiểm tra nhanh (smoke test) kết nối tới broker và đẩy lên được một nhịp
+  heartbeat thật.
+
+**Chưa xây dựng:** **adapter** nối bộ nhận diện K230 vừa đưa vào với ngăn xếp an toàn (lát cắt kế tiếp của
+[ADR-0016](docs/adr/ADR-0016-repo-consolidation-and-perception-source.vi.md) — đầu ra bộ nhận diện của họ
+→ `esw.perception`), các ràng buộc truyền tải mạng thật (telemetry và lệnh hiện vẫn chạy qua một uplink giả
+và các khung do harness dựng), và **toàn bộ kiểm định trên phần cứng thật** — chưa có bo K230 hay YoloUno
+nào trong tay, nên phép đo thời gian trên K230 và các bài kiểm định RF của LoRa vẫn là những ẩn số quyết
+định. Xem [doc 03](docs/03-roadmap-and-phasing.md) cho lộ trình phân kỳ và thực tế ngân sách 20 triệu VND.
+
+Về ADR: **tập ADR do phần mềm sở hữu đã được chấp nhận (2026-06-27)**; phần còn lại vẫn ở trạng thái
+*Đề xuất*, chờ các quyết định phần cứng / vận hành ([mục lục ADR](docs/adr/README.md)).
 
 *Ghi chú ngôn ngữ:* các tài liệu được viết bằng tiếng Anh (ngôn ngữ chung của giới kỹ thuật, khớp với
 tên dự án) kèm một **bảng thuật ngữ song ngữ** ánh xạ mọi thuật ngữ then chốt trở lại thuyết minh tiếng
-Việt. Bản dịch tiếng Việt đầy đủ có thể được tạo theo yêu cầu.
+Việt. Bản dịch tiếng Việt đầy đủ đã có sẵn — mỗi tài liệu đều có một tệp `.vi.md` song song, và mỗi
+sơ đồ đều có một biến thể `-vi.svg`.
