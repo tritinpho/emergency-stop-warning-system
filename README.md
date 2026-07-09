@@ -42,6 +42,7 @@ triangles) to **active, automatic warning** — the central thesis of the propos
 | 08 | [docs/08-interface-control-document.md](docs/08-interface-control-document.md) | **Interface Control Document v1** — concrete interface inventory, message schemas, the authenticated sign-link protocol, config/OTA/override contracts |
 | 09 | [docs/09-software-hardware-handoff.md](docs/09-software-hardware-handoff.md) | **Software → Hardware requirements & interface handoff** — what software requires of the hardware/firmware part choices (RQ-H1..H7), and the cross-team decisions gating the still-*Proposed* ADRs |
 | 10 | [docs/10-if4-sign-controller-firmware-spec.md](docs/10-if4-sign-controller-firmware-spec.md) | **IF-4 sign-controller firmware spec (RQ-H2)** — the ESP32 dead-man's-switch firmware handoff: the authenticated 29-byte `SHOW` frame, verify + two-guard anti-replay, the LoRa airtime budget that sets `T_signhold`, and the firmware conformance checklist |
+| 11 | [docs/11-dev-environment-setup.md](docs/11-dev-environment-setup.md) | **Dev-environment setup runbook** — per-module toolchains for the three build environments: the K230 AI camera (CanMV/MicroPython + the ADR-0015 D3 spike), the CoreIOT oversight server (IF-6/7 uplink smoke test), and the ESP32 YoloUno sign controller (PlatformIO + the doc 10 bench) |
 | — | [docs/adr/README.md](docs/adr/README.md) | Architecture Decision Records index (15 ADRs; **software-owned set accepted 2026-06-27**, the rest Proposed pending hardware/ops) |
 
 Figure 1 from the proposal (the concept infographic) is preserved at

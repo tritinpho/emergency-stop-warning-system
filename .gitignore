@@ -17,3 +17,6 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+
+# PlatformIO (firmware/ — build output + per-machine caches)
+.pio/
