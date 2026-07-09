@@ -56,14 +56,18 @@ def _bad(reason):
 
 
 def verify_command(key, frame, last_seq, now_ms, replay_window_ms):
-    """Return {"ok","reason","ctype","seq","payload"}. ok requires: right version; a self-consistent
-    length; a good auth tag; seq strictly > last_seq (anti-replay / anti-reorder); the frame ts
-    within replay_window of now (freshness); and a well-formed JSON payload. On any failure the
-    caller MUST treat the command as if it never arrived (fail-loud)."""
+    """Return {"ok","reason","ctype","seq","payload"}. ok requires: right version; a KNOWN
+    command type; a self-consistent length; a good auth tag; seq strictly > last_seq
+    (anti-replay / anti-reorder); the frame ts within replay_window of now (freshness); and a
+    well-formed JSON payload. On any failure the caller MUST treat the command as if it never
+    arrived (fail-loud). An unknown ctype is rejected here (reason "ctype"), never silently
+    dropped downstream -- a version-skewed TMC must show up on the reject counters (FR-21)."""
     if frame is None or len(frame) < _HDR_LEN + _TAG_LEN:
         return _bad("len")
     if frame[0] != _VERSION:
         return _bad("proto")
+    if frame[1] not in _CMD_NAMES:
+        return _bad("ctype")
     plen = int.from_bytes(frame[16:18], "big")
     if len(frame) != _HDR_LEN + plen + _TAG_LEN:
         return _bad("len")

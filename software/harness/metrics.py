@@ -12,7 +12,7 @@
 
 import math
 
-from esw.telemetry import _CLEAR_TYPES
+from esw.telemetry import CLEAR_TYPES
 
 
 def wilson_lower(k, n, z=1.96):
@@ -37,7 +37,7 @@ def warn_intervals(events, duration):
             continue
         if e["type"] == "activation" and on is None:
             on = e["ts"]
-        elif e["type"] in _CLEAR_TYPES and on is not None:
+        elif e["type"] in CLEAR_TYPES and on is not None:
             intervals.append([on, e["ts"]])
             on = None
     if on is not None:
@@ -51,11 +51,12 @@ def score_scenario(oracle, warns):
     detection latencies.
 
     A hazard interval with an overlapping warning = TP (detected); with none = FN (missed). A
-    warning overlapping no hazard = FP (false activation). A correct occlusion hold overlaps the
-    hazard, so it scores TP, never a clear-latency failure (doc 07 §4)."""
+    warning is an FP (false activation) only if it overlaps NO hazard -- a warning that flaps
+    off/on WITHIN one hazard (occlusion blip, forced clear + re-confirm) is a latency/continuity
+    story, not a false activation, so it must not inflate the doc 01 §5 FA rates. A correct
+    occlusion hold overlaps the hazard, so it scores TP, never a clear-latency failure (doc 07 §4)."""
     tp = fn = 0
     latencies = []
-    matched = [False] * len(warns)
     for hz in oracle:
         found = None
         for i, w in enumerate(warns):
@@ -66,9 +67,16 @@ def score_scenario(oracle, warns):
             fn += 1
         else:
             tp += 1
-            matched[found] = True
             latencies.append(warns[found][0] - hz[0])  # warning ON - hazard onset
-    fp = sum(1 for m in matched if not m)
+    fp = 0
+    for w in warns:
+        hit = False
+        for hz in oracle:
+            if w[0] < hz[1] and w[1] > hz[0]:          # any overlap with any hazard
+                hit = True
+                break
+        if not hit:
+            fp += 1                                    # warned where nothing warnable was
     return {"tp": tp, "fn": fn, "fp": fp, "latencies": latencies}
 
 

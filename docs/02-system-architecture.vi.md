@@ -481,12 +481,20 @@ ngoài* bảng này.
 | `T_activate` | hằng số có giới hạn | ≤ 2 s | **≤ 2 s** | NFR-01 (phần phụ trợ LED) |
 | `T_sensor_timeout` | hằng số có giới hạn | 0 s | **0–2 s** | bộ giám sát sức khỏe: một cảm biến bị coi là HỎNG sau khoảng này nếu không có dữ liệu mới (FR-10); mặc định 0 = phản ứng tức thì (bảo thủ), tăng lên để chống chớp-tắt |
 | `T_time_holdover` | hằng số có giới hạn | 0.5 s | **0–5 s** | bộ giám sát sức khỏe: thời gian tuyệt đối còn hợp lệ trong khoảng này sau khi mất GNSS/PPS (NFR-16); khả năng duy trì nhiều giờ thực tế để lại cho hiện trường |
+| `T_corr_tolerance` | hằng số có giới hạn | 0.5 s | **0–2 s** | xác nhận chéo của radar vẫn được coi là *còn sống* trong khoảng này sau lần phản hồi cuối, nên một nhịp quét radar bị hụt không bao giờ làm rơi trạng thái giữ-khi-bị-che ([ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)); nhỏ theo giới hạn so với `T_hold`/`T_occlusion` |
+| `T_reescalate` | hằng số có giới hạn | 10 s | **5–60 s** | một cảnh báo CRITICAL chưa được xác nhận sẽ leo thang lại một lần mỗi khoảng này (NFR-15, [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.vi.md)) |
+| `T_drift_debounce` | hằng số có giới hạn | 2 s | **0–10 s** | phần dư trôi hiệu chuẩn phải vượt dung sai liên tục trong khoảng này trước khi thiết bị bị đánh dấu DEGRADED (FR-10, R15) |
+| `T_sign_stuck_grace` | hằng số có giới hạn | 0.5 s | **0–2 s** | phản hồi trạng thái IF-3 được phép trễ sau lệnh TẮT tới mức này quá `T_signhold` trước khi tuyên bố biển-báo-kẹt ([ADR-0013 §C.3](adr/ADR-0013-degraded-hold-unification.vi.md)) |
+| `congestion_min_tracks` | hằng số có giới hạn | 4 | **3–10** | ngưỡng ùn tắc R14: số vệt đứng yên trên toàn khung cảnh; giới hạn dưới (≥ 3) tồn tại để không giá trị đẩy xuống nào khiến các xe dừng lẻ 1–2 chiếc tự triệt tiêu cảnh báo |
 | dung sai trôi | hằng số có giới hạn (theo từng địa điểm lúc nghiệm thu) | theo từng địa điểm | trong giới hạn bao đã khảo sát | ngưỡng bộ-giám-sát-trôi (§4, R15) |
 
 **Quy tắc:** các chốt chặn trọng yếu an toàn (`T_watchdog`, `T_signhold`, `T_assert_refresh`, `T_degraded_max`,
 `T_activate`) được giới hạn chặt đến mức không giá trị đẩy xuống nào có thể vô hiệu hóa bất biến mà chúng bảo vệ;
 thiết bị **từ chối hoặc kẹp** bất kỳ giá trị nào nằm ngoài cột ở trên và giữ lại giá-trị-tốt-cuối-cùng, **lớn
-tiếng tới người vận hành** (FR-20, [tài liệu 04 R16](04-risk-and-safety.vi.md#1-bảng-đăng-ký-rủi-ro)). Các dải giá
+tiếng tới người vận hành** (FR-20, [tài liệu 04 R16](04-risk-and-safety.vi.md#1-bảng-đăng-ký-rủi-ro)). Một giá trị
+hoàn toàn không thể kẹp — sai kiểu, hoặc **NaN, thứ vô hiệu hóa mọi phép so sánh giới hạn số** — được coi là
+ngoài-giới-hạn theo định nghĩa: cấu hình lúc khởi động khôi phục giá trị mặc định đã kiểm định (có gắn cờ);
+một lệnh đẩy lúc chạy bị từ chối thẳng, giữ nguyên giá-trị-tốt-cuối-cùng. Các dải giá
 trị là các giới hạn khởi đầu cần xác nhận trong đợt đóng băng Giai-đoạn-2; *điểm mấu chốt* là danh sách đã đầy đủ
 và mỗi mục đều có một giới hạn.
 

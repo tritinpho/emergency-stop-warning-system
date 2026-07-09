@@ -12,7 +12,7 @@
 #
 # This is the SUT: byte-identical in sim and on the K230. MicroPython-safe subset.
 
-from esw.params import default_config, clamp_config, clamp_update
+from esw.params import default_config, clamp_config, clamp_update, cfg_fingerprint
 
 # Warning-lifecycle states (doc 02 §4 diagram).
 IDLE = "IDLE"
@@ -35,17 +35,10 @@ MESSAGE_STOPPED = "STOPPED_VEHICLE_AHEAD"  # message_id; QCVN-41 set is ADR-0004
 # Operator-alert severity ladder (ADR-0011): None/NONE < DEGRADED < CRITICAL.
 _ALERT_RANK = {None: 0, "NONE": 0, "DEGRADED": 1, "CRITICAL": 2}
 
-# Congestion suppression threshold (R14, doc 02 §4): a jam is >= this many stationary tracks
-# spanning the scene. A bounded constant to reconcile into the doc 02 §7a surface.
-_CONGESTION_MIN_TRACKS = 4
-
-# Alarm re-escalation window (NFR-15, ADR-0011): an unacked CRITICAL re-escalates after this
-# long. Drift-monitor debounce (FR-10): a residual must exceed tolerance this long before the
-# unit is marked degraded. Sign-stuck grace: how far past T_signhold a still-ON read-back is
-# tolerated before declaring the sign wedged. Bounded constants (reconcile into §7a).
-_T_REESCALATE = 10.0
-_T_DRIFT_DEBOUNCE = 2.0
-_SIGN_STUCK_GRACE = 0.5
+# The congestion threshold (R14), alarm re-escalation window (NFR-15), drift debounce (FR-10),
+# and sign-stuck grace (ADR-0013 §C.3) all live in the doc 02 §7a surface now (esw/params.py:
+# congestion_min_tracks / T_reescalate / T_drift_debounce / T_sign_stuck_grace) -- bounded,
+# clamped, boot-only -- so "nothing safety-relevant is tunable outside the table" stays true.
 
 
 def _max_alert(a, b):
@@ -63,6 +56,10 @@ class StateMachine:
             self.rejected_cfg = []
         else:
             self.cfg, self.rejected_cfg = clamp_config(config)
+        # R10 audit binding: fingerprint the config ACTUALLY IN FORCE (post-clamp), and
+        # recompute on every runtime push (apply_config) so IF-4 frames and IF-6/7 records
+        # never stamp a stale cfg_ver after a live reconfiguration.
+        self.cfg_ver = cfg_fingerprint(self.cfg)
         self.state = IDLE
         self.mode = FULL
         self.escalation = None        # latched max-severity escalation (e.g. forced clear)
@@ -93,18 +90,21 @@ class StateMachine:
             return RADAR_ONLY
         return NEITHER
 
-    def _new_track(self, now, speed):
+    def _new_track(self, speed):
         return {"stationary_since": None, "confirmed": False, "absent_since": None,
                 "degraded_since": None, "stale_now": False, "seen_leaving": False,
-                "suppressed_last_seen": False, "last_speed": speed}
+                "suppressed_last_seen": False, "last_speed": speed, "radar_last": None}
 
     def apply_config(self, partial):
         """Merge a runtime IF-8 config push into the LIVE config (clamp_update: §7a-clamped, with
         the bounded safety backstops refused as boot-only). Latches the fail-loud rejected/adjusted
-        set for the decision report (FR-21). Mutates self.cfg in place so shared readers stay valid."""
+        set for the decision report (FR-21). Mutates self.cfg in place so shared readers stay valid,
+        and re-fingerprints cfg_ver so subsequent frames/audit records bind to the live config."""
         accepted, rejected = clamp_update(partial)
         for name in accepted:
             self.cfg[name] = accepted[name]
+        if accepted:
+            self.cfg_ver = cfg_fingerprint(self.cfg)
         self.config_rejected = rejected if rejected else None
 
     def tick(self, now, observations, health=None, override=None, inputs=None):
@@ -137,7 +137,7 @@ class StateMachine:
         if inputs.get("drift", False):
             if self.drift_since is None:
                 self.drift_since = now
-            if (now - self.drift_since) >= _T_DRIFT_DEBOUNCE:
+            if (now - self.drift_since) >= self.cfg["T_drift_debounce"]:
                 self.drift_degraded = True
         else:
             self.drift_since = None
@@ -168,6 +168,11 @@ class StateMachine:
         # CAMERA_ONLY / RADAR_ONLY are handled inline (BLIND-TO-NEW guard + alert severity).
         if self.mode == NEITHER:
             self.state = SAFE_STATE
+            # Nothing is asserted in NEITHER, so the watchdog's evidence clock must not keep
+            # aging across the blackout: left stale, the first recovery tick that re-holds a
+            # pre-blackout track (> T_watchdog later) would fire a spurious watchdog CRITICAL
+            # instead of a quiet WARN_HOLD -> T_hold clear (pinned by SC-40).
+            self.warn_evidence_since = None
             # An override cannot lift the both-sensors-dead safe state, but it must never be
             # silently dropped (FR-21): report why it did not apply. A malformed override
             # surfaces its own reason; a well-formed one is rejected as safe-state-suppressed.
@@ -186,7 +191,7 @@ class StateMachine:
             if (o.get("sensor_source", "fused") in ("camera", "fused")
                     and o.get("speed_kph", 0.0) < gate):
                 stationary_ids.add(o["track_id"])
-        congestion = len(stationary_ids) >= _CONGESTION_MIN_TRACKS
+        congestion = len(stationary_ids) >= cfg["congestion_min_tracks"]
 
         # Split IF-2 events by corroboration source (ICD IF-2 sensor_source). Camera
         # (or fused) events drive dwell / confirm / exit -- the camera owns class + image
@@ -208,7 +213,7 @@ class StateMachine:
             cls = o.get("cls", "car")
             tr = self.tracks.get(tid)
             if tr is None:
-                tr = self._new_track(now, speed)
+                tr = self._new_track(speed)
                 self.tracks[tid] = tr
             tr["absent_since"] = None
             tr["degraded_since"] = None    # camera re-acquired -> leave any degraded hold
@@ -243,8 +248,17 @@ class StateMachine:
                 if tr["confirmed"]:
                     tr["seen_leaving"] = True  # moving while confirmed = observed exit
 
+        # Stamp radar corroboration on the tracks it renews. Corroboration is treated as
+        # LIVE for T_corr_tolerance after its last return (checked below): a real radar /
+        # fusion pipeline misses individual scans, and requiring a return on EVERY tick made
+        # one missed beat past T_hold silently clear a live occlusion hold (SC-39).
+        for tid in radar_corr:
+            tr = self.tracks.get(tid)
+            if tr is not None:
+                tr["radar_last"] = now
+
         # Camera-absent confirmed tracks -> the clearing paths (ADR-0009 §C), none silent,
-        # none unbounded: confirmed exit (fast); no corroboration -> T_hold -> loud clear
+        # none unbounded: confirmed exit (fast); corroboration lost for T_hold -> loud clear
         # (or, if it was R14-suppressed when last seen, a quiet clear -- no assert to hold,
         # SC-38); corroborated occlusion -> WARN_HOLD until T_occlusion then
         # CAMERA_OCCLUDED_DEGRADED, itself bounded by T_degraded_max -> forced loud clear.
@@ -262,27 +276,41 @@ class StateMachine:
                 if absent >= cfg["T_hold"]:
                     del self.tracks[tid]                   # unconfirmed + lost -> drop
                 continue
-            if tid in radar_corr:
-                if absent >= cfg["T_occlusion"]:
-                    if tr["degraded_since"] is None:
-                        tr["degraded_since"] = now         # enter CAMERA_OCCLUDED_DEGRADED
-                    if (now - tr["degraded_since"]) >= cfg["T_degraded_max"]:
-                        del self.tracks[tid]               # bound the one state the watchdog can't reach
-                        self.escalation = "CRITICAL"       # forced loud clear + max-severity escalation
+            # T_degraded_max bounds the degraded hold UNCONDITIONALLY from first entry,
+            # evaluated before the corroboration split -- so a flapping radar (gaps that
+            # reset nothing, returns that renew) can never stretch the one state the
+            # watchdog can't reach. degraded_since resets only on camera re-acquire.
+            if (tr["degraded_since"] is not None
+                    and (now - tr["degraded_since"]) >= cfg["T_degraded_max"]):
+                del self.tracks[tid]                       # forced loud clear...
+                self.escalation = "CRITICAL"               # ...+ max-severity escalation
+                continue
+            corr = (tr["radar_last"] is not None
+                    and (now - tr["radar_last"]) <= cfg["T_corr_tolerance"])
+            if tr["suppressed_last_seen"] and not (corr and tr["radar_last"] >= tr["absent_since"]):
+                # Congestion carry-over (R14, doc 02 §4 / ADR-0008): a track confirmed only
+                # while the shoulder warning was SUPPRESSED never earned an un-suppressed
+                # assertion. Vanishing with no confirmed exit and no radar corroboration,
+                # there is no shown warning to hold -- holding it would flash a WARN_HOLD the
+                # instant suppression lifts (cry-wolf on the very geometry R14 distrusts). The
+                # same distrust that suppressed the assert clears it quietly (SC-38). Radar-
+                # corroborated occlusion is unaffected (below): real presence holds -- but only
+                # a return heard SINCE the camera lost the track counts (radar_last >=
+                # absent_since); a pre-vanish return remembered through T_corr_tolerance is
+                # not presence evidence and must not re-flash the very hold R14 distrusts.
+                del self.tracks[tid]                       # suppressed + lost, uncorroborated -> quiet clear
+            elif corr:
+                if absent >= cfg["T_occlusion"] and tr["degraded_since"] is None:
+                    tr["degraded_since"] = now             # enter CAMERA_OCCLUDED_DEGRADED
                 # else: within T_occlusion -> corroboration renews the hold (WARN_HOLD)
-            else:
-                tr["degraded_since"] = None
-                if tr["suppressed_last_seen"]:
-                    # Congestion carry-over (R14, doc 02 §4 / ADR-0008): a track confirmed only
-                    # while the shoulder warning was SUPPRESSED never earned an un-suppressed
-                    # assertion. Vanishing with no confirmed exit and no radar corroboration,
-                    # there is no shown warning to hold -- holding it would flash a WARN_HOLD the
-                    # instant suppression lifts (cry-wolf on the very geometry R14 distrusts). The
-                    # same distrust that suppressed the assert clears it quietly (SC-38). Radar-
-                    # corroborated occlusion is unaffected (handled above): real presence holds.
-                    del self.tracks[tid]                   # suppressed + lost, uncorroborated -> quiet clear
-                elif absent >= cfg["T_hold"]:
-                    del self.tracks[tid]                   # lost all corroboration -> loud clear
+            elif (absent >= cfg["T_hold"]
+                  and (tr["radar_last"] is None
+                       or (now - tr["radar_last"]) >= cfg["T_hold"])):
+                # Lost ALL corroboration: the T_hold hysteresis runs from the last evidence
+                # on ANY channel (camera absence AND radar silence both >= T_hold), honoring
+                # "no corroboration -> T_hold -> loud clear" even when the camera went
+                # absent long before the radar fell silent (SC-39 sustained-loss phase).
+                del self.tracks[tid]                       # lost all corroboration -> loud clear
 
         present = held = degraded = fresh = False
         for tid in self.tracks:
@@ -370,7 +398,7 @@ class StateMachine:
         if (not asserting) and inputs.get("sign_status", False):
             if self.clear_since is None:
                 self.clear_since = now
-            if (now - self.clear_since) >= self.cfg["T_signhold"] + _SIGN_STUCK_GRACE:
+            if (now - self.clear_since) >= cfg["T_signhold"] + cfg["T_sign_stuck_grace"]:
                 self.escalation = "CRITICAL"
                 self.state = SAFE_STATE
         else:
@@ -417,7 +445,7 @@ class StateMachine:
 
         # Alarm management (NFR-15, ADR-0011): a sustained CRITICAL raises ONE alarm (dedup) and,
         # until the operator acks it (inputs["ack"], handled in tick()), re-escalates once per
-        # _T_REESCALATE window so the count climbs slowly rather than storming every tick. An ack
+        # T_reescalate window so the count climbs slowly rather than storming every tick. An ack
         # freezes the climb for this epoch; when the epoch ends (alert drops then re-raises) it
         # re-arms, so a fresh critical after an ack alarms again.
         if alert == "CRITICAL":
@@ -425,7 +453,7 @@ class StateMachine:
                 self.alarm_count += 1
                 self.alarm_since = self._now
                 self.alarm_acked = False       # a freshly-raised alarm starts un-acked
-            elif not self.alarm_acked and (self._now - self.alarm_since) >= _T_REESCALATE:
+            elif not self.alarm_acked and (self._now - self.alarm_since) >= self.cfg["T_reescalate"]:
                 self.alarm_count += 1
                 self.alarm_since = self._now
         else:
@@ -445,4 +473,5 @@ class StateMachine:
                 "alert": alert, "override": self.override_active,
                 "override_rejected": self.override_rejected,
                 "ota_deferred": self.ota_deferred, "alarm_count": self.alarm_count,
-                "config_rejected": self.config_rejected}
+                "config_rejected": self.config_rejected,
+                "cfg_ver": self.cfg_ver}

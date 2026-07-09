@@ -7,7 +7,8 @@
 #    "leave_speed"(kph or None -> a confirmed exit vs a silent vanish),
 #    "exit_window"(s, how long it is seen moving before `leave`),
 #    "speed_windows"[[t0,t1,kph],...] mid-life speed overrides (a transient blip),
-#    "gaps"[[t0,t1],...] intervals it is occluded (present but unseen),
+#    "gaps"[[t0,t1],...] intervals it is occluded (present but unseen by the CAMERA),
+#    "radar_gaps"[[t0,t1],...] intervals the RADAR misses it (a dropped scan/beat, SC-39),
 #    "cls"}
 #
 # Nuisance injection (dropout rate, false detections, footprint noise, class
@@ -39,6 +40,11 @@ def observations_at(scenario, t):
                 break
         camera_sees = cam_ok and not occluded
         radar_sees = rad_ok and trk.get("radar_visible", True)
+        if radar_sees:
+            for g in trk.get("radar_gaps", []):
+                if g[0] <= t < g[1]:
+                    radar_sees = False   # a missed radar scan/beat (dropout), SC-39
+                    break
         if not (camera_sees or radar_sees):
             continue  # present in the world, but neither channel can report it now
         speed = trk.get("speed", 0.0)

@@ -91,7 +91,7 @@ perception pipeline is byte-identical in sim and on the board.
 
 ## The boards today
 
-**Level A — `run_tests.py`: 38 passing · 0 red · 0 pending** (`exit 0`). The full SC-01..38
+**Level A — `run_tests.py`: 40 passing · 0 red · 0 pending** (`exit 0`). The full SC-01..40
 catalogue: the happy path, dwell / creep / cold-start, pass-through, the set-based occlusion
 policy (`WARN_HOLD → CAMERA_OCCLUDED_DEGRADED → T_degraded_max` forced clear, incl. the
 weak-(b) stale-ON guard), the FULL / CAMERA-ONLY / RADAR-ONLY / NEITHER sensor-mode matrix
@@ -102,7 +102,11 @@ re-escalate, the three fail-safe blank paths (kill SM / kill box / cut link → 
 ≤ `T_signhold`), the **IF-4 auth path** (SC-33/34: forged and replayed `SHOW` frames are
 rejected — an attacker on the link can neither light nor sustain the sign), and the **health
 monitor in the loop** (SC-35 derived-health debounce, SC-36 GNSS/PPS loss → DEGRADED-not-blanked,
-SC-37 independent force-safe blanks the sign despite `SHOW`). The state machine's sign assertions
+SC-37 independent force-safe blanks the sign despite `SHOW`), plus two code-review regressions:
+**radar-corroboration gap tolerance** (SC-39: one missed radar beat holds the occlusion warning —
+`T_corr_tolerance` — while sustained silence still loud-clears at `T_hold` from the *last*
+corroboration) and the **post-blackout watchdog re-arm** (SC-40: recovering from a > `T_watchdog`
+NEITHER outage re-holds quietly instead of firing a spurious watchdog CRITICAL). The state machine's sign assertions
 now drive the **real `esw/if4` frame codec** through the actuator to the controller, so the board
 verifies the exact bytes the ESP32 firmware will (doc 10); the sensor mode is now **derived** by
 the real health monitor, not injected.
@@ -151,7 +155,7 @@ flash + MQTT on the K230). This surfaced one honest fix: the audit record stampe
 `bytes`, so any durable/wire serializer must encode it (the store hex-encodes it) — a future cleanup
 could have telemetry stamp a hex fingerprint so the record is natively wire-safe.
 
-**Level F — `run_command_tests.py`: 12 passing** (`exit 0`). CMD-01..12 drive the authenticated
+**Level F — `run_command_tests.py`: 14 passing** (`exit 0`). CMD-01..14 drive the authenticated
 IF-8/9/10 command channel (`esw/command.py`) through the real loop — the receive-side twin of the
 IF-4 sign-link. A **valid** override lights an otherwise-dark sign, a valid OTA request defers behind
 an active warning, a valid operator ack freezes alarm re-escalation, and a valid **config-push**
@@ -159,11 +163,18 @@ retunes the live unit (CMD-09: `T_dwell` 5→3 s makes a parked car confirm earl
 controls; their **forged** (wrong-key → `auth`), **replayed** (seq ≤ watermark → `replay`), and
 **stale** (ts outside the freshness window → `stale`) counterparts are rejected upstream and change
 nothing, so an attacker who can transmit can neither force the sign, trigger a restart, silence the
-operator escalation (NFR-09 / NFR-15), nor reconfigure the unit. The **IF-8 config** path adds two
-guards on top of auth: an out-of-§7a value is clamped and reported fail-loud (CMD-10, FR-20/21), and
-the bounded safety backstops (`T_signhold` / `T_watchdog` / `T_degraded_max` / …) are **boot-only** —
+operator escalation (NFR-09 / NFR-15), nor reconfigure the unit. An **unknown command type** (a
+version-skewed TMC / fuzzed uplink) is rejected loud at verify (CMD-13 → `ctype`), never silently
+dropped in dispatch. The **IF-8 config** path adds three
+guards on top of auth: an out-of-§7a value is clamped and reported fail-loud (CMD-10, FR-20/21),
+**NaN — which defeats every numeric bound check — is refused outright, keeping last-good** (CMD-14),
+and the bounded safety backstops (`T_signhold` / `T_watchdog` / `T_degraded_max` / …) are **boot-only** —
 a runtime push to one is refused (CMD-11), so no live reconfiguration can move a fail-safe invariant.
-The auth is the same HMAC + two-guard anti-replay as IF-4 (shared `esw/crypto.py`); the command
+A runtime push also **re-fingerprints `cfg_ver`**, so IF-4 frames and IF-6/7 audit records always
+bind to the config in force (R10), never the boot config a push has replaced.
+The auth is the same HMAC + two-guard anti-replay as IF-4 (shared `esw/crypto.py`, with per-site /
+per-channel **key derivation** — `crypto.derive_key(master, "IF4"|"CMD", site_id)` — so a frame
+MAC'd for one unit or channel can never verify on another); the command
 *policy* ships in `esw/`, the wire transport is a drop-in backend.
 
 ## Extending the board

@@ -441,7 +441,7 @@ SCENARIOS = [
         "duration": 30.0,
         # Completes the ADR-0011 §2 alarm ladder: the ack half that stops re-escalation.
         # Both sensors die (t=2) -> sustained CRITICAL. One deduped alarm (count 1), then an
-        # unacked re-escalation to 2 at _T_REESCALATE. The operator ACKS count 2 (t=13): the
+        # unacked re-escalation to 2 at T_reescalate. The operator ACKS count 2 (t=13): the
         # count now FREEZES -- without the ack it would climb to 3 at t=22. Sensors then recover
         # (t=25 -> alert clears, epoch ends) and die again (t=27): a NEW critical re-arms to 3,
         # proving the ack was epoch-scoped, not a permanent mute (the stale count-2 ack is
@@ -549,7 +549,7 @@ SCENARIOS = [
         "duration": 18.0,
         # SC-11's jam, but the WHOLE scene vanishes on ONE tick (leave=10, no leave_speed) --
         # a detector artifact / global blink, NOT the realistic per-vehicle confirmed exit. On
-        # that tick congestion lifts (< _CONGESTION_MIN_TRACKS) AND the confirmed-but-SUPPRESSED
+        # that tick congestion lifts (< congestion_min_tracks) AND the confirmed-but-SUPPRESSED
         # shoulder track goes absent with no confirmed exit and no radar corroboration. Pre-fix
         # it entered WARN_HOLD and the sign FLASHED for the whole T_hold window the instant
         # suppression lifted -- a cry-wolf built on a confirmation we never trusted enough to
@@ -568,5 +568,55 @@ SCENARIOS = [
                    {"t": 10.5, "on": False, "state": "IDLE"},     # vanished w/o exit -> quiet clear, NO flash
                    {"t": 13.0, "on": False},                      # still dark across the whole former T_hold window
                    {"t": 15.0, "on": False, "state": "IDLE"}],    # settled, never asserted
+    },
+    {
+        "id": "SC-39", "status": "impl",
+        "title": "Radar-corroboration gap tolerance: a missed beat holds; sustained silence clears at T_hold",
+        "duration": 40.0,
+        # Regression for per-tick corroboration brittleness: a real radar/fusion pipeline
+        # misses individual scans, and pre-fix ONE missed radar tick while camera-absent past
+        # T_hold instantly (and silently) cleared a live occlusion hold -- unrecoverable until
+        # camera re-acquire (BLIND-TO-NEW rightly stops radar re-creating the track). Now
+        # corroboration stays LIVE for T_corr_tolerance (0.5 s) after its last return, so the
+        # 0.2 s blip at t=20 holds; and the loud clear runs T_hold from the LAST corroboration
+        # (radar falls silent for good at t=28 -> clear at ~32.9), honoring ADR-0009 §C's
+        # "lost all corroboration -> T_hold -> loud clear". T_degraded_max stays the hard
+        # ceiling and is NOT stretched by the blip (bounded from first degraded entry).
+        "config_push": {"T_dwell": 3.0, "T_hold": 5.0, "T_occlusion": 8.0, "T_degraded_max": 60.0},
+        "tracks": [{"id": "T1", "enter": 1.0, "leave": 60.0, "speed": 0.0,
+                    "in_roi": 1.0, "radar_visible": True,
+                    "gaps": [[6.0, 60.0]],                    # camera occluded from t=6 on
+                    "radar_gaps": [[20.0, 20.2], [28.0, 60.0]]}],  # a missed beat; then real loss
+        "checks": [{"t": 5.0, "on": True, "state": "WARN_ON"},                    # confirmed, seen
+                   {"t": 12.0, "on": True, "state": "WARN_HOLD"},                 # occluded < T_occlusion
+                   {"t": 19.5, "on": True, "state": "CAMERA_OCCLUDED_DEGRADED",
+                    "alert": "DEGRADED"},                                         # corroborated hold
+                   {"t": 20.1, "on": True, "state": "CAMERA_OCCLUDED_DEGRADED"},  # mid-blip: HELD (pre-fix: cleared)
+                   {"t": 26.0, "on": True, "state": "CAMERA_OCCLUDED_DEGRADED"},  # long after the blip
+                   {"t": 30.0, "on": True},                                       # radar silent < T_hold: still held
+                   {"t": 36.0, "on": False}],                                     # silent >= T_hold -> loud clear
+    },
+    {
+        "id": "SC-40", "status": "impl",
+        "title": "Recovery from a long NEITHER blackout re-holds quietly -- no spurious watchdog CRITICAL",
+        "duration": 32.0,
+        # Regression for the stale watchdog-evidence clock: a confirmed warning, then BOTH
+        # sensors die for longer than T_watchdog (the car departs unseen mid-blackout). In
+        # NEITHER nothing is asserted, so the evidence clock must not keep aging; pre-fix the
+        # first recovery tick that re-held the pre-blackout track measured 10 s of "stale-ON"
+        # against a warning that had been dark the whole time -> spurious watchdog CRITICAL +
+        # SAFE_STATE (cry-wolf on the alarm channel). Post-fix: recovery re-holds WARN_HOLD
+        # (conservative: the unverified confirm re-asserts), then quiet-clears at T_hold.
+        "config_push": {"T_dwell": 3.0, "T_hold": 5.0, "T_watchdog": 8.0},
+        "health_events": [{"t": 10.0, "health": {"camera": False, "radar": False}},
+                          {"t": 20.0, "health": {"camera": True, "radar": True}}],
+        "tracks": [{"id": "T1", "enter": 1.0, "leave": 15.0, "speed": 0.0,
+                    "in_roi": 1.0, "radar_visible": True}],      # departs unseen, mid-blackout
+        "checks": [{"t": 8.0, "on": True, "state": "WARN_ON", "alarm_count": 0},  # healthy warning
+                   {"t": 15.0, "on": False, "state": "SAFE_STATE", "mode": "NEITHER",
+                    "alert": "CRITICAL", "alarm_count": 1},                       # blind -> safe + one alarm
+                   {"t": 21.0, "on": True, "state": "WARN_HOLD", "mode": "FULL",
+                    "alert": "NONE", "alarm_count": 1},          # re-hold, NO watchdog fire (pre-fix: SAFE_STATE+2)
+                   {"t": 28.0, "on": False, "state": "IDLE", "alarm_count": 1}],  # T_hold -> quiet clear
     },
 ]

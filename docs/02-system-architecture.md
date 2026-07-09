@@ -489,12 +489,20 @@ tunable *outside* this table.
 | `T_activate` | bounded constant | ≤ 2 s | **≤ 2 s** | NFR-01 (LED backend) |
 | `T_sensor_timeout` | bounded constant | 0 s | **0–2 s** | health monitor: a sensor is DOWN after this long with no fresh data (FR-10); default 0 = react immediately (conservative), tune up for anti-flap |
 | `T_time_holdover` | bounded constant | 0.5 s | **0–5 s** | health monitor: absolute time stays valid this long after GNSS/PPS loss (NFR-16); real multi-hour hold-over is field-deferred |
+| `T_corr_tolerance` | bounded constant | 0.5 s | **0–2 s** | radar corroboration stays *live* this long after its last return, so one missed radar scan can never drop an occlusion hold ([ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)); small by bound vs `T_hold`/`T_occlusion` |
+| `T_reescalate` | bounded constant | 10 s | **5–60 s** | an unacked CRITICAL re-escalates once per this window (NFR-15, [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.md)) |
+| `T_drift_debounce` | bounded constant | 2 s | **0–10 s** | a drift residual must exceed tolerance this long before the unit is marked DEGRADED (FR-10, R15) |
+| `T_sign_stuck_grace` | bounded constant | 0.5 s | **0–2 s** | IF-3 read-back may lag a commanded OFF this far past `T_signhold` before sign-stuck is declared ([ADR-0013 §C.3](adr/ADR-0013-degraded-hold-unification.md)) |
+| `congestion_min_tracks` | bounded constant | 4 | **3–10** | R14 jam threshold: stationary tracks scene-wide; the lower bound (≥ 3) exists so no pushed value can make ordinary 1–2-car shoulder stops self-suppress |
 | drift tolerance | bounded constant (per-site at commissioning) | per-site | within surveyed envelope | drift-monitor threshold (§4, R15) |
 
 **Rule:** the safety-critical backstops (`T_watchdog`, `T_signhold`, `T_assert_refresh`, `T_degraded_max`,
 `T_activate`) are bounded so tightly that no pushed value can disable the invariant they protect; the
 unit **rejects or clamps** any value outside the column above and keeps the last-good, **loud to operators**
-(FR-20, [doc 04 R16](04-risk-and-safety.md#1-risk-register)). Ranges are the starting bounds to confirm in
+(FR-20, [doc 04 R16](04-risk-and-safety.md#1-risk-register)). A value that cannot be clamped at all — a
+wrong type, or **NaN, which defeats every numeric bound comparison** — is treated as out-of-bounds by
+definition: boot config restores the vetted default (flagged); a runtime push is refused outright,
+keeping the last-good value. Ranges are the starting bounds to confirm in
 the Phase-2 freeze; the *point* is that the list is complete and every entry has a bound.
 
 Concrete encodings (protobuf/JSON, MQTT/HTTPS for telemetry; the sign vendor's protocol or an

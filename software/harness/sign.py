@@ -18,11 +18,18 @@ from esw import if4
 
 
 class Sign:
-    def __init__(self, cfg, key, latch=False, can_turn_off=True):
+    def __init__(self, cfg, key, latch=False, can_turn_off=True, replay_window_s=None):
         self.cfg = cfg
         self.key = key
         self.latch = latch
         self.can_turn_off = can_turn_off
+        # Anti-replay freshness window -- a DISTINCT knob from the T_signhold dead-man's
+        # window. Doc 10 defaults it to T_signhold (an older frame is useless and suspicious),
+        # but the two protect different things (replay exposure vs blank latency) and the
+        # freshness check additionally assumes edge<->controller clock sync within this window
+        # (doc 10 "Time"), so keep it independently settable rather than silently coupled.
+        self.replay_window = (replay_window_s if replay_window_s is not None
+                              else cfg["T_signhold"])
         self.link_up = True              # a cut link stops frames reaching the controller
         self.last_show_ts = None
         self.last_seq = None             # anti-replay high-water mark for THIS session
@@ -35,8 +42,8 @@ class Sign:
         auth / anti-replay / freshness is ignored -> the sign blanks on staleness (RQ-H2)."""
         if not self.link_up or frame is None:
             return
-        window = self.cfg["T_signhold"]
-        r = if4.verify(self.key, frame, self.last_seq, if4.to_ms(now), if4.to_ms(window))
+        r = if4.verify(self.key, frame, self.last_seq, if4.to_ms(now),
+                       if4.to_ms(self.replay_window))
         if r["ok"]:
             self.last_show_ts = now
             self.last_seq = r["seq"]

@@ -13,9 +13,9 @@
 
 _HEARTBEAT_EVERY = 1.0   # IF-6 cadence (s) -- a fixed reporting cadence, not safety-relevant
 
-# IF-7 event types that close a warning interval (the sign went dark). Kept in sync with the
-# reducer (harness/metrics.py) -- these are what warn_intervals() treats as a clear.
-_CLEAR_TYPES = ("clear", "low_confidence_clear", "forced_clear")
+# IF-7 event types that close a warning interval (the sign went dark). Public on purpose:
+# the reducer (harness/metrics.py) imports it so the two ends can never drift apart.
+CLEAR_TYPES = ("clear", "low_confidence_clear", "forced_clear")
 
 
 class Telemetry:
@@ -34,6 +34,12 @@ class Telemetry:
     def step(self, now, decision, hm_status, sign_on):
         """Return the records emitted this tick: 0+ IF-7 events, plus an IF-6 heartbeat on cadence."""
         out = []
+        # R10 audit binding: the SM re-fingerprints cfg_ver on every runtime IF-8 push and
+        # carries it in the decision -- track it so records stamp the config IN FORCE, not
+        # the boot config a live reconfiguration has since replaced.
+        cv = decision.get("cfg_ver")
+        if cv is not None:
+            self.versions["cfg_ver"] = cv
         state = decision.get("state")
         alert = decision.get("alert")
         override = decision.get("override")

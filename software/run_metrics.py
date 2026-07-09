@@ -62,6 +62,15 @@ def _unit_tests():
     if (sc["tp"], sc["fn"], sc["fp"]) != (1, 1, 1):
         fails.append(("score_scenario tp/fn/fp", (1, 1, 1), (sc["tp"], sc["fn"], sc["fp"])))
 
+    # A warning that flaps within ONE hazard (occlusion blip / forced clear + re-confirm) is a
+    # continuity story, not a false activation: both intervals overlap the hazard -> fp == 0.
+    # (Regression: the matched-first-only scoring counted the re-activation as an FP and
+    # inflated the doc 01 §5 FA-per-hour rate.)
+    sc2 = metrics.score_scenario([[0.0, 20.0]], [[2.0, 8.0], [10.0, 18.0]])
+    if (sc2["tp"], sc2["fn"], sc2["fp"]) != (1, 0, 0):
+        fails.append(("score_scenario re-activation within a hazard is not FP", (1, 0, 0),
+                      (sc2["tp"], sc2["fn"], sc2["fp"])))
+
     # aggregate: false-activation per-100-scenarios and per-hour.
     agg = metrics.aggregate([{"tp": 4, "fn": 0, "fp": 1, "latencies": [5.0]}],
                             n_scenarios=5, total_hours=0.5)

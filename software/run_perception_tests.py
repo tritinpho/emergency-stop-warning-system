@@ -25,13 +25,15 @@ from esw.perception import Perception
 from esw.params import default_config
 from esw.state_machine import StateMachine
 from esw.actuator import Actuator
-from esw import if4
+from esw import crypto, if4
 from harness.frames import detections_at
 from harness.sign import Sign
 
 TICK_DT = 0.1
 ROI_GATE = default_config()["roi_overlap_gate"]
-_KEY = b"esw-if4-shared-secret-v1-0123456789"
+# Per-site, per-channel derived key (esw.crypto.derive_key) -- same provisioning story as
+# the Level-A runner; the actuator and the sign controller share the derived link key.
+_KEY = crypto.derive_key(b"esw-master-secret-v1-0123456789abc", "IF4", "bench-01")
 
 
 def _run(case):

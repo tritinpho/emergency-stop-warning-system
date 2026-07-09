@@ -6,7 +6,7 @@
 #
 # A checkpoint may assert the sign (`on`) / disposition as usual, plus `cmd_rejects` (how many
 # frames the receiver rejected so far) and `cmd_last_reject` (auth | replay | stale | len | proto |
-# payload) -- so a case pins WHICH guard fired, not merely that the attack had no effect.
+# ctype | payload) -- so a case pins WHICH guard fired, not merely that the attack had no effect.
 
 _OVR_ON = {"action": "force_on", "issued": 2.0, "expiry": 60.0,
            "message_id": "STOPPED_VEHICLE_AHEAD", "reason": "ops-drill"}
@@ -121,5 +121,31 @@ COMMAND_CASES = [
         "inject_commands": [{"t": 2.0, "kind": "forged", "ctype": "config", "payload": {"T_dwell": 3.0}}],
         "checks": [{"t": 3.0, "config_rejected": None,                          # never applied
                     "cmd_rejects": 1, "cmd_last_reject": "auth"}],
+    },
+    {
+        "id": "CMD-13", "status": "impl",
+        "title": "Unknown command type is rejected loud, never silently dropped (version skew)",
+        "duration": 6.0, "auth_commands": True, "tracks": [],
+        # A genuinely-keyed frame with an unmapped ctype byte (a version-skewed TMC, or a fuzzed
+        # uplink) must be REJECTED at verify (reason "ctype") and show on the reject counters --
+        # not verify ok and vanish in dispatch, where a TMC/edge protocol drift would be invisible.
+        "inject_commands": [{"t": 2.0, "kind": "unknown_ctype", "payload": {"action": "force_on"}}],
+        "checks": [{"t": 3.0, "on": False, "cmd_rejects": 1, "cmd_last_reject": "ctype"}],
+    },
+    {
+        "id": "CMD-14", "status": "impl",
+        "title": "Config-push of NaN is refused -- unclampable, keep last-good (FR-20/21)",
+        "duration": 8.0, "auth_commands": True,
+        # NaN defeats numeric clamping (every bound comparison is False), so it must be REFUSED
+        # like a wrong type, keeping the LIVE value -- never applied raw (dwell would never
+        # elapse: a silent permanent miss) and never quietly reset to the default either. Boot
+        # dwell is 3 s; the NaN push at t=1 is refused + reported; the car parked from t=0.5
+        # confirms at ~3.5 s -- exactly the kept last-good dwell (default-5 would still be dark
+        # at 4.5; NaN applied would never light at all).
+        "config_push": {"T_dwell": 3.0},
+        "tracks": [{"id": "T1", "enter": 0.5, "leave": 40.0, "speed": 0.0, "in_roi": 1.0}],
+        "commands": [{"t": 1.0, "ctype": "config", "payload": {"T_dwell": float("nan")}}],
+        "checks": [{"t": 2.0, "on": False, "config_rejected": ["T_dwell"]},     # refused + fail-loud
+                   {"t": 4.5, "on": True}],                                     # last-good dwell 3 s kept
     },
 ]

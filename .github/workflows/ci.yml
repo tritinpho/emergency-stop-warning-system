@@ -30,7 +30,7 @@ jobs:
           python-version: '3.12'
       - name: MicroPython-safety gate (AST lint on esw/)
         run: python software/tools/mp_safe_check.py software/esw
-      - name: Level-A -- state machine (SC-01..38)
+      - name: Level-A -- state machine (SC-01..40)
         run: python software/run_tests.py
       - name: Level-B -- perception IF-1->IF-2 (PC-01..11)
         run: python software/run_perception_tests.py
@@ -40,7 +40,7 @@ jobs:
         run: python software/run_metrics.py
       - name: Level-E -- durable evidence outbox (SK-01..06)
         run: python software/run_sink_tests.py
-      - name: Level-F -- authenticated command channel (CMD-01..08)
+      - name: Level-F -- authenticated command channel (CMD-01..14)
         run: python software/run_command_tests.py
       - name: esw smoke -- perception + geometry + sink + command
         run: python software/tools/mpy_smoke.py
