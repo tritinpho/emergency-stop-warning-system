@@ -43,7 +43,7 @@ triangles) to **active, automatic warning** — the central thesis of the propos
 | 09 | [docs/09-software-hardware-handoff.md](docs/09-software-hardware-handoff.md) | **Software → Hardware requirements & interface handoff** — what software requires of the hardware/firmware part choices (RQ-H1..H7), and the cross-team decisions gating the still-*Proposed* ADRs |
 | 10 | [docs/10-if4-sign-controller-firmware-spec.md](docs/10-if4-sign-controller-firmware-spec.md) | **IF-4 sign-controller firmware spec (RQ-H2)** — the ESP32 dead-man's-switch firmware handoff: the authenticated 29-byte `SHOW` frame, verify + two-guard anti-replay, the LoRa airtime budget that sets `T_signhold`, and the firmware conformance checklist |
 | 11 | [docs/11-dev-environment-setup.md](docs/11-dev-environment-setup.md) | **Dev-environment setup runbook** — per-module toolchains for the three build environments: the K230 AI camera (CanMV/MicroPython + the ADR-0015 D3 spike), the CoreIOT oversight server (IF-6/7 uplink smoke test), and the ESP32 YoloUno sign controller (PlatformIO + the doc 10 bench) |
-| — | [docs/adr/README.md](docs/adr/README.md) | Architecture Decision Records index (15 ADRs; **software-owned set accepted 2026-06-27**, the rest Proposed pending hardware/ops) |
+| — | [docs/adr/README.md](docs/adr/README.md) | Architecture Decision Records index (16 ADRs; **software-owned set accepted**, the rest Proposed pending hardware/ops) |
 
 Figure 1 from the proposal (the concept infographic) is preserved at
 [docs/assets/figure-1-concept-infographic.jpeg](docs/assets/figure-1-concept-infographic.jpeg) and is
@@ -134,8 +134,35 @@ A fuller list lives at the end of [doc 01](docs/01-requirements.md#appendix-a--c
 
 ## Status
 
-**Proposed.** These are design-stage artifacts to turn the approved proposal into a buildable plan.
-Nothing here is built yet. ADRs are marked *Proposed* until the project team accepts them.
+**Design + simulation stage — building, not yet deployed.** The artifacts (docs 00–11, 15 ADRs)
+turn the approved proposal into a buildable plan, and the first build workstreams have now landed on
+top of them:
+
+- **Safety-loop software** ([`software/`](software/README.md)) — the decision state machine,
+  perception (ROI-gating + tracker), health monitor, telemetry, durable outbox, and the authenticated
+  command / sign-link codecs are implemented and green across six simulation boards (Level A–F) under
+  CPython, with the shipped `esw/` subset also proven under the **real MicroPython runtime** in CI —
+  the same subset that ships to the K230.
+- **ESP32 sign-controller firmware** ([`firmware/sign-controller/`](firmware/sign-controller/README.md))
+  — the IF-4 dead-man's-switch scaffold (verify core, two-guard anti-replay, LoRa bearer) **builds
+  green** on the YoloUno board definition and passes its boot-time conformance vectors.
+- **K230 perception layer** ([`firmware/k230-detector/`](firmware/k230-detector/README.md)) — the
+  ACLAB ELMS hardware team's **device-tested** detector (YOLOv8n ~30 FPS, day/night `kmodel`s, a web
+  ROI-config tool, noise filters) vendored under
+  [ADR-0016](docs/adr/ADR-0016-repo-consolidation-and-perception-source.md) as the real backend behind
+  our perception seam. Its `LED:ON/OFF` MQTT sign-latch is superseded by the IF-4 dead-man's switch.
+- **CoreIOT oversight** — a connectivity smoke test reaches the broker and lands a real heartbeat.
+
+**Not yet built:** the **adapter** wiring the newly-vendored K230 detector into the safety stack
+(the [ADR-0016](docs/adr/ADR-0016-repo-consolidation-and-perception-source.md) next slice — their
+detector output → `esw.perception`), the live network transport bindings (telemetry and commands
+still run over a fake uplink and harness-built frames), and **all on-hardware validation** — no K230
+or YoloUno board is in hand yet, so the K230 timing spike and the LoRa RF-acceptance tests remain the
+gating unknowns.
+See [doc 03](docs/03-roadmap-and-phasing.md) for the phasing and the 20M-VND scope reality.
+
+ADRs: the **software-owned set is accepted (2026-06-27)**; the rest stay *Proposed* pending the
+hardware / ops decisions ([ADR index](docs/adr/README.md)).
 
 *Language note:* documents are written in English (engineering lingua franca, matching the project
 name) with a **bilingual glossary** mapping every key term back to the Vietnamese proposal. A full

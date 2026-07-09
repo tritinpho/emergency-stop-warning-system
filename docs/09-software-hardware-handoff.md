@@ -25,6 +25,26 @@
 
 ---
 
+## 1a. ACLAB ELMS baseline reconciliation ([ADR-0016](adr/ADR-0016-repo-consolidation-and-perception-source.md))
+
+The hardware team's device-tested K230 prototype is now **vendored** into this repo
+([`firmware/k230-detector/`](../firmware/k230-detector/README.md)) and reconciled against the requirements above:
+
+| Their baseline | Requirement | Disposition |
+|---|---|---|
+| K230 YOLOv8n ~30 FPS detector | **RQ-H4** edge compute | ✅ adopted as the **IF-2 perception source** via `software/esw/k230_adapter.py`; ~30 FPS partially answers RQ-H4 (full NFR-01 latency + solar budget still bench-gated). Their C-accelerated `aidemo` postprocess also partially answers the [ADR-0015](adr/ADR-0015-state-machine-implementation-strategy.md) D3 timing question. |
+| Custom single-class `"vehicle"` `kmodel` | detector class set | → **COCO multi-class** (car / truck / bus / **person**), to keep pedestrian onset (SC-12) + per-class footprint. ACLAB ELMS carries the multi-class model. |
+| `LED:ON/OFF` **latch** over Wi-Fi + CoreIoT MQTT | **RQ-H2** smart sign controller (IF-4) | ❌ **superseded** by the IF-4 dead-man's switch ([`firmware/sign-controller`](../firmware/sign-controller/README.md)); retire the latch from the safety path — a firmware-behaviour change (the ESP32 already sits at the switch point), not a redesign. |
+| CoreIoT MQTT in the control path | edge-local ([ADR-0002](adr/ADR-0002-edge-vs-cloud-processing.md)) | → **IF-6 / IF-7 telemetry only**; never carries `SHOW`/`CLEAR`. A missing heartbeat is how the TMC sees an outage. |
+| Cloud time-sync for Day/Night | **RQ-H5** GNSS/PPS | Day/Night hint OK; **audit time stays GNSS/PPS** (NFR-16). |
+| Hardcoded Wi-Fi pw + CoreIoT token (already public) | security hygiene ([ADR-0012](adr/ADR-0012-security-and-threat-model.md)) | **rotate + move to config**; scrub the vendored copy. |
+
+**Net:** the perception layer is adopted wholesale behind our interfaces; the only behaviour ACLAB ELMS must
+*change* is the sign link (**RQ-H2 → IF-4**). Everything else is additive. Radar is still absent in both repos
+(**RQ-H1** unchanged).
+
+---
+
 ## 2. Interfaces frozen *jointly* (software proposes, hardware co-signs)
 
 Software has unilaterally frozen the **internal** interfaces — **IF-2** (perception → state machine) and **IF-3** (state machine ↔ actuator abstraction). The following are **shared** and must be agreed with hardware before they're frozen; schemas are in the [ICD (doc 08)](08-interface-control-document.md):

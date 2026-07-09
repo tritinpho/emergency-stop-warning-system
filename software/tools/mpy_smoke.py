@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # MicroPython smoke test for the SHIPPED esw/ modules that the Level-A/C boards do NOT
-# import -- perception.py, geometry.py, sink.py, and command.py (Level A scripts IF-2 events
-# directly and reduces in-process, so those never load under `micropython run_tests.py`; crypto.py
-# IS covered transitively, since if4.py imports it). This closes the mpy coverage gap: it imports
-# every esw module and exercises the IF-1->IF-2 perception path, the geometry primitives, the
-# durable outbox policy, and the authenticated command codec, so CI proves all twelve shipped
-# modules load and run under MicroPython, not just parse clean (mp_safe_check.py) or run on CPython.
+# import -- perception.py, geometry.py, sink.py, command.py, and k230_adapter.py (Level A scripts
+# IF-2 events directly and reduces in-process, so those never load under `micropython run_tests.py`;
+# crypto.py IS covered transitively, since if4.py imports it). This closes the mpy coverage gap: it
+# imports every esw module and exercises the IF-1->IF-2 perception path, the K230 detector adapter,
+# the geometry primitives, the durable outbox policy, and the authenticated command codec, so CI
+# proves all thirteen shipped modules load and run under MicroPython, not just parse clean
+# (mp_safe_check.py) or run on CPython.
 #
 #   python software/tools/mpy_smoke.py       # CPython
 #   micropython tools/mpy_smoke.py           # from software/, MicroPython unix port
@@ -44,6 +45,7 @@ from esw.perception import Perception
 from esw.sink import Outbox
 from esw.command import CommandReceiver, encode_command, verify_command, CMD_OVERRIDE
 from esw.crypto import derive_key
+from esw.k230_adapter import detections_from_yolo
 
 _fails = []
 
@@ -112,6 +114,27 @@ while i < 6:
     t += 0.1
     i += 1
 check("outside-ROI detection -> in_roi below gate", len(out) == 1 and out[0]["in_roi"] < 0.5)
+
+
+# --- K230 detector adapter (raw YOLO -> IF-1 detections, ADR-0016) ------------
+# The on-device caller glue must load + run on-target: xywh->xyxy, class aliasing, `person`
+# kept (their vendored vehicle-only filter dropped it -> SC-12), and the drop rules. Full
+# behavioural coverage is the host Level-G board; this proves the shipped module runs under mpy.
+_adlabels = ["person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck"]
+_ad = detections_from_yolo([[360, 520, 80, 80], [10, 10, 30, 30], [100, 100, 40, 90]],
+                           [2, 1, 0], [0.9, 0.6, 0.8], _adlabels)   # car, bicycle(drop), person
+_adnames = []
+_ak = 0
+while _ak < len(_ad):
+    _adnames.append(_ad[_ak]["cls"])
+    _ak += 1
+check("adapter: car + person kept, bicycle dropped", _adnames == ["car", "person"])
+check("adapter: xywh -> xyxy bbox", len(_ad) > 0 and _ad[0]["bbox"] == [360, 520, 440, 600])
+check("adapter: sub-25px blob dropped", detections_from_yolo([[1, 1, 20, 20]], [2], [0.9], _adlabels) == [])
+_adv = detections_from_yolo([[360, 520, 80, 80]], [0], [0.9], ["vehicle"])   # single-class model
+check("adapter: single-class 'vehicle' -> car footprint", len(_adv) == 1 and _adv[0]["cls"] == "car")
+_adc = detections_from_yolo([[360, 520, 80, 80]], [0], [0.9], ["CAR"])       # upper-case label (.lower())
+check("adapter: case-insensitive label -> car", len(_adc) == 1 and _adc[0]["cls"] == "car")
 
 
 # --- sink (durable evidence outbox) -------------------------------------------
