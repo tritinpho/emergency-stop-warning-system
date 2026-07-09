@@ -67,7 +67,11 @@ def score_scenario(oracle, warns):
             fn += 1
         else:
             tp += 1
-            latencies.append(warns[found][0] - hz[0])  # warning ON - hazard onset
+            lat = warns[found][0] - hz[0]              # warning ON - hazard onset
+            if lat < 0.0:
+                lat = 0.0    # warn already ON at this hazard's onset (one warning interval
+                #              spanning two hazards) = zero detection latency, never negative
+            latencies.append(lat)
     fp = 0
     for w in warns:
         hit = False

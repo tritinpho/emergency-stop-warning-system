@@ -6,7 +6,7 @@
 #   python software/run_perception_tests.py     (from the repo root)
 #
 # Exit 0 when every case matches its oracle and the closed loop lights the sign; 1 otherwise.
-# Complements run_tests.py (the Level-A SC-01..30 state-machine board).
+# Complements run_tests.py (the Level-A state-machine board).
 
 import sys
 

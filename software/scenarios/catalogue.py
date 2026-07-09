@@ -619,4 +619,67 @@ SCENARIOS = [
                     "alert": "NONE", "alarm_count": 1},          # re-hold, NO watchdog fire (pre-fix: SAFE_STATE+2)
                    {"t": 28.0, "on": False, "state": "IDLE", "alarm_count": 1}],  # T_hold -> quiet clear
     },
+    {
+        "id": "SC-41", "status": "impl",
+        "title": "Person->vehicle class flicker on a confirmed pedestrian -> occlusion still HOLDS (no fast clear)",
+        "duration": 18.0,
+        # Regression for the seen_leaving latch on a pedestrian: a confirmed walking person
+        # (5 kph, above the stationarity gate -- exactly why FR-08 confirms on presence, not
+        # speed) is relabelled "car" by the detector for ONE tick (PC-09-class confusion at
+        # the SM boundary). The old code read that tick as a confirmed VEHICLE moving above
+        # gate = an observed exit, latched seen_leaving with no reset path (a walking person
+        # is never re-seen below gate), and the next camera absence FAST-CLEARED the warning
+        # instead of holding T_hold -- blanking on a possibly-still-present person. Post-fix
+        # a person seen again is PRESENT, not leaving: the latch clears, absence holds
+        # WARN_HOLD for the full T_hold, then clears.
+        "config_push": {"T_person_debounce": 1.5, "T_hold": 5.0},
+        "tracks": [{"id": "P1", "enter": 1.0, "leave": 9.0, "speed": 5.0, "in_roi": 1.0,
+                    "cls": "person", "radar_visible": False,
+                    "cls_windows": [[5.0, 5.1, "car"]]}],   # one relabelled tick
+        "checks": [{"t": 4.0, "on": True, "state": "WARN_ON"},    # presence-debounced warrant up
+                   {"t": 8.0, "on": True},                        # after the flicker, still present
+                   {"t": 11.0, "on": True, "state": "WARN_HOLD"}, # absent < T_hold -> HELD (pre-fix: cleared)
+                   {"t": 13.5, "on": True},                       # held across the whole hysteresis
+                   {"t": 16.5, "on": False}],                     # T_hold elapsed -> cleared
+    },
+    {
+        "id": "SC-42", "status": "impl",
+        "title": "Vehicle->person class flicker mid-dwell -> full T_dwell still required (no early confirm)",
+        "duration": 12.0,
+        # Regression for the shared warrant clock: a stopped car two seconds into its dwell
+        # is relabelled "person" for ONE tick. The old code ran the person warrant against
+        # the VEHICLE's stationary_since (2.0 s >= T_person_debounce 1.5 s) and confirmed +
+        # asserted instantly -- a single-frame class flicker turned the 5 s dwell into 1.5 s
+        # (cry-wolf, the dominant project risk). Post-fix the person presence clock is its
+        # own onset (person_since): one flicker tick accrues ~0 s of person evidence, the
+        # dwell clock is untouched, and the car confirms exactly on T_dwell.
+        "tracks": [{"id": "T1", "enter": 1.0, "leave": 12.0, "speed": 0.0, "in_roi": 1.0,
+                    "cls_windows": [[3.0, 3.1, "person"]]}],  # one relabelled tick at 2 s stationary
+        "checks": [{"t": 3.5, "on": False, "state": "TRACKING"},  # flickered, NOT confirmed (pre-fix: ON)
+                   {"t": 5.5, "on": False},                       # still dwelling (T_dwell 5 from enter@1)
+                   {"t": 7.0, "on": True, "state": "WARN_ON"}],   # confirmed on schedule
+    },
+    {
+        "id": "SC-43", "status": "impl",
+        "title": "Stationary bystanders are not congestion -> shoulder warning still asserts (R14 counts vehicles)",
+        "duration": 16.0,
+        # Regression for the class-blind congestion count: one car breaks down on the
+        # shoulder while three PERSONS stand near the road (scene-wide, off-ROI -- a bus
+        # stop, a crew). The old pre-scan counted any camera track below the speed gate, so
+        # 1 car + 3 people >= congestion_min_tracks read as a jam and SUPPRESSED the genuine
+        # shoulder warning. R14's distrust is queued TRAFFIC geometry; bystanders are not a
+        # jam. Post-fix persons are excluded from the count: 1 stationary vehicle < 4 -> the
+        # warning asserts normally. (SC-11/38's four-CAR jams still suppress, unchanged.)
+        "config_push": {"T_dwell": 3.0},
+        "tracks": [{"id": "T-SH", "enter": 1.0, "leave": 16.0, "speed": 0.0, "in_roi": 1.0},
+                   {"id": "P-1", "enter": 1.0, "leave": 16.0, "speed": 0.0, "in_roi": 0.0,
+                    "cls": "person", "radar_visible": False},
+                   {"id": "P-2", "enter": 1.0, "leave": 16.0, "speed": 0.0, "in_roi": 0.0,
+                    "cls": "person", "radar_visible": False},
+                   {"id": "P-3", "enter": 1.0, "leave": 16.0, "speed": 0.0, "in_roi": 0.0,
+                    "cls": "person", "radar_visible": False}],
+        "checks": [{"t": 2.0, "on": False},                       # dwelling
+                   {"t": 6.0, "on": True, "state": "WARN_ON"},    # asserts (pre-fix: R14-suppressed OFF)
+                   {"t": 12.0, "on": True}],                      # stays asserted
+    },
 ]

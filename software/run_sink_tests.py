@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Level-E sink board: exercise the durable evidence outbox (esw/sink.py) over the host file store
 # (harness/store.py) -- the store-and-forward layer that persists the IF-6/IF-7 records the
-# acceptance-evidence reducer consumes (ADR-0007, doc 01 5, doc 08 4). Six properties:
+# acceptance-evidence reducer consumes (ADR-0007, doc 01 5, doc 08 4). Eight properties:
 #
 #   SK-01 durability across reboot  -- records + the resume cursor survive an object-loss reboot
 #   SK-02 flaky link, no loss       -- a link that fails then recovers still delivers all, in order
@@ -9,6 +9,8 @@
 #   SK-04 crash between send + ack   -- a lost ack re-sends (at-least-once); dedup by seq -> no loss
 #   SK-05 reducer equivalence        -- metrics off the DURABLE LOG == metrics in-process (faithful)
 #   SK-06 gated on box-alive         -- a dead box logs nothing; the gap in the log IS the outage
+#   SK-07 torn-tail recovery         -- a crash mid-append never bricks recover(); counted loud
+#   SK-08 steady state never rescans -- pump() drains the RAM tail; deep backlog scans, loses nothing
 #
 #   python software/run_sink_tests.py     (from the repo root)
 #
@@ -220,6 +222,82 @@ def sk06(tmp):
     return fails
 
 
+# --- SK-07 -- a torn tail line (crash mid-append) never bricks recovery ---------
+def sk07(tmp):
+    fails = []
+    path = tmp + "/sk07"
+    store = FileStore(path)
+    ob = Outbox(store)
+    ob.record(_sample_records(3))
+    f = open(store.data_path, "a")
+    f.write('{"seq": 3, "rec": {"if": 7, "ty')     # power loss mid-append: no newline, invalid JSON
+    f.close()
+
+    # Reboot over the torn log: recover() must come up (crash-consistent read = every
+    # COMPLETE line), count the torn line loud, and resume the cursor after the survivors.
+    store2 = FileStore(path)
+    try:
+        ob2 = Outbox(store2)
+    except Exception as e:
+        return [("SK-07 recover over a torn tail must not crash", "no exception", repr(e))]
+    if store2.corrupt_lines != 1:
+        fails.append(("SK-07 torn line counted loud", 1, store2.corrupt_lines))
+    if ob2.next_seq() != 3:
+        fails.append(("SK-07 cursor resumes after the last complete record", 3, ob2.next_seq()))
+    if [e["seq"] for e in store2.load()] != [0, 1, 2]:
+        fails.append(("SK-07 complete records survive", [0, 1, 2],
+                      [e["seq"] for e in store2.load()]))
+
+    # The next append must start on a FRESH line (the torn tail has no newline; without
+    # healing it would concatenate with -- and corrupt -- the first post-reboot record).
+    ob2.record(_sample_records(1))
+    seqs = [e["seq"] for e in store2.load()]
+    if seqs != [0, 1, 2, 3]:
+        fails.append(("SK-07 post-reboot append is not corrupted by the torn tail",
+                      [0, 1, 2, 3], seqs))
+    return fails
+
+
+# --- SK-08 -- steady-state pump never rescans the store; deep backlog still drains -
+class _CountingStore(FileStore):
+    def __init__(self, path):
+        FileStore.__init__(self, path)
+        self.load_calls = 0
+
+    def load(self):
+        self.load_calls += 1
+        return FileStore.load(self)
+
+
+def sk08(tmp):
+    fails = []
+    store = _CountingStore(tmp + "/sk08")
+    tr = FakeTransport()
+    ob = Outbox(store, tr)                 # recover() reads the store once
+    base = store.load_calls
+
+    for _ in range(20):                    # the steady state: record one, pump one, every tick
+        ob.record(_sample_records(1))
+        ob.pump(True)
+    if tr.seqs() != list(range(20)):
+        fails.append(("SK-08 steady state forwards in order", list(range(20)), tr.seqs()))
+    if store.load_calls != base:
+        fails.append(("SK-08 steady-state pump never re-reads the store", base, store.load_calls))
+    if ob.pending() != 0:
+        fails.append(("SK-08 backlog clear", 0, ob.pending()))
+
+    # Deep backlog: a long outage overflows the bounded RAM tail (80 > _TAIL_MAX); the
+    # drain falls back to an in-order store scan and still loses nothing, in order.
+    for _ in range(80):
+        ob.record(_sample_records(1))      # uplink down: no pump while these accumulate
+    ob.pump(True)
+    if tr.seqs() != list(range(100)):
+        fails.append(("SK-08 overflow drain: in order, no loss, no dup", 100, len(tr.seqs())))
+    if ob.pending() != 0:
+        fails.append(("SK-08 backlog clear after deep drain", 0, ob.pending()))
+    return fails
+
+
 _TESTS = [
     ("SK-01", "durability across reboot", sk01),
     ("SK-02", "flaky link loses nothing", sk02),
@@ -227,6 +305,8 @@ _TESTS = [
     ("SK-04", "crash between send/ack -> at-least-once", sk04),
     ("SK-05", "reducer equivalence (durable log == in-process)", sk05),
     ("SK-06", "gated on box-alive (gap = outage)", sk06),
+    ("SK-07", "torn-tail recovery (crash mid-append, counted loud)", sk07),
+    ("SK-08", "steady state never rescans; deep backlog drains", sk08),
 ]
 
 

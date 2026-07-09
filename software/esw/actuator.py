@@ -33,14 +33,23 @@ class Actuator:
         self.unknown_msgs = 0          # observability: SHOWs asserted with an unmapped
         self.last_unknown = None       # message_id (mirrors sign.rejects; FR-21 fail-loud)
 
-    def step(self, now, decision, nonce=None):
+    def step(self, now, decision, nonce=None, wall_ms=None):
         """Return the frame bytes to transmit this tick, or None to transmit nothing.
-        None (silence) is how the sign is ALLOWED to blank -- see the module invariant."""
+        None (silence) is how the sign is ALLOWED to blank -- see the module invariant.
+
+        CLOCKS: `now` is the loop's TICK time (monotonic -- whatever clock tick() runs on).
+        The wire timestamp feeds the controller's anti-replay FRESHNESS check, which needs
+        the clock the edge and the sign controller AGREE on (GNSS epoch ms, doc 10 "Time")
+        -- on a real edge pass that as `wall_ms`; do NOT feed seconds-since-boot to the
+        wire. The sim's tick time IS its epoch, so the default wall_ms = to_ms(now) is
+        exact there and every existing caller is unchanged."""
         if decision is None or decision.get("assertion") != "SHOW":
             return None
         self._seq += 1
         if nonce is None:
             nonce = self._seq          # deterministic in sim; a real edge uses os.urandom(4)
+        if wall_ms is None:
+            wall_ms = if4.to_ms(now)
         mid, known = _msg_id(decision.get("message_id"))
         if not known:
             self.unknown_msgs += 1
@@ -48,4 +57,4 @@ class Actuator:
         # cfg_ver comes from the DECISION (the SM re-fingerprints on every runtime IF-8
         # push), so frames bind to the config in force, not the boot config (R10).
         cfg_ver = decision.get("cfg_ver", self._cfg_ver)
-        return if4.encode_show(self._key, mid, self._seq, nonce, cfg_ver, if4.to_ms(now))
+        return if4.encode_show(self._key, mid, self._seq, nonce, cfg_ver, wall_ms)

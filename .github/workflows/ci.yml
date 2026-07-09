@@ -30,7 +30,7 @@ jobs:
           python-version: '3.12'
       - name: MicroPython-safety gate (AST lint on esw/)
         run: python software/tools/mp_safe_check.py software/esw
-      - name: Level-A -- state machine (SC-01..40)
+      - name: Level-A -- state machine (SC-01..43)
         run: python software/run_tests.py
       - name: Level-B -- perception IF-1->IF-2 (PC-01..11)
         run: python software/run_perception_tests.py
@@ -38,9 +38,9 @@ jobs:
         run: python software/run_health_tests.py
       - name: Level-D -- acceptance-evidence reducer (EV-01..06)
         run: python software/run_metrics.py
-      - name: Level-E -- durable evidence outbox (SK-01..06)
+      - name: Level-E -- durable evidence outbox (SK-01..08)
         run: python software/run_sink_tests.py
-      - name: Level-F -- authenticated command channel (CMD-01..14)
+      - name: Level-F -- authenticated command channel (CMD-01..16)
         run: python software/run_command_tests.py
       - name: esw smoke -- perception + geometry + sink + command
         run: python software/tools/mpy_smoke.py
@@ -48,10 +48,10 @@ jobs:
   micropython:
     name: Shipped esw/ under MicroPython unix port
     runs-on: ubuntu-latest
-    # Pinned to the exact image validated locally: v1.28.0 ==
-    # micropython/unix@sha256:6dffcbec834582741cc7a0eddcbb8e3704862c2f970dc9bf712023aff11615e0
+    # Pinned by DIGEST (v1.28.0, the image validated locally) so the runtime-portability
+    # gate cannot drift under a moved tag.
     env:
-      MPY_IMAGE: micropython/unix:v1.28.0
+      MPY_IMAGE: micropython/unix@sha256:6dffcbec834582741cc7a0eddcbb8e3704862c2f970dc9bf712023aff11615e0
     steps:
       - uses: actions/checkout@v4
       - name: Pull the MicroPython unix port

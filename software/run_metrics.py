@@ -71,6 +71,15 @@ def _unit_tests():
         fails.append(("score_scenario re-activation within a hazard is not FP", (1, 0, 0),
                       (sc2["tp"], sc2["fn"], sc2["fp"])))
 
+    # One warning interval spanning TWO hazards: the second hazard's onset finds the warning
+    # already ON -> its detection latency is 0, never negative (a negative latency would
+    # deflate the mean and could mask a real max). (Regression: warn_start - onset went -11.)
+    sc3 = metrics.score_scenario([[0.0, 10.0], [12.0, 20.0]], [[1.0, 15.0]])
+    if (sc3["tp"], sc3["fn"], sc3["fp"]) != (2, 0, 0) or sc3["latencies"] != [1.0, 0.0]:
+        fails.append(("score_scenario spanning-warn latency clamps to 0",
+                      ((2, 0, 0), [1.0, 0.0]),
+                      ((sc3["tp"], sc3["fn"], sc3["fp"]), sc3["latencies"])))
+
     # aggregate: false-activation per-100-scenarios and per-hour.
     agg = metrics.aggregate([{"tp": 4, "fn": 0, "fp": 1, "latencies": [5.0]}],
                             n_scenarios=5, total_hours=0.5)

@@ -7,6 +7,7 @@
 #    "leave_speed"(kph or None -> a confirmed exit vs a silent vanish),
 #    "exit_window"(s, how long it is seen moving before `leave`),
 #    "speed_windows"[[t0,t1,kph],...] mid-life speed overrides (a transient blip),
+#    "cls_windows"[[t0,t1,"cls"],...] mid-life class relabels (detector confusion, SC-41/42),
 #    "gaps"[[t0,t1],...] intervals it is occluded (present but unseen by the CAMERA),
 #    "radar_gaps"[[t0,t1],...] intervals the RADAR misses it (a dropped scan/beat, SC-39),
 #    "cls"}
@@ -55,6 +56,11 @@ def observations_at(scenario, t):
         leave_speed = trk.get("leave_speed", None)
         if leave_speed is not None and t >= trk["leave"] - trk.get("exit_window", 1.5):
             speed = leave_speed  # seen accelerating away -> a confirmed exit
+        cls = trk.get("cls", "car")
+        for cw in trk.get("cls_windows", []):
+            if cw[0] <= t < cw[1]:
+                cls = cw[2]      # scripted class-relabel window (a detector flicker, SC-41/42)
+                break
         if camera_sees and radar_sees:
             source = "fused"
         elif camera_sees:
@@ -69,7 +75,7 @@ def observations_at(scenario, t):
                     break
         obs.append({
             "track_id": trk["id"],
-            "cls": trk.get("cls", "car"),
+            "cls": cls,
             "in_roi": trk.get("in_roi", 1.0),
             "speed_kph": speed,
             "sensor_source": source,
