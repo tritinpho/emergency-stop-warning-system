@@ -8,7 +8,8 @@
 #
 # Scenario schema (opt-in via `auth_commands: True`):
 #   "commands":        [{"t", "ctype": config|ota|override|ack, "payload": {...}}, ...]  (genuine)
-#   "inject_commands": [{"t", "kind": forged|replay|stale|unknown_ctype, "ctype"?, "payload"?, "ts"?}, ...]
+#   "inject_commands": [{"t", "kind": forged|replay|stale|unknown_ctype|nondict_payload,
+#                        "ctype"?, "payload"?, "ts"?}, ...]
 
 from esw import command
 from esw.command import CommandReceiver, encode_command
@@ -75,6 +76,9 @@ class CommandFeed:
             return encode_command(self._wrong, ct, self._atk_seq, 7, to_ms(now), payload)
         if kind == "stale":                                 # genuine key, but an OLD ts -> freshness fails
             return encode_command(self._key, ct, self._atk_seq, 8, to_ms(inj.get("ts", 0.0)), payload)
+        if kind == "nondict_payload":                       # genuine key + ctype, but the payload is a JSON
+            #                                                 array/scalar, not a command object (CMD-15)
+            return encode_command(self._key, ct, self._atk_seq, 10, to_ms(now), payload)
         return None
 
     def _apply(self, res):

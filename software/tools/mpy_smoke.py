@@ -175,6 +175,14 @@ _rep = _rx.submit(_cf, 10010)["ok"]                 # same seq re-submitted -> a
 check("receiver accepts then rejects a replay", _okc and (not _rep) and _rx.rejects == 1)
 _unk = encode_command(_ck, 99, 3, 3, 10000, {})     # genuine key, unmapped ctype (version skew)
 check("unknown ctype rejected loud", verify_command(_ck, _unk, None, 10000, _win)["reason"] == "ctype")
+_nd = encode_command(_ck, CMD_OVERRIDE, 4, 4, 10000, [1, 2])   # authenticated, but not an OBJECT
+check("non-object payload rejected (payload)",
+      verify_command(_ck, _nd, None, 10000, _win)["reason"] == "payload")
+_rx2 = CommandReceiver(_ck, _win, 5)                # a persisted anti-replay watermark, restored
+_r5 = _rx2.submit(encode_command(_ck, CMD_OVERRIDE, 5, 5, 10000, {}), 10000)
+_r6 = _rx2.submit(encode_command(_ck, CMD_OVERRIDE, 6, 6, 10000, {}), 10000)
+check("restored watermark blocks seq<=5, accepts 6, exposes last_seq",
+      _r5["reason"] == "replay" and _r6["ok"] and _rx2.last_seq == 6)
 
 # --- per-site / per-channel key derivation (esw/crypto.derive_key, ADR-0012) ---
 _dk_if4 = derive_key(b"master-secret", "IF4", "site-A")
@@ -207,6 +215,17 @@ _cfgn, _rejn = params.clamp_config({"T_watchdog": _nan})
 check("clamp_config: NaN cannot disable a backstop", _cfgn["T_watchdog"] == 30.0 and ("T_watchdog" in _rejn))
 _accn, _rejn2 = params.clamp_update({"T_dwell": _nan})
 check("clamp_update: NaN refused, keep last-good", ("T_dwell" not in _accn) and ("T_dwell" in _rejn2))
+_iv, _iw = params.clamp("congestion_min_tracks", 4.5)   # counts hold integers (doc 02 s7a)
+check("clamp: count param truncates 4.5 -> 4, flagged", _iv == 4 and _iw is True)
+_iv2, _iw2 = params.clamp("congestion_min_tracks", 4.0)
+check("clamp: exact 4.0 normalizes to int silently", _iv2 == 4 and isinstance(_iv2, int) and _iw2 is False)
+
+# --- actuator clock contract (wall_ms carries the wire ts; `now` stays tick time) ---
+_act = actuator.Actuator(_ck, b"\x00\x00\x00\x00")
+_afr = _act.step(1.0, {"assertion": "SHOW", "message_id": "STOPPED_VEHICLE_AHEAD"},
+                 nonce=1, wall_ms=123456)
+check("actuator wall_ms sets the wire timestamp",
+      _afr is not None and int.from_bytes(_afr[15:21], "big") == 123456)
 
 print("-" * 60)
 if _fails:

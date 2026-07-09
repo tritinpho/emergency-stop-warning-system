@@ -148,4 +148,35 @@ COMMAND_CASES = [
         "checks": [{"t": 2.0, "on": False, "config_rejected": ["T_dwell"]},     # refused + fail-loud
                    {"t": 4.5, "on": True}],                                     # last-good dwell 3 s kept
     },
+    {
+        "id": "CMD-15", "status": "impl",
+        "title": "Authenticated non-object payload is rejected at verify (payload), never dispatched",
+        "duration": 6.0, "auth_commands": True, "tracks": [],
+        # A genuinely-keyed frame whose payload is a JSON ARRAY, not a command object (a buggy
+        # or version-skewed TMC serializer). Every consumer keys into the payload dict, so
+        # pre-fix this verified ok and CRASHED the loop at dispatch (an AttributeError in the
+        # feed / SM) -- one malformed command took the whole edge down. It must be rejected at
+        # verify (reason "payload"), exactly like unparseable JSON: fail-loud, change nothing.
+        "inject_commands": [{"t": 2.0, "kind": "nondict_payload", "ctype": "override",
+                             "payload": ["force_on"]}],
+        "checks": [{"t": 3.0, "on": False, "cmd_rejects": 1, "cmd_last_reject": "payload"}],
+    },
+    {
+        "id": "CMD-16", "status": "impl",
+        "title": "Override with a NaN expiry is rejected malformed -- no forever-mute (ADR-0010)",
+        "duration": 12.0, "auth_commands": True, "config_push": {"T_dwell": 3.0},
+        # The CMD-14 NaN lesson applied to IF-10: JSON round-trips NaN, and a NaN expiry
+        # compares False against BOTH the T_override_max ceiling clamp and `now >= expiry` --
+        # pre-fix an authenticated {"action": "mute", "expiry": NaN} suppressed a live warning
+        # INDEFINITELY (mandatory auto-expiry defeated by one malformed field: a silent-miss
+        # channel for a buggy TMC). It must be rejected malformed; the warning stays up.
+        "tracks": _STOPPED_CAR,
+        "commands": [{"t": 6.0, "ctype": "override",
+                      "payload": {"action": "mute", "issued": 6.0, "expiry": float("nan"),
+                                  "reason": "ops"}}],
+        "checks": [{"t": 5.0, "on": True},                                      # warning up (dwell 3 s)
+                   {"t": 8.0, "on": True, "override": None,                     # mute NOT applied...
+                    "override_rejected": "malformed"},                          # ...rejected fail-loud
+                   {"t": 11.0, "on": True}],                                    # still warning
+    },
 ]

@@ -29,12 +29,16 @@
 #
 # GROWTH is the backend's responsibility: the log is the evidence artifact, so entries at or
 # below the ack watermark may be ARCHIVED/ROTATED off the primary store (never silently
-# deleted) without affecting pump()/recover(). The policy here avoids per-tick full-log scans
-# (pending() is O(1) arithmetic; pump() early-outs when there is no backlog or no link), but a
-# large drain still reads through the log once -- a flash backend can index by seq if needed.
+# deleted) without affecting pump()/recover(). The per-tick path never re-reads the store:
+# records forward from a BOUNDED in-RAM tail of recent appends (steady state = append one,
+# send one, zero store reads -- a flash log must not be re-parsed once per heartbeat, SK-08).
+# Only a DEEP backlog (an outage that overflowed the tail, or a fresh boot over a backlog)
+# falls back to an in-order store scan, and only until the drain catches the tail again.
 #
 # MicroPython-safe subset (byte-identical sim + K230): no f-strings / comprehensions / lambdas /
 # sets / json in here -- serialization lives in the injected store.
+
+_TAIL_MAX = 64      # RAM bound on the recent-appends tail; beyond this a drain scans the store
 
 
 class Outbox:
@@ -43,10 +47,13 @@ class Outbox:
         self.transport = transport
         self._next_seq = 0
         self._acked_through = -1
+        self._tail = []             # unacked entries appended THIS process life (bounded)
         self.recover()
 
     def recover(self):
-        """Rebuild the in-RAM cursor from the durable store (reboot-survival). Idempotent."""
+        """Rebuild the in-RAM cursor from the durable store (reboot-survival). Idempotent.
+        The RAM tail starts empty: any pre-existing backlog is only in the store, so the
+        first drain after a reboot takes the store-scan path, then hands back to the tail."""
         entries = self.store.load()
         mx = -1
         for e in entries:
@@ -55,30 +62,56 @@ class Outbox:
                 mx = s
         self._next_seq = mx + 1
         self._acked_through = self.store.acked()
+        self._tail = []
 
     def record(self, records):
         """Durably append each IF-6/IF-7 record with a monotonic seq. Returns the seqs assigned.
 
         `records` is the list telemetry.step() returned this tick (may be empty). Gating on
         box-alive is the CALLER's job (a dead box emits no records, so nothing is appended and
-        the gap in the log is the outage signal) -- this method just persists what it is given."""
+        the gap in the log is the outage signal) -- this method just persists what it is given.
+        Each entry is also kept in the bounded RAM tail so the steady-state pump() never
+        re-reads the store; overflow drops the OLDEST tail entries (they stay durable and a
+        deep drain recovers them via the scan path)."""
         seqs = []
         for rec in records:
             s = self._next_seq
-            self.store.append({"seq": s, "rec": rec})
+            entry = {"seq": s, "rec": rec}
+            self.store.append(entry)
             self._next_seq = s + 1
             seqs.append(s)
+            self._tail.append(entry)
+            if len(self._tail) > _TAIL_MAX:
+                self._tail.pop(0)
         return seqs
 
     def pump(self, link_up):
         """Forward unacked records in seq order while the uplink is up. At-least-once: a record is
         acked only after transport.send() confirms it; forwarding stops on the first failure so a
         later reconnect resumes cleanly from the same watermark. Returns the count sent this call.
-        Early-outs on no-transport / link-down / empty-backlog, so the steady state (everything
-        acked) never touches the store -- pump() is called every tick."""
+
+        Early-outs on no-transport / link-down / empty-backlog. The steady state (backlog small
+        enough to live in the RAM tail) drains WITHOUT touching the store (SK-08); only a deep
+        backlog -- the tail overflowed during a long outage, or a fresh recover() found stored
+        backlog -- falls back to ONE in-order store scan, until the drain catches the tail."""
         if self.transport is None or not link_up or self.pending() == 0:
             return 0
         sent = 0
+        # Prune tail entries already acked (e.g. by an earlier scan drain).
+        while self._tail and self._tail[0]["seq"] <= self._acked_through:
+            self._tail.pop(0)
+        if self._tail and self._tail[0]["seq"] == self._acked_through + 1:
+            # RAM path: the tail is contiguous from the watermark -> no store read.
+            while self._tail:
+                e = self._tail[0]
+                if not self.transport.send(e):
+                    return sent
+                self._acked_through = e["seq"]
+                self.store.ack(e["seq"])
+                self._tail.pop(0)
+                sent = sent + 1
+            return sent
+        # Deep-backlog path: the records after the watermark predate the RAM tail.
         for e in self.store.load():
             if e["seq"] <= self._acked_through:
                 continue

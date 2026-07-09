@@ -82,7 +82,8 @@ def run_scenario(scenario, outbox=None):
 
     # Opt-in authenticated command channel (IF-8/9/10): when a scenario sets `auth_commands`, the
     # override / OTA / ack the SM consumes come ONLY from verified command frames (forged/replayed
-    # ones are rejected upstream). Default off -> the plain injectors run, so SC-01..38 are unchanged.
+    # ones are rejected upstream). Default off -> the plain injectors run; pre-existing SC
+    # scenarios are unchanged.
     feed = None
     if scenario.get("auth_commands", False):
         feed = CommandFeed(scenario, _CMD_KEY, _WRONG_CMD_KEY, _CMD_REPLAY_WINDOW_MS, TICK_DT)

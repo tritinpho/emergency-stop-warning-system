@@ -91,9 +91,10 @@ class StateMachine:
         return NEITHER
 
     def _new_track(self, speed):
-        return {"stationary_since": None, "confirmed": False, "absent_since": None,
-                "degraded_since": None, "stale_now": False, "seen_leaving": False,
-                "suppressed_last_seen": False, "last_speed": speed, "radar_last": None}
+        return {"stationary_since": None, "person_since": None, "confirmed": False,
+                "absent_since": None, "degraded_since": None, "stale_now": False,
+                "seen_leaving": False, "suppressed_last_seen": False,
+                "last_speed": speed, "radar_last": None}
 
     def apply_config(self, partial):
         """Merge a runtime IF-8 config push into the LIVE config (clamp_update: §7a-clamped, with
@@ -183,12 +184,16 @@ class StateMachine:
                 self.override_rejected = "safe_state_neither"
             return self._decision("NONE")
 
-        # Congestion pre-scan (R14, doc 02 §4): count stationary tracks across the WHOLE scene
-        # (through lanes included, before ROI gating). A jam is many stationary tracks; a
-        # shoulder breakdown is one. Used below to suppress a shoulder warning in stop-and-go.
+        # Congestion pre-scan (R14, doc 02 §4): count stationary VEHICLE tracks across the
+        # WHOLE scene (through lanes included, before ROI gating). A jam is many stationary
+        # vehicles; a shoulder breakdown is one. Persons are excluded from the count: R14's
+        # distrust is shoulder-vs-through ROI geometry for queued TRAFFIC -- three bystanders
+        # standing near the road are not a jam and must not suppress a genuine shoulder
+        # warning (SC-43). Used below to suppress a shoulder warning in stop-and-go.
         stationary_ids = set()
         for o in observations:
             if (o.get("sensor_source", "fused") in ("camera", "fused")
+                    and o.get("cls", "car") != "person"
                     and o.get("speed_kph", 0.0) < gate):
                 stationary_ids.add(o["track_id"])
         congestion = len(stationary_ids) >= cfg["congestion_min_tracks"]
@@ -225,16 +230,26 @@ class StateMachine:
                 # MOVES, so the stationarity gate would miss them -> confirm on debounced
                 # PRESENCE in/beside the ROI (T_person_debounce), not speed. Camera-only warrant
                 # (negligible RCS -> no radar corroboration / occlusion hold, ADR-0008 scope).
-                if tr["stationary_since"] is None:
-                    tr["stationary_since"] = now   # presence-onset time
+                # The presence clock is person_since -- its OWN onset, never the vehicle
+                # stationarity clock: one relabelled tick on an already-stationary car must
+                # not let T_person_debounce stand in for T_dwell (SC-42). And a person seen
+                # again is PRESENT, not leaving: clear any exit latched by a person->vehicle
+                # relabel blip, so a later occlusion still holds for T_hold (SC-41).
+                tr["seen_leaving"] = False
+                if tr["person_since"] is None:
+                    tr["person_since"] = now   # presence-onset time
                 if (not tr["confirmed"] and self.mode != RADAR_ONLY
-                        and (now - tr["stationary_since"]) >= cfg["T_person_debounce"]):
+                        and (now - tr["person_since"]) >= cfg["T_person_debounce"]):
                     tr["confirmed"] = True
-            elif speed < gate:
+            else:
+                tr["person_since"] = None      # presence evidence is class-gated: stops accruing
+            if speed < gate:
                 # Seen stopped again -> it did not leave. Without this reset a single
                 # >gate blip (centroid jump / door-open / fused Doppler) would latch
                 # seen_leaving for good and a later genuine occlusion would fast-clear a
-                # still-present car instead of holding the warning (SC-31).
+                # still-present car instead of holding the warning (SC-31). Stationarity is
+                # class-INDEPENDENT (a standing person accrues dwell too); only the person
+                # presence warrant above is class-gated.
                 tr["seen_leaving"] = False
                 if tr["stationary_since"] is None:
                     tr["stationary_since"] = now
@@ -245,8 +260,10 @@ class StateMachine:
                     tr["confirmed"] = True  # dwell satisfied -> confirmed-stopped
             else:
                 tr["stationary_since"] = None
-                if tr["confirmed"]:
-                    tr["seen_leaving"] = True  # moving while confirmed = observed exit
+                if tr["confirmed"] and cls != "person":
+                    tr["seen_leaving"] = True  # moving VEHICLE while confirmed = observed exit
+                #   (a walking person is presence, not an exit -- FR-08 exists exactly
+                #    because stranded occupants move; SC-41)
 
         # Stamp radar corroboration on the tracks it renews. Corroboration is treated as
         # LIVE for T_corr_tolerance after its last return (checked below): a real radar /
@@ -412,11 +429,23 @@ class StateMachine:
         T_override_max, reject out-of-policy force-ons, enforce mandatory auto-expiry."""
         if override is None:
             return None, None
+        if not isinstance(override, dict):
+            return None, "malformed"       # the IF-10 payload must be a command object
         action = override.get("action")
         if action not in ("force_on", "force_off", "mute"):
             return None, "unknown_action"
         issued = override.get("issued", now)
-        expiry = override.get("expiry", issued + self.cfg["T_override_max"])
+        expiry = override.get("expiry", None)
+        # Timing fields must be numbers, and never NaN: a NaN expiry compares False against
+        # both the ceiling clamp AND `now >= expiry`, so it would neither clamp nor ever
+        # expire -- a forever-mute from one malformed field (the FR-20 NaN lesson from the
+        # config path, applied to IF-10; CMD-16). Rejected fail-loud, never applied.
+        if isinstance(issued, bool) or not isinstance(issued, (int, float)) or issued != issued:
+            return None, "malformed"
+        if expiry is None:
+            expiry = issued + self.cfg["T_override_max"]
+        if isinstance(expiry, bool) or not isinstance(expiry, (int, float)) or expiry != expiry:
+            return None, "malformed"
         if expiry > issued + self.cfg["T_override_max"]:
             expiry = issued + self.cfg["T_override_max"]   # clamp over-ceiling expiry (SC-18)
         if action == "force_on":

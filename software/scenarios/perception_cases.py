@@ -1,7 +1,7 @@
 # PC-01.. -- Level-B perception cases (doc 07 §2): exercise the REAL perception pipeline
 # (detector-agnostic ROI gating + tracker) on scripted detections and score its IF-2 output.
 #
-# Level A (SC-01..30, catalogue.py) injects IF-2 events and tests the state machine. Level B
+# Level A (catalogue.py) injects IF-2 events and tests the state machine. Level B
 # (here) injects DETECTIONS (image bboxes) and tests the perception that PRODUCES those events
 # -- ROI overlap geometry, track association/continuity, and speed estimation.
 #

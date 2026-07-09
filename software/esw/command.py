@@ -90,6 +90,11 @@ def verify_command(key, frame, last_seq, now_ms, replay_window_ms):
         payload = json.loads(bytes(body).decode("utf-8"))
     except ValueError:
         return _bad("payload")     # authenticated but malformed -> reject, never act on garbage
+    if not isinstance(payload, dict):
+        return _bad("payload")     # authenticated but not a command OBJECT (list/str/number/
+        #                            null): every consumer keys into the payload, so a
+        #                            non-object is the same fail-loud reject, never a crash
+        #                            further down the safety loop (CMD-15)
     return {"ok": True, "reason": "", "ctype": frame[1], "seq": seq, "payload": payload}
 
 
@@ -97,14 +102,24 @@ class CommandReceiver:
     """Stateful IF-8/9/10 receiver: one anti-replay seq watermark for the channel, fail-loud on
     every reject. The inbound twin of the sign controller's verify side (harness/sign.py). A fresh
     edge boot constructs a fresh receiver (last_seq = None); an OLD replayed command is still blocked
-    by ts-freshness, exactly as on the IF-4 reconnect path."""
+    by ts-freshness, exactly as on the IF-4 reconnect path. Where the integration has durable
+    storage (e.g. alongside the outbox store), persist `last_seq` and restore it at construction
+    so cross-reboot anti-replay does not rest on the freshness window alone -- commands are rare,
+    so the extra durable write is cheap."""
 
-    def __init__(self, key, replay_window_ms):
+    def __init__(self, key, replay_window_ms, last_seq=None):
         self._key = key
         self._window = replay_window_ms
-        self._last_seq = None
+        self._last_seq = last_seq   # a restored durable watermark, or None on a cold channel
         self.rejects = 0            # observability: count + last reason (mirrors sign.rejects)
         self.last_reject = None
+
+    @property
+    def last_seq(self):
+        """The anti-replay watermark (highest accepted seq; None if nothing accepted yet).
+        Persist it durably and hand it back to __init__ on reboot so an OLD captured command
+        is blocked by seq even inside the ts freshness window."""
+        return self._last_seq
 
     def submit(self, frame, now_ms):
         """Verify one delivered frame. On success advance the anti-replay watermark and return the

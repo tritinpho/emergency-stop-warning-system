@@ -37,9 +37,19 @@ class FileStore:
         # (the record was sent, the ack had not reached durable storage). Used by the SK-04
         # at-least-once test; True in every normal run.
         self.ack_persist = True
+        # Torn lines seen by the LAST load() (a crash mid-append leaves an unterminated tail).
+        # Counted loud (FR-21 spirit), never a crash -- see load(). SK-07 pins this.
+        self.corrupt_lines = 0
+        self._healed = False
 
     def append(self, entry):
         f = open(self.data_path, "a")
+        if not self._healed:
+            # First append of this process life starts on a FRESH line: a torn tail from a
+            # crash mid-append has no newline, and without this it would concatenate with
+            # (and corrupt) the next record ever written. Blank lines are skipped by load().
+            f.write("\n")
+            self._healed = True
         f.write(json.dumps(entry, default=json_default) + "\n")
         f.close()
 
@@ -47,11 +57,20 @@ class FileStore:
         if not os.path.exists(self.data_path):
             return []
         out = []
+        self.corrupt_lines = 0
         f = open(self.data_path, "r")
         for line in f:
             line = line.strip()
-            if line:
+            if not line:
+                continue
+            try:
                 out.append(json.loads(line))
+            except ValueError:
+                # A torn append (crash/power-loss mid-write): the record never fully
+                # persisted, so the crash-consistent read is every COMPLETE line. Counted,
+                # never silent, and never a crash -- recover() must not brick the evidence
+                # subsystem at boot over an uncommitted tail (mirrors the ack-file stance).
+                self.corrupt_lines += 1
         f.close()
         return out
 

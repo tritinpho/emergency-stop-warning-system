@@ -45,10 +45,12 @@ DEFAULTS = {
     #                                                                      tolerance this long before DEGRADED
     "T_sign_stuck_grace": {"default": 0.5,  "lo": 0.0,  "hi": 2.0},      # ADR-0013 sC.3: read-back may lag the
     #                                                                      commanded OFF this far past T_signhold
-    "congestion_min_tracks": {"default": 4, "lo": 3,    "hi": 10},       # R14: a jam is >= this many stationary
-    #                                                                      tracks scene-wide (count, not seconds).
+    "congestion_min_tracks": {"default": 4, "lo": 3,    "hi": 10,        # R14: a jam is >= this many stationary
+                              "int": True},                              # tracks scene-wide (count, not seconds).
     #                                                                      lo>=3: a lower value would suppress
     #                                                                      genuine 1-2 car shoulder warnings.
+    #                                                                      int: counts hold integers -- a pushed
+    #                                                                      4.5 truncates to 4 and is flagged.
 }
 
 
@@ -74,7 +76,9 @@ def clamp(name, value):
     A non-numeric value for a known name is out-of-bounds by definition: restore the
     vetted default and report it clamped, rather than crash the config ingest (FR-20).
     NaN is unclampable (every comparison against the bounds is False, so it would sail
-    through and silently disable any timer it reaches) -> vetted default, flagged."""
+    through and silently disable any timer it reaches) -> vetted default, flagged.
+    An "int" spec (a count) truncates a fractional value and flags the adjustment --
+    a count parameter must never hold 4.5 (an exact 4.0 normalizes silently)."""
     spec = DEFAULTS.get(name)
     if spec is None:
         return value, False
@@ -86,6 +90,10 @@ def clamp(name, value):
         return spec["lo"], True
     if value > spec["hi"]:
         return spec["hi"], True
+    if spec.get("int", False) and isinstance(value, float):
+        # Bounds first (lo/hi are ints, so +/-inf already clamped above); then coerce.
+        iv = int(value)
+        return iv, iv != value
     return value, False
 
 

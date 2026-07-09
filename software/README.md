@@ -2,14 +2,14 @@
 
 This is **workstream #1** from the build plan: the event-level ("Level A") simulation
 harness ([doc 07 §2](../docs/07-simulation-methodology.md)) driving the **real** decision
-state machine as the system under test (SUT), scored against the **SC-01..38** scenario
+state machine as the system under test (SUT), scored against the **SC-01..43** scenario
 oracles ([doc 07 §5](../docs/07-simulation-methodology.md)). A second board adds the
 **Level-B** perception stage (IF-1→IF-2) — the real ROI-gating + tracking pipeline driven by
 scripted *detections* (with doc 07 §3.1 detector nuisances) — scored against **PC-01..11**.
 
 It embodies the three build decisions in **[ADR-0015](../docs/adr/ADR-0015-state-machine-implementation-strategy.md)**:
 
-1. **The SC-01..38 oracles are the executable spec.** The state machine is correct when
+1. **The SC-01..43 oracles are the executable spec.** The state machine is correct when
    its sign-over-time matches every scenario's oracle. TDD against the board.
 2. **Fixed-rate tick execution.** `StateMachine.tick(now, observations, health)` is called
    every cycle (10 Hz in the harness); timers are deadlines against `now`, no wall-clock is
@@ -42,7 +42,7 @@ software/
     store.py        #   Level-E: file-backed durable store + fake uplink for the evidence outbox
     commands.py     #   Level-F: scenario commands -> authenticated IF-8/9/10 frames (+ forged/replay)
   scenarios/
-    catalogue.py        #   SC-01..38 — Level-A executable spec (the state machine)
+    catalogue.py        #   SC-01..43 — Level-A executable spec (the state machine)
     perception_cases.py #   PC-01.. — Level-B perception cases (IF-1→IF-2)
     health_cases.py     #   HM-01.. — Level-C health-monitor unit cases
     evidence_cases.py   #   EV-01.. — Level-D acceptance-evidence set (with ground-truth oracles)
@@ -58,7 +58,7 @@ software/
 ## Run
 
 ```
-python software/run_tests.py             # Level A — SC-01..38 state-machine board
+python software/run_tests.py             # Level A — SC-01..43 state-machine board
 python software/run_perception_tests.py  # Level B — perception (IF-1→IF-2) board
 python software/run_health_tests.py      # Level C — health-monitor (FR-10/NFR-16/IF-5) board
 python software/run_metrics.py           # Level D — acceptance-evidence reducer + sample report
@@ -91,7 +91,7 @@ perception pipeline is byte-identical in sim and on the board.
 
 ## The boards today
 
-**Level A — `run_tests.py`: 40 passing · 0 red · 0 pending** (`exit 0`). The full SC-01..40
+**Level A — `run_tests.py`: 43 passing · 0 red · 0 pending** (`exit 0`). The full SC-01..43
 catalogue: the happy path, dwell / creep / cold-start, pass-through, the set-based occlusion
 policy (`WARN_HOLD → CAMERA_OCCLUDED_DEGRADED → T_degraded_max` forced clear, incl. the
 weak-(b) stale-ON guard), the FULL / CAMERA-ONLY / RADAR-ONLY / NEITHER sensor-mode matrix
@@ -102,11 +102,16 @@ re-escalate, the three fail-safe blank paths (kill SM / kill box / cut link → 
 ≤ `T_signhold`), the **IF-4 auth path** (SC-33/34: forged and replayed `SHOW` frames are
 rejected — an attacker on the link can neither light nor sustain the sign), and the **health
 monitor in the loop** (SC-35 derived-health debounce, SC-36 GNSS/PPS loss → DEGRADED-not-blanked,
-SC-37 independent force-safe blanks the sign despite `SHOW`), plus two code-review regressions:
+SC-37 independent force-safe blanks the sign despite `SHOW`), plus five code-review regressions:
 **radar-corroboration gap tolerance** (SC-39: one missed radar beat holds the occlusion warning —
 `T_corr_tolerance` — while sustained silence still loud-clears at `T_hold` from the *last*
-corroboration) and the **post-blackout watchdog re-arm** (SC-40: recovering from a > `T_watchdog`
-NEITHER outage re-holds quietly instead of firing a spurious watchdog CRITICAL). The state machine's sign assertions
+corroboration), the **post-blackout watchdog re-arm** (SC-40: recovering from a > `T_watchdog`
+NEITHER outage re-holds quietly instead of firing a spurious watchdog CRITICAL), and **class-flicker
+warrant isolation** (SC-41/42: the person presence clock is its own onset, so one relabelled tick
+can neither fast-clear a confirmed pedestrian's occlusion hold nor let `T_person_debounce` stand in
+for a vehicle's full `T_dwell`) with the **bystander congestion filter** (SC-43: R14 counts stationary
+*vehicles* — three people standing near the road are not a jam and cannot suppress a genuine
+shoulder warning). The state machine's sign assertions
 now drive the **real `esw/if4` frame codec** through the actuator to the controller, so the board
 verifies the exact bytes the ESP32 firmware will (doc 10); the sensor mode is now **derived** by
 the real health monitor, not injected.
@@ -142,20 +147,24 @@ must be **real captures**. The sample report makes the point visible: 4/4 synthe
 100% recall but only a **~51% Wilson lower bound** — the machinery is real and ready to ingest real
 staged/field captures; the *number* waits on them.
 
-**Level E — `run_sink_tests.py`: 6 passing** (`exit 0`). SK-01..06 exercise the durable evidence
+**Level E — `run_sink_tests.py`: 8 passing** (`exit 0`). SK-01..08 exercise the durable evidence
 outbox (`esw/sink.py`) over the host file store (`harness/store.py`): records **survive an
 object-loss reboot** with the seq cursor intact (SK-01), a **flaky link** loses nothing and delivers
 in order (SK-02), an **uplink outage** buffers then resumes from the watermark with no re-send
 (SK-03), a **crash between send and ack** re-sends so the contract is **at-least-once** — the consumer
 dedups by seq, never a silent loss (SK-04), the acceptance metrics reduced from the **durable log**
-are **identical** to the in-process path (SK-05, the faithful-conduit proof), and a **dead box** logs
-nothing so the gap in the log is the outage (SK-06). The store-and-forward *policy* ships in `esw/`;
+are **identical** to the in-process path (SK-05, the faithful-conduit proof), a **dead box** logs
+nothing so the gap in the log is the outage (SK-06), a **torn tail line** (crash mid-append) never
+bricks `recover()` — the crash-consistent read skips it, counted loud, and the next append heals the
+unterminated line (SK-07), and the steady-state `pump()` drains a **bounded in-RAM tail** so the
+per-tick path never re-parses the growing flash log — only a deep post-outage backlog falls back to
+an in-order store scan, still losing nothing (SK-08). The store-and-forward *policy* ships in `esw/`;
 the durable store and the oversight uplink are drop-in backends (a host file + a fake link here;
 flash + MQTT on the K230). This surfaced one honest fix: the audit record stamped `cfg_ver` as raw
 `bytes`, so any durable/wire serializer must encode it (the store hex-encodes it) — a future cleanup
 could have telemetry stamp a hex fingerprint so the record is natively wire-safe.
 
-**Level F — `run_command_tests.py`: 14 passing** (`exit 0`). CMD-01..14 drive the authenticated
+**Level F — `run_command_tests.py`: 16 passing** (`exit 0`). CMD-01..16 drive the authenticated
 IF-8/9/10 command channel (`esw/command.py`) through the real loop — the receive-side twin of the
 IF-4 sign-link. A **valid** override lights an otherwise-dark sign, a valid OTA request defers behind
 an active warning, a valid operator ack freezes alarm re-escalation, and a valid **config-push**
@@ -165,11 +174,17 @@ controls; their **forged** (wrong-key → `auth`), **replayed** (seq ≤ waterma
 nothing, so an attacker who can transmit can neither force the sign, trigger a restart, silence the
 operator escalation (NFR-09 / NFR-15), nor reconfigure the unit. An **unknown command type** (a
 version-skewed TMC / fuzzed uplink) is rejected loud at verify (CMD-13 → `ctype`), never silently
-dropped in dispatch. The **IF-8 config** path adds three
+dropped in dispatch, and an authenticated frame whose payload is **not a JSON object** is rejected
+at verify too (CMD-15 → `payload`) — every consumer keys into the payload, so a non-object must be
+inert, never a crash further down the safety loop. The **IF-8 config** path adds three
 guards on top of auth: an out-of-§7a value is clamped and reported fail-loud (CMD-10, FR-20/21),
 **NaN — which defeats every numeric bound check — is refused outright, keeping last-good** (CMD-14),
 and the bounded safety backstops (`T_signhold` / `T_watchdog` / `T_degraded_max` / …) are **boot-only** —
 a runtime push to one is refused (CMD-11), so no live reconfiguration can move a fail-safe invariant.
+The same NaN lesson is applied to **IF-10 override timing fields**: a `mute` with a NaN expiry would
+neither clamp nor ever expire (a forever-mute — mandatory auto-expiry defeated by one malformed
+field), so non-numeric / NaN `issued`/`expiry` are rejected `malformed` and the warning stays up
+(CMD-16).
 A runtime push also **re-fingerprints `cfg_ver`**, so IF-4 frames and IF-6/7 audit records always
 bind to the config in force (R10), never the boot config a push has replaced.
 The auth is the same HMAC + two-guard anti-replay as IF-4 (shared `esw/crypto.py`, with per-site /
