@@ -8,7 +8,7 @@
 #
 # Scenario schema (opt-in via `auth_commands: True`):
 #   "commands":        [{"t", "ctype": config|ota|override|ack, "payload": {...}}, ...]  (genuine)
-#   "inject_commands": [{"t", "kind": forged|replay|stale, "ctype"?, "payload"?, "ts"?}, ...]
+#   "inject_commands": [{"t", "kind": forged|replay|stale|unknown_ctype, "ctype"?, "payload"?, "ts"?}, ...]
 
 from esw import command
 from esw.command import CommandReceiver, encode_command
@@ -67,8 +67,10 @@ class CommandFeed:
         if kind == "replay":
             return self._last_genuine_frame                 # re-send a captured genuine frame verbatim
         self._atk_seq += 1
-        ct = _CTYPE[inj.get("ctype", "override")]
         payload = inj.get("payload", {})
+        if kind == "unknown_ctype":                         # genuine key, unmapped type byte (version skew)
+            return encode_command(self._key, 99, self._atk_seq, 9, to_ms(now), payload)
+        ct = _CTYPE[inj.get("ctype", "override")]
         if kind == "forged":
             return encode_command(self._wrong, ct, self._atk_seq, 7, to_ms(now), payload)
         if kind == "stale":                                 # genuine key, but an OLD ts -> freshness fails

@@ -11,7 +11,7 @@ from esw.state_machine import StateMachine
 from esw.actuator import Actuator
 from esw.health import HealthMonitor
 from esw.telemetry import Telemetry
-from esw import if4
+from esw import crypto, if4
 from harness.sensors import (observations_at, health_at, override_at, ota_at, drift_at, ack_at,
                              gnss_at, selftest_at)
 from harness.sign import Sign
@@ -19,25 +19,29 @@ from harness.commands import CommandFeed
 
 TICK_DT = 0.1  # 10 Hz fixed-rate tick (ADR-0015)
 
-# Per-unit shared secret for IF-4 auth (ADR-0012). Real deployments provision this
-# out-of-band per unit and rotate it; these are test vectors. _WRONG_KEY stands in for an
-# attacker who can transmit on the link but does not hold the key.
-_KEY = b"esw-if4-shared-secret-v1-0123456789"
-_WRONG_KEY = b"attacker-without-the-shared-secret!"
-
-# The IF-8/9/10 command channel uses its OWN per-unit secret -- a separate hardened channel from
-# the sign link (ADR-0012). _WRONG_CMD_KEY is an attacker who can transmit on the uplink but holds
-# no command key; the replay window is how fresh a command's timestamp must be to be accepted.
-_CMD_KEY = b"esw-cmd-shared-secret-v1-0123456789"
-_WRONG_CMD_KEY = b"attacker-has-no-command-channel-key"
-_CMD_REPLAY_WINDOW_MS = 5000
-
 # Audit fingerprint stubs for the sim (doc 02 §7). cfg_ver is computed per run from the real
-# config; fw/model/calib are placeholders until those artifacts exist on the K230.
+# clamped config (sm.cfg_ver); fw/model/calib are placeholders until those artifacts exist.
 _SITE_ID = "bench-01"
 _FW_VER = "sim-fw"
 _MODEL_VER = "sim-model"
 _CALIB_VER = "sim-calib"
+
+# Per-site, per-channel link keys, DERIVED from a master secret (esw.crypto.derive_key,
+# ADR-0012 / doc 10 §5): the channel label ("IF4" vs "CMD") and the site id are bound into
+# the key itself, so a frame MAC'd for another unit or channel can never verify here even
+# if a fleet were (mis)provisioned from one master. These are test vectors; real
+# deployments provision the master out-of-band per unit and rotate it. _WRONG_* stand in
+# for an attacker who can transmit but holds no key material for this unit.
+_MASTER = b"esw-master-secret-v1-0123456789abc"
+_KEY = crypto.derive_key(_MASTER, "IF4", _SITE_ID)
+_WRONG_KEY = crypto.derive_key(b"attacker-without-the-master-secret", "IF4", _SITE_ID)
+
+# The IF-8/9/10 command channel gets its OWN derived key -- a separate hardened channel from
+# the sign link (ADR-0012). _WRONG_CMD_KEY is an attacker who can transmit on the uplink but
+# holds no command key; the replay window is how fresh a command's timestamp must be.
+_CMD_KEY = crypto.derive_key(_MASTER, "CMD", _SITE_ID)
+_WRONG_CMD_KEY = crypto.derive_key(b"attacker-without-the-master-secret", "CMD", _SITE_ID)
+_CMD_REPLAY_WINDOW_MS = 5000
 
 
 def _merge(base, over):
@@ -66,8 +70,8 @@ def run_scenario(scenario, outbox=None):
     off the durable evidence log instead of the in-memory timeline (Level-E). Default None leaves
     the loop byte-for-byte unchanged, so boards A-D are unaffected."""
     cfg = _merge(default_config(), scenario.get("config_push", {}))
-    cfg_ver = if4.cfg_fingerprint(cfg)
     sm = StateMachine(cfg)                        # SUT gets the (possibly bad) pushed config
+    cfg_ver = sm.cfg_ver                          # fingerprint of the config IN FORCE (post-clamp, R10)
     monitor = HealthMonitor(sm.cfg)               # derives health/time/force-safe (shares clamped cfg)
     telem = Telemetry(_SITE_ID, {"fw_ver": _FW_VER, "cfg_ver": cfg_ver,
                                  "model_ver": _MODEL_VER, "calib_ver": _CALIB_VER})  # IF-6/IF-7 audit

@@ -11,14 +11,12 @@
 # MicroPython-safe subset (byte-identical sim + K230): no f-strings, comprehensions,
 # lambdas, typing, enum. hashlib.sha256 is the only primitive (uhashlib on some ports).
 
-try:
-    import hashlib
-except ImportError:                 # MicroPython ports that only expose uhashlib
-    import uhashlib as hashlib
-
 # The HMAC + constant-time compare + 4-byte coercion are SHARED with the IF-8/9/10 command
 # channel -- one tested crypto primitive for both hardened channels (esw/crypto.py, ADR-0012).
 from esw.crypto import hmac_sha256 as _hmac_sha256, ct_equal as _ct_equal, as4 as _as4
+# cfg_fingerprint lives with the config surface (esw/params.py) so the state machine can
+# recompute it on every runtime IF-8 push; re-exported here because it is a wire field (R10).
+from esw.params import cfg_fingerprint
 
 # Wire layout (big-endian). Compact ON PURPOSE: LoRa time-on-air scales with payload
 # bytes and IF-4 airtime is duty-cycle-bound (ADR-0014), so these sizes ARE the airtime
@@ -43,21 +41,6 @@ def message_id_to_text(mid):
     return _MSG_ID_TEXT.get(mid, "UNKNOWN")
 
 
-def cfg_fingerprint(cfg):
-    # 4-byte fingerprint of the active safety config (R10 audit / cfg_ver). Canonical
-    # "name=value;" over sorted keys so the hash is stable regardless of dict order.
-    # It is authenticated but OPAQUE to the controller (echoed for audit, not interpreted),
-    # so float-repr differences across runtimes cannot change a safety decision.
-    names = sorted(cfg.keys())
-    s = ""
-    i = 0
-    while i < len(names):
-        n = names[i]
-        s = s + n + "=" + str(cfg[n]) + ";"
-        i += 1
-    return hashlib.sha256(s.encode("utf-8")).digest()[:4]
-
-
 def encode_show(key, message_id, seq, nonce, cfg_ver, ts_ms):
     """Build the authenticated SHOW frame: header || truncated-HMAC(header)."""
     header = bytearray()
@@ -80,7 +63,13 @@ def verify(key, frame, last_seq, now_ms, replay_window_ms):
     """Return {"ok", "reason", "message_id", "seq"}. ok requires: right length/version/
     type; good auth_tag; seq strictly > last_seq (anti-replay / anti-reorder); and the
     frame timestamp within replay_window of now (freshness). A dead box or a cut link
-    deliver NO frame -> verify is never reached -> the sign blanks on staleness."""
+    deliver NO frame -> verify is never reached -> the sign blanks on staleness.
+
+    CLOCK ASSUMPTION: the freshness check requires the edge and controller clocks to
+    agree within replay_window (doc 10 "Time": GNSS/PPS at the sign or an edge-synced
+    clock; the no-clock fallback is a persistent seq). Skew beyond the window rejects
+    GENUINE frames -> the sign blanks (fail-safe direction, but an availability loss
+    that reads as reject-reason "stale" on the controller's counters)."""
     if frame is None or len(frame) != FRAME_LEN:
         return _bad("len")
     if frame[0] != _VERSION or frame[1] != MSG_SHOW:

@@ -27,6 +27,12 @@
 #     ack(seq)       -- durably record the forward watermark (highest contiguously-forwarded seq)
 #     acked()        -- return that watermark, or -1 if nothing forwarded yet
 #
+# GROWTH is the backend's responsibility: the log is the evidence artifact, so entries at or
+# below the ack watermark may be ARCHIVED/ROTATED off the primary store (never silently
+# deleted) without affecting pump()/recover(). The policy here avoids per-tick full-log scans
+# (pending() is O(1) arithmetic; pump() early-outs when there is no backlog or no link), but a
+# large drain still reads through the log once -- a flash backend can index by seq if needed.
+#
 # MicroPython-safe subset (byte-identical sim + K230): no f-strings / comprehensions / lambdas /
 # sets / json in here -- serialization lives in the injected store.
 
@@ -67,8 +73,10 @@ class Outbox:
     def pump(self, link_up):
         """Forward unacked records in seq order while the uplink is up. At-least-once: a record is
         acked only after transport.send() confirms it; forwarding stops on the first failure so a
-        later reconnect resumes cleanly from the same watermark. Returns the count sent this call."""
-        if self.transport is None or not link_up:
+        later reconnect resumes cleanly from the same watermark. Returns the count sent this call.
+        Early-outs on no-transport / link-down / empty-backlog, so the steady state (everything
+        acked) never touches the store -- pump() is called every tick."""
+        if self.transport is None or not link_up or self.pending() == 0:
             return 0
         sent = 0
         for e in self.store.load():
@@ -82,12 +90,11 @@ class Outbox:
         return sent
 
     def pending(self):
-        """How many durably-stored records are not yet forwarded (oversight backlog depth)."""
-        n = 0
-        for e in self.store.load():
-            if e["seq"] > self._acked_through:
-                n = n + 1
-        return n
+        """How many durably-stored records are not yet forwarded (oversight backlog depth).
+        O(1): the outbox assigns seqs contiguously and acks contiguously, so the backlog is
+        pure cursor arithmetic -- no store scan on the per-tick path."""
+        n = self._next_seq - self._acked_through - 1
+        return n if n > 0 else 0
 
     def next_seq(self):
         """The seq the next appended record will get -- exposed for reboot-resume assertions."""

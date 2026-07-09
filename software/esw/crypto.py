@@ -38,6 +38,22 @@ def hmac_sha256(key, msg):
     return hashlib.sha256(bytes(opad) + inner).digest()
 
 
+def derive_key(master, channel, site_id):
+    """Per-site, per-channel link key: HMAC(master, "esw-key-v1|" + channel + "|" + site_id).
+
+    Binds the CHANNEL ("IF4" sign-link vs "CMD" command uplink) and the unit's SITE ID into
+    the key itself, so a frame MAC'd for one unit or channel can never verify on another --
+    even if a fleet is (mis)provisioned from one master secret, and with NO change to the
+    wire format or the per-frame MAC (doc 10 s5 keeps its layout; provisioning simply
+    installs the derived key on both ends). This turns the ADR-0012 "per-unit keys" policy
+    into a mechanism instead of a hope."""
+    if not isinstance(channel, (bytes, bytearray)):
+        channel = channel.encode("utf-8")
+    if not isinstance(site_id, (bytes, bytearray)):
+        site_id = site_id.encode("utf-8")
+    return hmac_sha256(master, b"esw-key-v1|" + bytes(channel) + b"|" + bytes(site_id))
+
+
 def ct_equal(a, b):
     """Length-fixed, no early exit -- do not leak an auth-tag oracle by timing."""
     if len(a) != len(b):

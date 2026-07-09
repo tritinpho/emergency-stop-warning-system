@@ -68,7 +68,11 @@ class FileStore:
         f = open(self.ack_path, "r")
         v = f.read().strip()
         f.close()
-        return int(v) if v else -1
+        try:
+            return int(v) if v else -1
+        except ValueError:
+            return -1   # corrupt watermark (torn write) -> re-forward from scratch:
+            #             at-least-once holds, the consumer dedups by seq -- never crash the outbox
 
 
 class FakeTransport:

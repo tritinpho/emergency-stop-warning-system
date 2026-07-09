@@ -43,6 +43,7 @@ from esw.geometry import bbox_ground_point, footprint_box, overlap_fraction, is_
 from esw.perception import Perception
 from esw.sink import Outbox
 from esw.command import CommandReceiver, encode_command, verify_command, CMD_OVERRIDE
+from esw.crypto import derive_key
 
 _fails = []
 
@@ -172,6 +173,16 @@ _rx = CommandReceiver(_ck, _win)
 _okc = _rx.submit(_cf, 10000)["ok"]
 _rep = _rx.submit(_cf, 10010)["ok"]                 # same seq re-submitted -> anti-replay
 check("receiver accepts then rejects a replay", _okc and (not _rep) and _rx.rejects == 1)
+_unk = encode_command(_ck, 99, 3, 3, 10000, {})     # genuine key, unmapped ctype (version skew)
+check("unknown ctype rejected loud", verify_command(_ck, _unk, None, 10000, _win)["reason"] == "ctype")
+
+# --- per-site / per-channel key derivation (esw/crypto.derive_key, ADR-0012) ---
+_dk_if4 = derive_key(b"master-secret", "IF4", "site-A")
+_dk_cmd = derive_key(b"master-secret", "CMD", "site-A")
+_dk_b = derive_key(b"master-secret", "IF4", "site-B")
+check("derive_key: 32 bytes, channel- and site-separated",
+      len(_dk_if4) == 32 and _dk_if4 != _dk_cmd and _dk_if4 != _dk_b)
+check("derive_key deterministic", derive_key(b"master-secret", "IF4", "site-A") == _dk_if4)
 
 
 # --- runtime config push (IF-8: params.clamp_update / StateMachine.apply_config) ---------------
@@ -182,8 +193,20 @@ check("clamp_update clamps a runtime param to bound", _acc.get("T_dwell") == 10.
 check("clamp_update refuses a bounded backstop (boot-only)", ("T_signhold" not in _acc) and ("T_signhold" in _rej))
 check("clamp_update refuses an unknown name", ("bogus" not in _acc) and ("bogus" in _rej))
 _csm = state_machine.StateMachine()
+_ver0 = _csm.cfg_ver
 _csm.apply_config({"T_dwell": 3.0, "T_watchdog": 1.0})
 check("apply_config applies runtime, keeps backstop", _csm.cfg["T_dwell"] == 3.0 and _csm.cfg["T_watchdog"] == 30.0)
+check("apply_config re-fingerprints cfg_ver (R10 audit binding)", _csm.cfg_ver != _ver0)
+
+# NaN is unclampable (every bound comparison is False), so the FR-20 surface must catch it:
+# boot restores + flags the vetted default; a runtime push is refused outright (keep last-good).
+_nan = float("nan")
+_cv, _cw = params.clamp("T_watchdog", _nan)
+check("clamp: NaN -> vetted default, flagged", _cv == 30.0 and _cw is True)
+_cfgn, _rejn = params.clamp_config({"T_watchdog": _nan})
+check("clamp_config: NaN cannot disable a backstop", _cfgn["T_watchdog"] == 30.0 and ("T_watchdog" in _rejn))
+_accn, _rejn2 = params.clamp_update({"T_dwell": _nan})
+check("clamp_update: NaN refused, keep last-good", ("T_dwell" not in _accn) and ("T_dwell" in _rejn2))
 
 print("-" * 60)
 if _fails:
