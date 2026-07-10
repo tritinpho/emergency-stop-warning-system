@@ -26,3 +26,10 @@ venv/
 # `git add .` is one command away from publishing them. Storage is still undecided
 # (ADR-0016 backlog #7) — if that lands on git-LFS, drop this rule deliberately.
 *.kmodel
+
+# Host detector-in-the-loop (software/tools/host_yolo_loop.py): ultralytics downloads
+# YOLO weights into the CWD on first use, and capture sessions land in captures/ by
+# default. Weights are pinned by SHA-256 in each session's ground_truth.json, never
+# by committing them; sessions are evidence, reviewed and archived deliberately.
+*.pt
+captures/

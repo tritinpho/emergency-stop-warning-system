@@ -77,6 +77,14 @@ python software/tools/mp_safe_check.py software/esw   # MicroPython-safety AST l
 python software/tools/mpy_smoke.py        # esw smoke: perception + geometry + sink + command + adapter + app loop
 python software/tools/score_capture.py <session-dir>...   # score real device captures (exits 1 unless acceptance-grade)
 
+# Host detector-in-the-loop (needs `pip install ultralytics`, NOT required by any board or CI):
+# a REAL pretrained YOLOv8n driving the REAL EdgeApp over a video/still, written out as a
+# device-format session the scorer grades at tier "host" — validates the pipeline (adapter,
+# tracker under real detector noise, dwell, IF-4 cadence), never the unit (INT8 kmodel differs).
+python software/tools/host_yolo_loop.py --selftest
+python software/tools/host_yolo_loop.py --video clip.mp4 --calib calib.json --hazard 12.5:96 --score
+python software/tools/host_yolo_loop.py --video night.mp4 --calib calib.json --light-filter  # backlog #4b A/B
+
 # The shipped esw/ subset also RUNS under the real MicroPython unix port (not just CPython):
 cd software && micropython run_tests.py && micropython run_health_tests.py && micropython tools/mpy_smoke.py
 ```

@@ -41,7 +41,11 @@ HEARTBEAT_PERIOD_S = 1.0        # esw/telemetry.py _HEARTBEAT_EVERY
 GAP_TOL_PERIODS = 3.0           # a heartbeat gap wider than this is an outage, not jitter
 
 REAL_TIERS = ("real-field", "real-staged")
-KNOWN_TIERS = REAL_TIERS + ("synthetic",)
+# "host" = a REAL pretrained detector on REAL footage, but a host runtime (tools/host_yolo_loop.py).
+# Distinct from "synthetic" (scripted detections) AND from the real tiers: it validates the
+# pipeline -- adapter conventions, tracker association under real detector noise, dwell, IF-4
+# cadence -- never the unit, whose INT8 kmodel, camera and optics all differ.
+KNOWN_TIERS = REAL_TIERS + ("host", "synthetic")
 
 _VERSION_KEYS = ("fw_ver", "cfg_ver", "model_ver", "calib_ver")
 
@@ -215,6 +219,10 @@ def blockers(session):
 
     if session.tier not in KNOWN_TIERS:
         out.append("unknown tier %r (expected one of %s)" % (session.tier, list(KNOWN_TIERS)))
+    elif session.tier == "host":
+        out.append("tier 'host': a real detector on real footage, but a HOST runtime -- this "
+                   "validates the pipeline, not the unit (the K230 runs an INT8 kmodel behind "
+                   "different optics); acceptance needs device-tier captures")
     elif session.tier not in REAL_TIERS:
         out.append("tier '%s': recall from synthetic events measures simulator determinism, "
                    "not detection (doc 01 §5 hard rule)" % session.tier)
@@ -317,8 +325,9 @@ def report(sessions):
                 n_real, _hms(real_hours * 3600)),
             rate_label="per observed hour"))
     else:
-        L.append("No real captures. There is no recall claim to make -- only synthetic sessions,")
-        L.append("which substantiate the machinery and nothing about detection (doc 01 §5).")
+        L.append("No real captures. There is no recall claim to make -- only synthetic or")
+        L.append("host-tier sessions, which substantiate the machinery and the pipeline, not")
+        L.append("the unit's detection (doc 01 §5).")
     L.append("")
 
     syn_agg, syn_hours, n_syn = _pool(rows, ("synthetic",))
@@ -326,6 +335,15 @@ def report(sessions):
         L.append("(%d synthetic session(s) scored separately and NOT pooled into the above: "
                  "recall %s)" % (n_syn, "{:.0%}".format(syn_agg["recall"])
                                  if syn_agg["recall"] is not None else "n/a"))
+        L.append("")
+
+    host_agg, host_hours, n_host = _pool(rows, ("host",))
+    if host_agg:
+        L.append("(%d host-tier session(s) scored separately and NOT pooled into any claim: a "
+                 "real detector on a host runtime validates the pipeline, not the unit -- "
+                 "recall %s over %s observed)"
+                 % (n_host, "{:.0%}".format(host_agg["recall"])
+                    if host_agg["recall"] is not None else "n/a", _hms(host_hours * 3600)))
         L.append("")
 
     if n_blockers:
