@@ -4,7 +4,9 @@
 **camera-only**. Reopen at the cấp sở field project.
 **Date:** 2026-06-26 · **Closed:** 2026-07-10
 **Deciders:** PI (ThS. Phó Trí Tín), technical lead, road-safety advisor
-**Closed by:** project lead — hardware + business, the owning teams for this ADR *(name to be filled in)*
+**Closed by:** **ThS. Phó Trí Tín** — chủ nhiệm đề tài (principal investigator), 2026-07-10, on the
+project lead's direction. ADR-0001 is owned by the hardware + business teams; the PI records and
+accepts the decision and its consequences (R5, R20, R21).
 
 > ## Decision record — radar is NOT used in this phase
 >

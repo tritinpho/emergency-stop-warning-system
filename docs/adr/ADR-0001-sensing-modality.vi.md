@@ -6,7 +6,9 @@
 **chỉ dùng camera**. Mở lại ở đề tài hiện trường cấp sở.
 **Ngày:** 2026-06-26 · **Ngày khép lại:** 2026-07-10
 **Người quyết định:** Chủ nhiệm đề tài (ThS. Phó Trí Tín), trưởng nhóm kỹ thuật, cố vấn an toàn giao thông
-**Người khép lại:** trưởng dự án — phần cứng + kinh doanh, các nhóm sở hữu ADR này *(điền tên)*
+**Người khép lại:** **ThS. Phó Trí Tín** — chủ nhiệm đề tài, 2026-07-10, theo chỉ đạo của trưởng dự án.
+ADR-0001 do nhóm phần cứng + kinh doanh sở hữu; chủ nhiệm đề tài ghi nhận và chấp nhận quyết định cùng
+các hệ quả của nó (R5, R20, R21).
 
 > ## Biên bản quyết định — KHÔNG dùng radar trong giai đoạn này
 >
