@@ -20,19 +20,34 @@ simulation · **F** = field-deferred (cấp sở) · **D** = design/review only.
 
 ---
 
+> ## ⚠ PHASE NOTE — this build is CAMERA-ONLY
+>
+> [ADR-0001](adr/ADR-0001-sensing-modality.md) (camera + radar fusion) was **Rejected on 2026-07-10**. The cấp trường bench
+> prototype ships **camera-only**. Every radar-dependent behaviour described below — radar
+> corroboration, the occlusion hold (`WARN_HOLD` / `CAMERA_OCCLUDED_DEGRADED`), `T_degraded_max`, and
+> the `FULL` / `RADAR-ONLY` sensing modes — is **dormant: the code retains it, but it never executes**,
+> because `corr` is never true without a radar channel.
+>
+> Accepted consequences: **R5** (night/rain/fog blindness) is **unmitigated** and night/adverse recall
+> is **not claimed**; **R20** — an occluded vehicle is cleared at `T_hold` (~10 s), blanking the sign
+> with the hazard present; **R21** — the unit sits permanently in `CAMERA_ONLY`, hence permanently
+> `DEGRADED`. See [doc 04](04-risk-and-safety.md).
+>
+> Radar content below is the **cấp sở** target design, not this phase's build.
+
 ## 1. Functional requirements
 
 | ID | Requirement (short) | Pri | Governing ADR(s) | Tier | Verification scenario / test | Pass criterion |
 |----|---------------------|-----|------------------|------|------------------------------|----------------|
 | FR-01 | Monitor configurable ROI | M | [0003](adr/ADR-0003-detection-algorithm.md) | B·S | All scenarios; ROI-gating unit test (footprint overlap ≥ 50 %) | Detections outside ROI rejected; straddling pose deterministic |
-| FR-02 | Detect vehicle in ROI | M | [0001](adr/ADR-0001-sensing-modality.md)/[0003](adr/ADR-0003-detection-algorithm.md) | B·S (day) · **F** (night/adverse) | Day/night/rain set; recall metric (§5) | Recall ≥ 95 % day; night/adverse **gated** on radar gate, else field-deferred |
+| FR-02 | Detect vehicle in ROI | M | [0001](adr/ADR-0001-sensing-modality.md) *(Rejected)* /[0003](adr/ADR-0003-detection-algorithm.md) | B·S (day) · **—** (night/adverse) | Day set; recall metric (§5) over **real** captures | Recall ≥ 95 % day. Night/adverse **withdrawn** — no radar, no gate, no claim (R5 unmitigated) |
 | FR-03 | Stopped vs. passing | M | [0003](adr/ADR-0003-detection-algorithm.md)/[0008](adr/ADR-0008-detection-persistence-and-multitrack.md) | B·S | Transient pass-through; creep-along-shoulder | Pass-through does **not** trigger (false-activation §5) |
 | FR-04 | Dwell confirmation | M | [0008](adr/ADR-0008-detection-persistence-and-multitrack.md) | B·S | Stop-and-hold; dwell sweep 3–10 s | Confirm only after `T_dwell`; sized vs. unwarned-exposure budget |
 | FR-05 | Activate sign on confirm | M | [0004](adr/ADR-0004-warning-actuator-integration.md) | B·S | Closed-loop happy path | Sign ON ≤ dwell + 2 s (NFR-01) |
 | FR-06 | Track while active | M | [0008](adr/ADR-0008-detection-persistence-and-multitrack.md) | B·S | Sustained presence; multi-vehicle | Warning held while set non-empty |
 | FR-07 | Clear + hysteresis | M | [0008](adr/ADR-0008-detection-persistence-and-multitrack.md) | B·S | Departure; brief occlusion | Clear ≤ hold + 2 s on confirmed exit; brief dropout does not flap |
 | FR-08 | Pedestrian warrant (**presence-onset**) | S | [0003](adr/ADR-0003-detection-algorithm.md)/[0008](adr/ADR-0008-detection-persistence-and-multitrack.md) | S(approx)·**F** | **Moving stranded occupant** (walks, never stationary); person in/beside ROI | Presence-debounced trigger fires; recall tracked **separately** (§5), night best-effort |
-| FR-09 | Day/night/rain/fog | M | [0001](adr/ADR-0001-sensing-modality.md) | S(approx)·**F** | Simulated adverse; real-condition field | Degraded-but-functional; real recall **field-deferred** |
+| ~~FR-09~~ | Day/night/rain/fog | ~~M~~ **descoped** | [0001](adr/ADR-0001-sensing-modality.md) *(Rejected 2026-07-10)* | **—** | *(none — no adverse-condition acceptance in this phase)* | **Withdrawn.** Day only. Night/rain/fog needs the second sensor that was not funded; R5 unmitigated, reinstate at cấp sở |
 | FR-10 | Self-monitor + heartbeat (**incl. calibration-drift monitor**) | M | [0005](adr/ADR-0005-fail-safe-and-system-safety.md) | B·S · **F** (real drift) | Per-subsystem health; heartbeat cadence; **drift monitor** — inject a synthetic homography shift | Heartbeat carries health + version fingerprint; faults detected; drift shift → degraded + alert (real drift field-deferred, R15) |
 | FR-11 | Safe state + alert on fault | M | [0005](adr/ADR-0005-fail-safe-and-system-safety.md)/[0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)/[0013](adr/ADR-0013-degraded-hold-unification.md) | B·S | **Fault injection** (kill SM, kill box, cut link; **kill camera under active warning**; **CLEAR vs. wedged-ON sign**) | Sign blanks within `T_signhold` (SM/box/link); camera-kill → bounded hold → `T_degraded_max` loud clear; stuck-ON → SAFE STATE + sign-stuck escalation; operator alerted in every case |
 | FR-12 | Events to TMC + audit log | S | [0002](adr/ADR-0002-edge-vs-cloud-processing.md) | B·S | Activation/clear/fault events; link-down queueing | Events with version fingerprint reach audit; store-and-forward survives outage |
@@ -54,7 +69,7 @@ simulation · **F** = field-deferred (cấp sở) · **D** = design/review only.
 | NFR-02 | Vehicle-gone→off ≤ hold + 2 s | [0008](adr/ADR-0008-detection-persistence-and-multitrack.md) | B·S | Clear-latency on confirmed exit | ≤ hold + 2 s; held occlusion is **not** a clear-latency failure |
 | NFR-03 | Functional availability ≥ 99 % | [0005](adr/ADR-0005-fail-safe-and-system-safety.md) | **F** | Field measurement; bench = software-loop MTBF under fault injection | **Provisional** ≥ 99 %, **pending MTBF/MTTR budget** ([doc 04 Q6](04-risk-and-safety.md#5-open-safety-questions-for-the-team)) |
 | NFR-04 | No stale-ON (any fault) | [0005](adr/ADR-0005-fail-safe-and-system-safety.md)/[0008](adr/ADR-0008-detection-persistence-and-multitrack.md)/[0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)/[0013](adr/ADR-0013-degraded-hold-unification.md) | B·S | Watchdog expiry; **`T_degraded_max` forced clear (occlusion _and_ camera-fault cause)**; wedged-logic | No state — and no sensor-degraded mode — holds the sign ON without camera-verified, lane-attributed confirmation; bounded clear in every case |
-| NFR-05 | Rain/night robustness | [0001](adr/ADR-0001-sensing-modality.md) | **F** | Radar gate (a) bench, (b) test-track/field | **Contingent on radar gate**; not claimable from synthetic radar |
+| ~~NFR-05~~ | Rain/night robustness | [0001](adr/ADR-0001-sensing-modality.md) *(Rejected 2026-07-10)* | **—** | *(gate removed — deferred to cấp sở)* | **Descoped, not deferred.** No radar → no gate → **no claim**; never rested on synthetic radar (R5 unmitigated) |
 | NFR-06 | Edge autonomy (WAN offline) | [0002](adr/ADR-0002-edge-vs-cloud-processing.md) | B·S | WAN-outage injection | Detect→warn loop unaffected; events queue |
 | NFR-07 | Solar ≥ 72 h autonomy | [0006](adr/ADR-0006-connectivity-and-power.md) | **F** (D at bench) | Energy budget incl. gate-grade radar draw | Design-only at bench; field-measured at pilot |
 | NFR-08 | Maintainability (remote health/config/OTA) | [0002](adr/ADR-0002-edge-vs-cloud-processing.md) | B·D | Remote health/config/OTA exercised | Modular; remotely serviceable |

@@ -1,6 +1,6 @@
-<svg width="100%" viewBox="0 0 680 486" role="img" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+<svg width="100%" viewBox="0 0 680 506" role="img" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
 <title>Deployment / physical layout</title>
-<desc>Physical layout: a roadside mast and cabinet hold the camera and radar sensor head, the edge compute in an IP65 enclosure, and solar-plus-battery power. The edge unit watches the detection zone on the emergency lane, drives a warning sign placed upstream by at least the decision sight distance over a cable or radio link, and connects to the traffic management center over 4G/LTE or fibre.</desc>
+<desc>Physical layout: a roadside mast and cabinet hold the camera sensor head (radar is the cấp sở design and is not fitted in this camera-only build), the edge compute in an IP65 enclosure, and solar-plus-battery power. The edge unit watches the detection zone on the emergency lane, drives a warning sign placed upstream by at least the decision sight distance over a cable or radio link, and connects to the traffic management center over 4G/LTE or fibre.</desc>
 <defs>
 <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
 </defs>
@@ -14,7 +14,7 @@
 <text x="52" y="140" font-size="14" font-weight="500" fill="#2C2C2A">Roadside mast &amp; cabinet (~6–8 m)</text>
 
 <rect x="64" y="156" width="150" height="46" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
-<text x="139" y="178" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle">Camera + radar</text>
+<text x="139" y="178" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle">Camera + radar*</text>
 <text x="139" y="194" font-size="12" fill="#185FA5" text-anchor="middle">sensor head (IP65)</text>
 
 <rect x="64" y="224" width="150" height="46" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
@@ -62,4 +62,6 @@
 <text x="349" y="466" font-size="12" fill="#5F5E5A">center</text>
 <rect x="450" y="456" width="13" height="13" rx="3" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.8"/>
 <text x="469" y="466" font-size="12" fill="#5F5E5A">power / infra</text>
+<line x1="20" y1="478" x2="660" y2="478" stroke="#E2E1DB" stroke-width="1"/>
+<text x="20" y="493" font-size="10.5" fill="#5F5E5A">* CAMERA-ONLY build — ADR-0001 (camera+radar) rejected 2026-07-10. Radar = cấp sở design; R5 unmitigated (R20/R21).</text>
 </svg>

@@ -88,6 +88,13 @@ clean oracle feed):
 - **Day vs night/adverse** — *approximated* by raising dropout/noise; explicitly **S-approx**, never a real-recall claim (FR-09 real recall is **F**).
 
 ### 3.2 Radar channel — model the uncertainty, do not assume it away
+
+> **This channel is simulation-only, and now exclusively so.** [ADR-0001](adr/ADR-0001-sensing-modality.md)
+> was **Rejected on 2026-07-10** — the shipped unit is camera-only, so no radar return ever reaches the real
+> state machine, and the radar-dependent scenarios below (SC-06/08/09/25/26, SC-39) exercise code paths that
+> are **dormant on the device** ([doc 04](04-risk-and-safety.md) R20, R21). The model is retained
+> deliberately: it keeps the cấp sở design under test. The hard rule is unchanged — **synthetic events never
+> count toward recall.**
 Models presence/range/speed returns. The **methodologically critical** parameter:
 - **Lane-attribution error (criterion (b))** — a *configurable* probability that a return is attributed to the wrong lane (shoulder vs adjacent through-lane). The harness **must** run scenarios under **both** a *good-(b)* and a *weak-(b)* setting, because the [ADR-0001](adr/ADR-0001-sensing-modality.md) gate (b) is field-deferred and **uncertain**. The whole point of the occlusion-hold / `CAMERA_OCCLUDED_DEGRADED` / `T_degraded_max` design is its behaviour when (b) is weak — so the sim feeds it a radar that *can* mis-attribute, and verifies the failure is bounded (no indefinite stale-ON), never a radar that is perfect by assumption.
 - Presence dropout, range/speed noise, and (radar) false returns are also configurable.

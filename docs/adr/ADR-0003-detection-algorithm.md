@@ -4,6 +4,21 @@
 **Date:** 2026-06-26
 **Deciders:** PI, technical lead, CV engineer
 
+> ## ⚠ PHASE NOTE — this build is CAMERA-ONLY
+>
+> [ADR-0001](ADR-0001-sensing-modality.md) (camera + radar fusion) was **Rejected on 2026-07-10**. The cấp trường bench
+> prototype ships **camera-only**. Every radar-dependent behaviour described below — radar
+> corroboration, the occlusion hold (`WARN_HOLD` / `CAMERA_OCCLUDED_DEGRADED`), `T_degraded_max`, and
+> the `FULL` / `RADAR-ONLY` sensing modes — is **dormant: the code retains it, but it never executes**,
+> because `corr` is never true without a radar channel.
+>
+> Accepted consequences: **R5** (night/rain/fog blindness) is **unmitigated** and night/adverse recall
+> is **not claimed**; **R20** — an occluded vehicle is cleared at `T_hold` (~10 s), blanking the sign
+> with the hazard present; **R21** — the unit sits permanently in `CAMERA_ONLY`, hence permanently
+> `DEGRADED`. See [doc 04](../04-risk-and-safety.md).
+>
+> Radar content below is the **cấp sở** target design, not this phase's build.
+
 ## Context
 
 We must decide *how* the perception layer decides "a vehicle is stopped in the emergency lane." The
@@ -49,7 +64,7 @@ returns it, else camera-only.
 **Cons:** brittle outdoors; a vehicle stopped for a while fades into the learned background;
 shadows/headlight sweep cause false positives. Unsafe as the sole method.
 
-### Option B: Lightweight detector + ROI gating + dwell + radar *(chosen)*
+### Option B: Lightweight detector + ROI gating + dwell + radar *(chosen — the **radar** element is rejected for this phase, [ADR-0001](ADR-0001-sensing-modality.md); detector + ROI + dwell ship camera-only)*
 | Dimension | Assessment |
 |-----------|------------|
 | Complexity | Medium |
@@ -93,7 +108,7 @@ safety system — than a single opaque model (Option C), and far more robust tha
 - **Platform note (2026-07-03, hardware Week-1):** the concrete edge target is the **Kendryte K230**
   (RISC-V + KPU, CanMV/MicroPython, `kmodel`), not the Jetson/TensorRT path Option B implicitly assumed —
   the detector must convert/quantise to `kmodel` and re-benchmark (AI#1). With radar currently absent
-  ([ADR-0001](ADR-0001-sensing-modality.md) unresolved), the radar stationarity cross-check is
+  ([ADR-0001](ADR-0001-sensing-modality.md) **Rejected 2026-07-10 — deferred to cấp sở**), the radar stationarity cross-check is
   unavailable — stationarity leans on camera tracking alone until RQ-H1 resolves
   ([doc 09](../09-software-hardware-handoff.md)).
 

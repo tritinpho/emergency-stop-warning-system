@@ -20,6 +20,21 @@ bên dưới.*
 
 ---
 
+> ## ⚠ LƯU Ý GIAI ĐOẠN — bản dựng này CHỈ DÙNG CAMERA
+>
+> [ADR-0001](adr/ADR-0001-sensing-modality.vi.md) (hợp nhất camera + radar) đã bị **Bác bỏ ngày 2026-07-10**. Nguyên mẫu trên bàn
+> (cấp trường) **chỉ dùng camera**. Mọi hành vi phụ thuộc radar được mô tả bên dưới — radar chứng thực,
+> khoảng giữ-khi-che-khuất (`WARN_HOLD` / `CAMERA_OCCLUDED_DEGRADED`), `T_degraded_max`, và các chế độ
+> cảm biến `FULL` / `RADAR-ONLY` — đều **đang tạm ngưng: mã nguồn vẫn giữ, nhưng không bao giờ chạy**,
+> vì `corr` không bao giờ đúng khi không có kênh radar.
+>
+> Hệ quả được chấp nhận: **R5** (mù ban đêm/mưa/sương mù) **không còn biện pháp giảm thiểu** và khả năng
+> phát hiện ban đêm/bất lợi **không được tuyên bố**; **R20** — xe bị che khuất bị xóa sau `T_hold`
+> (~10 giây), biển báo tắt trong khi mối nguy vẫn còn; **R21** — thiết bị nằm vĩnh viễn ở `CAMERA_ONLY`,
+> do đó vĩnh viễn `DEGRADED`. Xem [tài liệu 04](04-risk-and-safety.vi.md).
+>
+> Nội dung radar bên dưới là **thiết kế mục tiêu cấp sở**, không phải bản dựng của giai đoạn này.
+
 ## 1. Các yếu tố định hình kiến trúc
 
 Hình dạng của kiến trúc này được rút ra trực tiếp từ các yêu cầu:
@@ -103,7 +118,7 @@ flowchart TB
 
 ## 3. Kiến trúc vật lý / triển khai
 
-![Bố trí triển khai / vật lý: một cột và tủ bên đường chứa đầu cảm biến camera+radar, bộ tính toán biên (IP65), và nguồn pin mặt trời + ắc quy; thiết bị biên giám sát vùng phát hiện, điều khiển một bảng cảnh báo đặt phía trước cách ≥ cự ly tầm nhìn quyết định qua một liên kết cáp/RF, và kết nối tới trung tâm điều hành giao thông qua 4G·LTE/cáp quang.](assets/deployment-diagram-vi.svg)
+![Bố trí triển khai / vật lý: một cột và tủ bên đường chứa đầu cảm biến camera (radar là thiết kế cấp sở, không lắp trong bản dựng chỉ-dùng-camera này), bộ tính toán biên (IP65), và nguồn pin mặt trời + ắc quy; thiết bị biên giám sát vùng phát hiện, điều khiển một bảng cảnh báo đặt phía trước cách ≥ cự ly tầm nhìn quyết định qua một liên kết cáp/RF, và kết nối tới trung tâm điều hành giao thông qua 4G·LTE/cáp quang.](assets/deployment-diagram-vi.svg)
 
 *Thiết bị tại hiện trường là một địa điểm vật lý duy nhất: cảm biến + bộ tính toán biên + nguồn trên
 cột/tủ, bảng cảnh báo đặt phía trước (liên kết cáp hoặc vô tuyến), và một đường lên không trọng yếu

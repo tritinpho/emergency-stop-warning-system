@@ -1,4 +1,4 @@
-<svg width="100%" viewBox="0 0 680 440" role="img" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+<svg width="100%" viewBox="0 0 680 460" role="img" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
 <title>Runtime sequence — detect, warn, clear</title>
 <desc>A sequence diagram with six lifelines: vehicle, sensors, perception and fusion, state machine, warning sign, and traffic management center. A vehicle stops in the lane; sensors feed perception, which sends a stationary track to the state machine; after a dwell time it confirms and commands the sign on; the sign reports status and the center is notified asynchronously. While the vehicle stays, tracks keep the hold timer reset. When the vehicle departs and stays absent past the hold time, the state machine clears the sign and notifies the center.</desc>
 <defs>
@@ -18,7 +18,7 @@
 <line x1="90" y1="112" x2="190" y2="112" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
 <text x="140" y="106" font-size="12" fill="#5F5E5A" text-anchor="middle">enters &amp; stops in lane</text>
 <line x1="190" y1="134" x2="290" y2="134" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-<text x="240" y="128" font-size="12" fill="#5F5E5A" text-anchor="middle">frames + radar returns</text>
+<text x="240" y="128" font-size="12" fill="#5F5E5A" text-anchor="middle">frames + radar returns*</text>
 <line x1="290" y1="156" x2="390" y2="156" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
 <text x="340" y="150" font-size="12" fill="#5F5E5A" text-anchor="middle">track in ROI · v≈0</text>
 
@@ -69,4 +69,6 @@
 <rect x="250" y="414" width="13" height="13" rx="3" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
 <text x="269" y="424" font-size="12" fill="#5F5E5A">center</text>
 <text x="470" y="424" font-size="12" fill="#888780" text-anchor="start">- - - async / return</text>
+<line x1="20" y1="434" x2="660" y2="434" stroke="#E2E1DB" stroke-width="1"/>
+<text x="20" y="449" font-size="10.5" fill="#5F5E5A">* CAMERA-ONLY build — ADR-0001 (camera+radar) rejected 2026-07-10. Radar = cấp sở design; R5 unmitigated (R20/R21).</text>
 </svg>

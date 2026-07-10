@@ -60,7 +60,7 @@ faithfully reflected by the architecture in document 02.
 ```mermaid
 flowchart LR
     subgraph Field["Roadside Unit (edge, at the monitored segment)"]
-        S["Sensors<br/>AI camera + radar"] --> E["Edge controller<br/>detect · confirm · decide"]
+        S["Sensors<br/>AI camera<br/>(radar: cấp sở)"] --> E["Edge controller<br/>detect · confirm · decide"]
         E --> A["Warning actuators<br/>upstream VMS / LED sign"]
         E -.heartbeat / telemetry.-> N
     end
@@ -93,15 +93,22 @@ add the engineering rigor a build needs, and propose a few corrections. The most
    more to *decide and change lane*. Document 01 derives the required upstream warning distance
    (sight-distance / decision-sight-distance) and makes it a hard requirement.
 
-3. **Elevated multi-sensor sensing from "optional" to "core" for the conditions that matter.**
-   The proposal names night / rain / fog / glare as the highest-risk conditions — which is exactly
-   where a camera-only system is weakest. We recommend **camera + radar fusion** (radar sees range
-   and presence in the dark and through rain/fog). See [ADR-0001](docs/adr/ADR-0001-sensing-modality.md).
+3. **Identified multi-sensor sensing as the right answer for the conditions that matter — and then
+   could not afford it.** The proposal names night / rain / fog / glare as the highest-risk
+   conditions, which is exactly where a camera-only system is weakest. **camera + radar fusion** was
+   the design answer. It was **Rejected for this phase on 2026-07-10**: the deciding gate criterion
+   (shoulder-vs-through-lane discrimination at the monitored range) is not bench-testable at any
+   budget this grant could reach. **This build is camera-only, and the night/adverse claim is
+   therefore not made** — risk R5 is carried unmitigated rather than rested on synthetic radar.
+   See [ADR-0001](docs/adr/ADR-0001-sensing-modality.md) and [doc 04](docs/04-risk-and-safety.md)
+   (R5, R20, R21). Radar returns with the cấp sở field project.
 
 4. **Made the closed loop concrete** as a state machine with **dwell confirmation, hysteresis,
-   radar-corroborated occlusion hold, multi-vehicle set semantics, a watchdog, and a
-   dead-man's-switch safe state** — so a passing car doesn't false-trigger, a long truck occlusion
-   doesn't drop a live warning, and a crashed controller can't leave the sign stuck on. The
+   multi-vehicle set semantics, a watchdog, and a dead-man's-switch safe state** — so a passing car
+   doesn't false-trigger and a crashed controller can't leave the sign stuck on. A
+   **radar-corroborated occlusion hold** is designed and implemented but **dormant in this
+   camera-only build**: a truck occluding the shoulder for longer than `T_hold` (~10 s) *does* drop
+   the warning (a loud, operator-alerted clear — R20). The
    **dead-man's switch lives in the sign controller** (so a dead edge box or a cut link also blanks the
    sign), and **degraded modes are honest** (a camera-dead unit is *blind to new hazards*, not "still
    running"). See [doc 02 §4](docs/02-system-architecture.md#4-the-detectionwarning-state-machine),

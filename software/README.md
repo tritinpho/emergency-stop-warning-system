@@ -105,7 +105,7 @@ re-escalate, the three fail-safe blank paths (kill SM / kill box / cut link → 
 rejected — an attacker on the link can neither light nor sustain the sign), and the **health
 monitor in the loop** (SC-35 derived-health debounce, SC-36 GNSS/PPS loss → DEGRADED-not-blanked,
 SC-37 independent force-safe blanks the sign despite `SHOW`), plus five code-review regressions:
-**radar-corroboration gap tolerance** (SC-39: one missed radar beat holds the occlusion warning —
+**radar-corroboration gap tolerance** (SC-39 — *simulation-only: [ADR-0001](../docs/adr/ADR-0001-sensing-modality.md) is Rejected, so no radar beat ever arrives on the real unit and this path never runs; see doc 04 R20*: one missed radar beat holds the occlusion warning —
 `T_corr_tolerance` — while sustained silence still loud-clears at `T_hold` from the *last*
 corroboration), the **post-blackout watchdog re-arm** (SC-40: recovering from a > `T_watchdog`
 NEITHER outage re-holds quietly instead of firing a spurious watchdog CRITICAL), and **class-flicker
@@ -134,7 +134,11 @@ the mode; a sustained loss reports the sensor DOWN), radar-dead-from-boot, **tim
 (GNSS/PPS loss → `time_valid` false past the hold-over, re-lock → valid), and the **independent
 force-safe** (a critical self-test failure trips IF-5). The monitor derives the `{camera, radar}`
 health the state machine consumes, so the FULL/CAMERA-ONLY/RADAR-ONLY/NEITHER mode is computed,
-not injected. `T_sensor_timeout` defaults to 0 (react immediately, conservative) — tune it up for
+not injected. **On the real unit only `CAMERA-ONLY` and `NEITHER` are reachable** — radar was
+rejected for this phase ([ADR-0001](../docs/adr/ADR-0001-sensing-modality.md)), so the unit sits
+permanently in `CAMERA-ONLY`/`DEGRADED` (doc 04 R21) and the occlusion hold never arms (R20). The
+`FULL` / `RADAR-ONLY` paths are exercised in simulation and retained for the cấp sở project.
+`T_sensor_timeout` defaults to 0 (react immediately, conservative) — tune it up for
 anti-flap; absolute-time hold-over across a multi-hour outage is field-deferred (NFR-16).
 
 **Level D — `run_metrics.py`: reducer unit tests + a sample acceptance report** (`exit 0` on the

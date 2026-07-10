@@ -112,7 +112,8 @@ LED panel while preserving a clean path to real VMS in the field pilot.
        ([doc 04 §0](../04-risk-and-safety.md#0-limits-of-protection-residual-hazards)). **This is a
        Phase-1 go/no-go gate** ([doc 03 §5](../03-roadmap-and-phasing.md#5-per-phase-risk-gates)), not a
        late-design check: a missing element forces a long-lead regulated-exception process that gates the
-       system's only output, so confirm it (or start the exception) at project start, alongside the radar
-       spike.
+       system's only output, so confirm it (or start the exception) at project start. ~~alongside the radar
+       spike~~ — the radar spike was cancelled ([ADR-0001](ADR-0001-sensing-modality.md) Rejected 2026-07-10),
+       so **this is now the only remaining Phase-1 long-lead gate** and nothing shares its schedule risk.
 5. [ ] Specify the **VMS-adapter latency + arbitration budget** and document the qualified NFR-01 and
        the latching-VMS fail-safe fallback ([ADR-0009](ADR-0009-failsafe-placement-and-degraded-modes.md)).

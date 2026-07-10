@@ -1,4 +1,4 @@
-<svg width="100%" viewBox="0 0 680 540" role="img" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+<svg width="100%" viewBox="0 0 680 560" role="img" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
 <title>Emergency stop-lane automatic warning system — architecture</title>
 <desc>A roadside edge unit (sensors, perception, decision state machine, warning-sign actuator, and an independent health monitor) detects a vehicle stopped in the emergency-lane detection zone and activates an upstream warning sign placed at least the decision sight distance ahead. A non-critical traffic management center provides oversight over a store-and-forward link.</desc>
 <defs>
@@ -31,7 +31,7 @@
 
 <rect x="58" y="236" width="118" height="54" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
 <text x="117" y="258" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle">Sensors</text>
-<text x="117" y="275" font-size="12" fill="#185FA5" text-anchor="middle">camera + radar</text>
+<text x="117" y="275" font-size="12" fill="#185FA5" text-anchor="middle">camera + radar*</text>
 
 <rect x="196" y="236" width="130" height="54" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.8"/>
 <text x="261" y="258" font-size="14" font-weight="500" fill="#0C447C" text-anchor="middle">Perception</text>
@@ -80,4 +80,6 @@
 <text x="250" y="518" font-size="12" fill="#5F5E5A">driver-facing warning</text>
 <rect x="410" y="508" width="13" height="13" rx="3" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
 <text x="430" y="518" font-size="12" fill="#5F5E5A">center · non-critical</text>
+<line x1="20" y1="532" x2="660" y2="532" stroke="#E2E1DB" stroke-width="1"/>
+<text x="20" y="547" font-size="10.5" fill="#5F5E5A">* CAMERA-ONLY build — ADR-0001 (camera+radar) rejected 2026-07-10. Radar = cấp sở design; R5 unmitigated (R20/R21).</text>
 </svg>

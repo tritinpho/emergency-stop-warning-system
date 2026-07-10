@@ -6,6 +6,21 @@
 **Ngày:** 2026-06-26
 **Người quyết định:** Chủ nhiệm đề tài, trưởng nhóm kỹ thuật, kỹ sư thị giác máy tính (CV)
 
+> ## ⚠ LƯU Ý GIAI ĐOẠN — bản dựng này CHỈ DÙNG CAMERA
+>
+> [ADR-0001](ADR-0001-sensing-modality.vi.md) (hợp nhất camera + radar) đã bị **Bác bỏ ngày 2026-07-10**. Nguyên mẫu trên bàn
+> (cấp trường) **chỉ dùng camera**. Mọi hành vi phụ thuộc radar được mô tả bên dưới — radar chứng thực,
+> khoảng giữ-khi-che-khuất (`WARN_HOLD` / `CAMERA_OCCLUDED_DEGRADED`), `T_degraded_max`, và các chế độ
+> cảm biến `FULL` / `RADAR-ONLY` — đều **đang tạm ngưng: mã nguồn vẫn giữ, nhưng không bao giờ chạy**,
+> vì `corr` không bao giờ đúng khi không có kênh radar.
+>
+> Hệ quả được chấp nhận: **R5** (mù ban đêm/mưa/sương mù) **không còn biện pháp giảm thiểu** và khả năng
+> phát hiện ban đêm/bất lợi **không được tuyên bố**; **R20** — xe bị che khuất bị xóa sau `T_hold`
+> (~10 giây), biển báo tắt trong khi mối nguy vẫn còn; **R21** — thiết bị nằm vĩnh viễn ở `CAMERA_ONLY`,
+> do đó vĩnh viễn `DEGRADED`. Xem [tài liệu 04](../04-risk-and-safety.vi.md).
+>
+> Nội dung radar bên dưới là **thiết kế mục tiêu cấp sở**, không phải bản dựng của giai đoạn này.
+
 ## Bối cảnh
 
 Ta phải quyết định *cách* lớp nhận diện kết luận rằng "một xe đang dừng trong làn dừng xe khẩn cấp".
@@ -51,7 +66,7 @@ của nó là cấp-độ-xe chỉ khi radar thực sự còn trả tín hiệu,
 **Nhược điểm:** mong manh khi ở ngoài trời; một xe dừng đủ lâu sẽ tan vào nền đã học được; bóng đổ/quét
 đèn pha gây dương tính giả. Không an toàn nếu là phương pháp duy nhất.
 
-### Phương án B: Bộ phát hiện nhẹ + giới hạn theo ROI + thời gian chờ + radar *(được chọn)*
+### Phương án B: Bộ phát hiện nhẹ + giới hạn theo ROI + thời gian chờ + radar *(được chọn — thành phần **radar** bị bác bỏ cho giai đoạn này, [ADR-0001](ADR-0001-sensing-modality.vi.md); bộ phát hiện + ROI + thời gian chờ vẫn chạy, chỉ dùng camera)*
 | Khía cạnh | Đánh giá |
 |-----------|------------|
 | Độ phức tạp | Trung bình |
@@ -101,7 +116,7 @@ so với sai phân điểm ảnh (Phương án A). Nó phù hợp với giới h
 - **Ghi chú nền tảng (2026-07-03, Tuần 1 phần cứng):** mục tiêu biên cụ thể là **Kendryte K230**
   (RISC-V + KPU, CanMV/MicroPython, `kmodel`), không phải đường Jetson/TensorRT mà Phương án B ngầm giả
   định — bộ phát hiện phải chuyển đổi/lượng-tử-hóa sang `kmodel` và đo chuẩn lại (AI#1). Với radar hiện
-  đang vắng mặt ([ADR-0001](ADR-0001-sensing-modality.vi.md) chưa được giải quyết), việc kiểm tra chéo
+  đang vắng mặt ([ADR-0001](ADR-0001-sensing-modality.vi.md) **bị Bác bỏ 2026-07-10 — hoãn sang cấp sở**), việc kiểm tra chéo
   tính đứng yên bằng radar là không có — tính đứng yên chỉ dựa vào theo dõi bằng camera cho đến khi RQ-H1
   được giải quyết ([tài liệu 09](../09-software-hardware-handoff.vi.md)).
 

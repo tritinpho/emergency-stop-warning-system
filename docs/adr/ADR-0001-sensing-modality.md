@@ -4,7 +4,9 @@
 **camera-only**. Reopen at the cấp sở field project.
 **Date:** 2026-06-26 · **Closed:** 2026-07-10
 **Deciders:** PI (ThS. Phó Trí Tín), technical lead, road-safety advisor
-**Closed by:** project lead — hardware + business, the owning teams for this ADR *(name to be filled in)*
+**Closed by:** **ThS. Phó Trí Tín** — chủ nhiệm đề tài (principal investigator), 2026-07-10, on the
+project lead's direction. ADR-0001 is owned by the hardware + business teams; the PI records and
+accepts the decision and its consequences (R5, R20, R21).
 
 > ## Decision record — radar is NOT used in this phase
 >
@@ -68,6 +70,10 @@ maintainability.
 
 ## Decision
 
+> **SUPERSEDED — see the decision record above.** This section states the *cấp sở* target design.
+> It was **Rejected for this phase on 2026-07-10**; the build is camera-only. Read the following in
+> the past conditional: this is what the system *would* do once radar is funded and its gate passes.
+
 Use a **camera + radar sensor pair with fusion** as the core sensing modality. The camera provides
 classification and ROI geometry; the radar provides **range, presence, and speed that survive
 darkness, rain, and fog**, and confirms "present and stationary" independently of pixels. Thermal
@@ -128,7 +134,7 @@ imaging is held as an optional add-on for sites with severe night/fog where budg
 **Cons:** weakest precisely when most needed; glare/occlusion false-negatives; a safety system that
 degrades silently at night.
 
-### Option B: Camera + radar fusion *(chosen)*
+### Option B: Camera + radar fusion *(chosen for cấp sở — **rejected for this phase**, 2026-07-10)*
 | Dimension | Assessment |
 |-----------|------------|
 | Complexity | Medium (fusion + time sync) |
@@ -200,8 +206,13 @@ claim, do not quietly rest it on synthetic data**.
 
 ## Action Items
 
-1. [ ] Select a specific **stopped-vehicle-capable** radar (imaging / HRR FMCW, 24/77 GHz, with clutter mapping) and camera (good WDR + IR) — not a generic presence module; **record its power draw** as an input to the [ADR-0006](ADR-0006-connectivity-and-power.md) solar budget (it exceeds the generic-presence assumption).
-2. [ ] **Validation gate (Phase 3):** demonstrate (a) reliable detection of a *stationary* vehicle in roadside clutter at the shoulder grazing geometry, day and night, **and** (b) azimuth/lane discrimination sufficient to attribute the return to the shoulder ROI vs. the adjacent through lane at the monitored range — before claiming adverse-condition robustness. Run an early, cheap feasibility spike in Phase 1 ([doc 03 §5](../03-roadmap-and-phasing.md#5-per-phase-risk-gates)) so a gate failure is found before the design leans its full weight on radar. **Venue split:** (a) is bench/Phase-3 at short range; **(b) needs lane separation at the monitored range** (test track or field) and is **field-deferred** — a bench pass of (a) alone does not discharge the gate. Record which criterion each result actually evidences.
-3. [ ] Define the fusion contract and the time-sync method (shared clock / PTP / timestamp align).
-4. [ ] Build the synthetic radar channel for the simulation harness — with a **documented, conservative** sensor model ([ADR-0007](ADR-0007-validation-and-data-strategy.md)).
-5. [ ] Add per-sensor health checks to the health monitor (feeds [ADR-0005](ADR-0005-fail-safe-and-system-safety.md)).
+> **Items 1–4 are DEFERRED to the cấp sở project — do not action them in this phase.** ADR-0001 is
+> Rejected (2026-07-10); no radar is procured, no fusion contract is defined, no radar gate is run.
+> **Item 5 remains live** — it is not radar-specific, and per-sensor health is exactly what derives
+> the permanent `CAMERA_ONLY` mode (R21).
+
+1. [ ] *(deferred — cấp sở)* Select a specific **stopped-vehicle-capable** radar (imaging / HRR FMCW, 24/77 GHz, with clutter mapping) and camera (good WDR + IR) — not a generic presence module; **record its power draw** as an input to the [ADR-0006](ADR-0006-connectivity-and-power.md) solar budget (it exceeds the generic-presence assumption).
+2. [ ] *(deferred — cấp sở; **specify the monitored range first**, it decides whether any affordable radar can pass (b))* **Validation gate:** demonstrate (a) reliable detection of a *stationary* vehicle in roadside clutter at the shoulder grazing geometry, day and night, **and** (b) azimuth/lane discrimination sufficient to attribute the return to the shoulder ROI vs. the adjacent through lane at the monitored range — before claiming adverse-condition robustness. Run an early, cheap feasibility spike in Phase 1 ([doc 03 §5](../03-roadmap-and-phasing.md#5-per-phase-risk-gates)) so a gate failure is found before the design leans its full weight on radar. **Venue split:** (a) is bench/Phase-3 at short range; **(b) needs lane separation at the monitored range** (test track or field) and is **field-deferred** — a bench pass of (a) alone does not discharge the gate. Record which criterion each result actually evidences.
+3. [ ] *(deferred — cấp sở)* Define the fusion contract and the time-sync method (shared clock / PTP / timestamp align).
+4. [x] *(done, and retained)* Build the synthetic radar channel for the simulation harness — with a **documented, conservative** sensor model ([ADR-0007](ADR-0007-validation-and-data-strategy.md)). It lives in `harness/sensors.py` (`radar_visible`, `radar_ghosts`) and still exercises the state machine's dormant radar paths in simulation. It **cannot** evidence recall ([doc 07](../07-simulation-methodology.md)).
+5. [x] **(live — done)** Add per-sensor health checks to the health monitor (feeds [ADR-0005](ADR-0005-fail-safe-and-system-safety.md)). Implemented in `esw/health.py`; this is what derives the permanent `CAMERA_ONLY` mode.

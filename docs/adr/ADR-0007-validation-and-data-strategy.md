@@ -4,6 +4,21 @@
 **Date:** 2026-06-27
 **Deciders:** PI (ThS. Phó Trí Tín), technical lead, CV engineer
 
+> ## ⚠ PHASE NOTE — this build is CAMERA-ONLY
+>
+> [ADR-0001](ADR-0001-sensing-modality.md) (camera + radar fusion) was **Rejected on 2026-07-10**. The cấp trường bench
+> prototype ships **camera-only**. Every radar-dependent behaviour described below — radar
+> corroboration, the occlusion hold (`WARN_HOLD` / `CAMERA_OCCLUDED_DEGRADED`), `T_degraded_max`, and
+> the `FULL` / `RADAR-ONLY` sensing modes — is **dormant: the code retains it, but it never executes**,
+> because `corr` is never true without a radar channel.
+>
+> Accepted consequences: **R5** (night/rain/fog blindness) is **unmitigated** and night/adverse recall
+> is **not claimed**; **R20** — an occluded vehicle is cleared at `T_hold` (~10 s), blanking the sign
+> with the hazard present; **R21** — the unit sits permanently in `CAMERA_ONLY`, hence permanently
+> `DEGRADED`. See [doc 04](../04-risk-and-safety.md).
+>
+> Radar content below is the **cấp sở** target design, not this phase's build.
+
 ## Context
 
 The funded (cấp trường) deliverable is a **bench rig + simulation**, not a field deployment
@@ -35,8 +50,9 @@ plan**:
 - **Simulation** validates the *logic*: the state machine, dwell/hysteresis/occlusion/multi-track
   policy ([ADR-0008](ADR-0008-detection-persistence-and-multitrack.md)), and **fault-injection
   coverage** against the scenario catalogue.
-- **Bench rig** validates *perception + actuation*: a real camera (and radar if funded) driving the
-  real loop to a stand-in sign on staged physical scenarios.
+- **Bench rig** validates *perception + actuation*: a real camera (**camera-only — radar was not funded**,
+  [ADR-0001](ADR-0001-sensing-modality.md) Rejected 2026-07-10) driving the real loop to a stand-in sign on
+  staged physical scenarios.
 
 **Provability boundary (state it in the report).** Bench/sim may claim: logic correctness,
 timing/latency, fault handling, and false-trigger resistance to *modelled* nuisances. They may **not**
@@ -113,6 +129,6 @@ target rather than an assumption.
 1. [ ] Write the **simulation methodology** — scenario catalogue, synthetic sensor model + assumptions (noise / dropout / occlusion behaviour), ground-truth labeling rule, and pass criteria — and **freeze it as a Phase-2 artifact**, not a Phase-3 by-product: it is the basis every Phase-3 logic claim rests on, so it must be settled *before* the loop is built ([doc 03 §3](../03-roadmap-and-phasing.md#3-phase-plan-aligned-to-the-proposals-6-phases)). **Drafted as [doc 07 — Simulation & Validation Methodology](../07-simulation-methodology.md).**
 2. [ ] Tag every doc-01 requirement and §5 metric as **bench / sim / field-deferred** (feeds the requirement-verifiability pass).
 3. [ ] Stand up the **data plan**: identify public datasets; open an operator-CCTV data-agreement conversation; define a consented local-capture protocol with retention/access limits as a fallback.
-3a. [ ] **Size the acceptance-evidence generation** as a Phase-1 deliverable: the [§5](../01-requirements.md#5-evaluation-metrics--acceptance-criteria) recall N must be **real captures** (synthetic N does not count toward recall) and the false-activation per-hour rate needs **continuous bench-hours** — so set the target positive-event count (e.g. ≥ 200, incl. night) and a staging-and-capture protocol that can reach the Wilson bound, scheduled and resourced like the radar spike. Public datasets are sparse in shoulder-stop positives, so most real positives will be **staged**; plan the logistics now, not at Phase 5.
+3a. [ ] **Size the acceptance-evidence generation** as a Phase-1 deliverable: the [§5](../01-requirements.md#5-evaluation-metrics--acceptance-criteria) recall N must be **real captures** (synthetic N does not count toward recall) and the false-activation per-hour rate needs **continuous bench-hours** — so set the target positive-event count (e.g. ≥ 200, incl. night) and a staging-and-capture protocol that can reach the Wilson bound. **It is now funded by the ~6–8M released when the radar was rejected** ([doc 03 §1](../03-roadmap-and-phasing.md#1-scope--budget-reality-check-read-first)) — this is the deliverable that money buys instead. Public datasets are sparse in shoulder-stop positives, so most real positives will be **staged**; plan the logistics now, not at Phase 5.
 4. [ ] Ensure the synthetic radar model's assumptions are **conservative** and that adverse-condition claims are gated on real-radar evidence ([ADR-0001](ADR-0001-sensing-modality.md)).
 5. [ ] Record the radar gate's **venue split** — (a) stationary-in-clutter is bench/Phase-3; (b) lane/azimuth discrimination at the monitored range is test-track/field — and label the occlusion-hold / `CAMERA_OCCLUDED_DEGRADED` guarantees **designed (logic-validated), not field-sound**, until (b) passes.

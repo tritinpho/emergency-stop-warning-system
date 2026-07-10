@@ -10,6 +10,21 @@ proposal's structure; it just attaches concrete engineering deliverables and a d
 
 ---
 
+> ## ⚠ PHASE NOTE — this build is CAMERA-ONLY
+>
+> [ADR-0001](adr/ADR-0001-sensing-modality.md) (camera + radar fusion) was **Rejected on 2026-07-10**. The cấp trường bench
+> prototype ships **camera-only**. Every radar-dependent behaviour described below — radar
+> corroboration, the occlusion hold (`WARN_HOLD` / `CAMERA_OCCLUDED_DEGRADED`), `T_degraded_max`, and
+> the `FULL` / `RADAR-ONLY` sensing modes — is **dormant: the code retains it, but it never executes**,
+> because `corr` is never true without a radar channel.
+>
+> Accepted consequences: **R5** (night/rain/fog blindness) is **unmitigated** and night/adverse recall
+> is **not claimed**; **R20** — an occluded vehicle is cleared at `T_hold` (~10 s), blanking the sign
+> with the hazard present; **R21** — the unit sits permanently in `CAMERA_ONLY`, hence permanently
+> `DEGRADED`. See [doc 04](04-risk-and-safety.md).
+>
+> Radar content below is the **cấp sở** target design, not this phase's build.
+
 ## 1. Scope & budget reality check (read first)
 
 The proposal's ambitions span field deployment, AI, IoT, and commercialization. The funding —
@@ -22,7 +37,7 @@ QCVN-41 LED VMS + IP65 enclosure + civil works + permits) costs **many multiples
 - a **simulation harness** that exercises the full detect→confirm→warn→clear loop and the fail-safe
   behaviour, plus
 - a **bench/desktop rig** (real camera, low-cost edge compute, a small LED panel standing in for the
-  sign, optionally a low-cost radar module) demonstrating the closed loop on staged scenarios, plus
+  sign; **camera-only — no radar**, [ADR-0001](adr/ADR-0001-sensing-modality.md) Rejected) demonstrating the closed loop on staged scenarios, plus
 - the **architecture, feasibility report, and a field-pilot proposal** for the follow-on
   **provincial (cấp sở)** project.
 
@@ -46,24 +61,26 @@ only the sensor/sign/power *backends* change — so nothing built now is throwaw
 |------|-----------:|------|
 | Edge compute (e.g. Raspberry Pi 5 + accelerator, or used Jetson Nano) | ~3–4M | Runs perception + state machine. |
 | Camera (IP, WDR, IR) | ~1.5–2.5M | Primary sensor. |
-| **Stopped-vehicle-capable** mmWave radar eval module (imaging / HRR FMCW) | ~6–8M | **Budget priority & the hard trade-off.** A module that can actually pass the [ADR-0001](adr/ADR-0001-sensing-modality.md) gate (stationary-in-clutter **+** shoulder-vs-through-lane discrimination) is an mmWave eval kit — **not** the ~1.5–2.5M *generic presence* unit the first cut assumed, and several times dearer. It is the *only* on-bench mitigation of R5 (top risk), so it is funded first and the lines below absorb the difference. Its **power draw** is also higher than a generic presence unit — a forward input to the solar sizing ([ADR-0006](adr/ADR-0006-connectivity-and-power.md)/NFR-07), reconciled like its cost was; moot at bench (mains), real at the field unit. |
+| ~~**Stopped-vehicle-capable** mmWave radar eval module (imaging / HRR FMCW)~~ | ~~~6–8M~~ → **0** | **NOT PROCURED — [ADR-0001](adr/ADR-0001-sensing-modality.md) Rejected 2026-07-10.** The ~6–8M is **released** back to contingency and to the **acceptance-evidence capture** (≥ 200 real events incl. night — the recall-with-Wilson-bound headline, which *is* bench-achievable and was previously unfunded). Rationale: gate criterion (b), shoulder-vs-through-lane at the monitored range, is **not bench-testable**, so a radar bought now would discharge **(a) only** — leaving every radar-dependent guarantee exactly where it already stands. **R5 is therefore unmitigated**, night/adverse recall is **not claimed**, and R20/R21 are accepted. Deferred to cấp sở; **specify the monitored range first**. |
 | LED panel (sign stand-in) + sign controller | ~1–2M | Demonstrates actuator interface. |
 | Mounts, cabling, power supply, misc | ~1–2M | Bench rig assembly. |
 | Dissemination (report, poster, infographic) | ~1M | Per proposal's products. |
 | Contingency | remainder | — |
 
 > Numbers are planning estimates to show the envelope is *feasible for a bench prototype*, not a
-> procurement quote. **Funding the gate-grade radar reshapes the budget**: at ~6–8M it consumes most of
-> the contingency and pushes the edge/camera lines to their lower, *used/lower-cost* end (e.g. a
-> second-hand Jetson Nano) — the deliberate trade to keep R5's only on-bench mitigation real. The
-> alternative is to defer radar to a **synthetic channel** in simulation (architecture unchanged) —
-> **but that makes the night/adverse recall claim field-deferred**, since it cannot be evidenced from
-> synthetic radar ([ADR-0001](adr/ADR-0001-sensing-modality.md),
-> [doc 01 §5](01-requirements.md#5-evaluation-metrics--acceptance-criteria)). Decide this explicitly at
-> the **Phase-1 radar spike** (§3/§5), not by silent default. **Procurement lead time is itself a
-> schedule risk:** an mmWave imaging eval kit can take **8–12 weeks** to arrive, so it must be ordered at
-> project start for the month 1–2 spike to land on time — treat a slipped delivery as a gate-slip risk
-> ([doc 04 R11](04-risk-and-safety.md#1-risk-register)).
+> procurement quote.
+>
+> **The radar decision was taken on 2026-07-10: no radar this phase** ([ADR-0001](adr/ADR-0001-sensing-modality.md)
+> Rejected). It was **decided explicitly, not by silent default** — which is what this section previously
+> demanded. Radar is deferred to a **synthetic channel** in simulation (architecture unchanged), and the
+> consequence is accepted in full: **the night/adverse recall claim is not made at all**, since it cannot
+> be evidenced from synthetic radar ([doc 01 §5](01-requirements.md#5-evaluation-metrics--acceptance-criteria)),
+> **R5 is unmitigated**, and R20/R21 are carried as residuals ([doc 04](04-risk-and-safety.md)).
+>
+> The ~6–8M and the **8–12 week mmWave procurement lead** (previously a Phase-1 schedule risk) both fall
+> away. The released funds go to **contingency** and to the **acceptance-evidence capture** — ≥ 200 real
+> staged events including night, which produces the recall figure with a Wilson bound and *is* achievable
+> on a bench. That capture was the load-bearing deliverable this budget had never funded.
 
 ## 2. MVP definition
 
@@ -81,9 +98,9 @@ cấp sở proposal is evidence-backed.
 
 | Phase | Proposal content (months) | Engineering deliverables (added) | Exit criteria |
 |------:|---------------------------|----------------------------------|---------------|
-| **1** | Survey & requirements (2) | Finalised [requirements](01-requirements.md); **per-site DSD placement** study (reconciled with TCVN 5729); **data-acquisition plan** ([ADR-0007](adr/ADR-0007-validation-and-data-strategy.md)); **acceptance-evidence-generation plan** — a staged-event capture protocol sized to the [§5](01-requirements.md#5-evaluation-metrics--acceptance-criteria) Wilson-bound N (real positive events incl. night) plus the continuous bench-hours that give the per-hour false-activation denominator (real recall N can't come from synthetic runs); **QCVN-41 message-element confirmation** — verify a conformant "stopped vehicle on shoulder" element exists *and* a **second** legal message for congestion re-messaging, else start the regulated-exception process now ([ADR-0004](adr/ADR-0004-warning-actuator-integration.md) AI#4); **order the mmWave eval kit (8–12 wk lead)** + **early radar feasibility spike** to de-risk R5 *before* the design commits its weight to radar ([ADR-0001](adr/ADR-0001-sensing-modality.md)); scenario catalogue (day/night/rain/**brief+sustained occlusion**/**`T_degraded_max` forced-clear**/**camera-fault-while-warning**/transient/**congestion**/pedestrian incl. **moving occupant**/**multi-vehicle**/**boot-present**/**override-expiry+config-bounds+OTA-defer**/faults). | Requirements + acceptance criteria signed off; data plan agreed; **radar spike go/no-go recorded**; **QCVN-41 element confirmed or exception process started**; **acceptance-evidence plan sized (target N set)**. |
+| **1** | Survey & requirements (2) | Finalised [requirements](01-requirements.md); **per-site DSD placement** study (reconciled with TCVN 5729); **data-acquisition plan** ([ADR-0007](adr/ADR-0007-validation-and-data-strategy.md)); **acceptance-evidence-generation plan** — a staged-event capture protocol sized to the [§5](01-requirements.md#5-evaluation-metrics--acceptance-criteria) Wilson-bound N (real positive events incl. night) plus the continuous bench-hours that give the per-hour false-activation denominator (real recall N can't come from synthetic runs); **QCVN-41 message-element confirmation** — verify a conformant "stopped vehicle on shoulder" element exists *and* a **second** legal message for congestion re-messaging, else start the regulated-exception process now ([ADR-0004](adr/ADR-0004-warning-actuator-integration.md) AI#4); ~~order the mmWave eval kit + early radar feasibility spike~~ **— cancelled; [ADR-0001](adr/ADR-0001-sensing-modality.md) Rejected 2026-07-10, no radar this phase (R5 unmitigated);** scenario catalogue (day/night/rain/**brief+sustained occlusion**/**`T_degraded_max` forced-clear**/**camera-fault-while-warning**/transient/**congestion**/pedestrian incl. **moving occupant**/**multi-vehicle**/**boot-present**/**override-expiry+config-bounds+OTA-defer**/faults). | Requirements + acceptance criteria signed off; data plan agreed; ~~radar spike go/no-go recorded~~ **— decided: no radar (ADR-0001 Rejected);** **QCVN-41 element confirmed or exception process started**; **acceptance-evidence plan sized (target N set)**. |
 | **2** | Principle model & system design (2) | [Architecture](02-system-architecture.md) ratified; **all 13 ADRs accepted**; **requirement→verification traceability matrix** ([doc 06](06-traceability-matrix.md)); interface contracts (**[doc 08 — ICD v1](08-interface-control-document.md)**) incl. the **bounded safety-parameter surface** ([doc 02 §7a](02-system-architecture.md#7-interfaces--contracts-initial), FR-20); **simulation-methodology spec frozen** (**[doc 07](07-simulation-methodology.md)**: scenario schema, synthetic-sensor noise/dropout model + stated assumptions, ground-truth labeling rule — the basis the Phase-3 logic claims rest on, [ADR-0007](adr/ADR-0007-validation-and-data-strategy.md)); ROI + **exit-boundary** + state-machine spec (incl. occlusion/multi-track [ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md); sign-controller fail-safe + degraded modes + **`T_degraded_max`** [ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.md); **degraded-hold unification + warning×sensor-mode matrix** [ADR-0013](adr/ADR-0013-degraded-hold-unification.md); **pedestrian presence-onset**; **operator-override policy** [ADR-0010](adr/ADR-0010-operator-override-and-manual-control.md); **operator concept-of-operations + alarm management** [ADR-0011](adr/ADR-0011-operator-concept-and-alarm-management.md); **security threat model** [ADR-0012](adr/ADR-0012-security-and-threat-model.md)); sensor/compute/sign selection. | ADRs Accepted; interfaces frozen incl. safety-parameter bounds; **simulation methodology frozen**; traceability matrix complete. |
-| **3** | Simulation, algorithm, interface (3) | **Simulation harness** (documented synthetic sensor model, [ADR-0007](adr/ADR-0007-validation-and-data-strategy.md)); perception + ROI gating + tracker; **state machine with dwell/hysteresis/occlusion-hold/multi-track/watchdog** ([ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md)); **radar stationary-detection gate** ([ADR-0001](adr/ADR-0001-sensing-modality.md)); warning UI content (QCVN-41-conformant). | Closed loop passes in simulation across the scenario catalogue; radar gate decided. |
+| **3** | Simulation, algorithm, interface (3) | **Simulation harness** (documented synthetic sensor model, [ADR-0007](adr/ADR-0007-validation-and-data-strategy.md)); perception + ROI gating + tracker; **state machine with dwell/hysteresis/occlusion-hold/multi-track/watchdog** ([ADR-0008](adr/ADR-0008-detection-persistence-and-multitrack.md)); ~~radar stationary-detection gate~~ **— removed; [ADR-0001](adr/ADR-0001-sensing-modality.md) Rejected, deferred to cấp sở;** warning UI content (QCVN-41-conformant). | Closed loop passes in simulation across the scenario catalogue; ~~radar gate decided~~ **— gate removed (no radar)**. |
 | **4** | Build/simulate test model (3) | **Bench rig**: camera (+radar) → edge → LED sign; actuator adapter with the **sign-controller dead-man's switch** (blank-on-heartbeat-loss); **health monitor + safe state + the three degraded modes** ([ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)); telemetry to a minimal TMC; **fault-injection harness** (kill the SM process, **kill the edge box, cut the sign link**, drop each sensor). | Closed loop + fail-safe demonstrated; **SM-kill, box-kill, and link-cut each blank the sign**; degraded modes escalate correctly. |
 | **5** | Evaluate & expert review (1) | Run the **acceptance suite** (doc 01 §5); collect metrics; **expert review** (traffic, electronics, AI, road safety) per the proposal's method. | Metrics meet prototype targets; review feedback captured. |
 | **6** | Final report & next steps (1) | **Feasibility report**; updated infographic; **cấp sở field-pilot proposal** (siting, BoM, power/connectivity, safety case, budget). | Deliverables submitted; follow-on proposal ready. |
@@ -110,12 +127,12 @@ gantt
 
 Each phase exit is also a **go/no-go gate**:
 
-- **After P1 (radar spike)** — an early, cheap feasibility check on a procurable mmWave module. If it
-  cannot even *approach* stationary-in-clutter **+** shoulder/through-lane discrimination, decide **now**
-  — before the architecture leans its weight on radar — whether to fund a gate-grade module (reshaping
-  the budget) or to treat the night/adverse claim as field-deferred and the bench radar as
-  fusion-plumbing only ([ADR-0001](adr/ADR-0001-sensing-modality.md)). Catching this in month 1–2 rather
-  than month 9 is the entire point.
+- ~~**After P1 (radar spike)**~~ — **CLOSED 2026-07-10, not run.** The decision this gate existed to
+  force was taken directly: **no radar** ([ADR-0001](adr/ADR-0001-sensing-modality.md) Rejected). The
+  night/adverse claim is **not made at all**, R5 is unmitigated, and R20/R21 are accepted residuals.
+  Reason the spike was not needed: criterion (b) — shoulder/through-lane discrimination at the monitored
+  range — cannot be exercised on a bench at any budget, so the spike could only ever have half-answered
+  it. Catching this in month 1 rather than month 9 was the entire point, and it was.
 - **After P1 (QCVN-41 message gate)** — a regulatory long-lead item, treated like the radar spike.
   Confirm QCVN 41 actually provides a conformant element for "stopped vehicle on the shoulder ahead"
   **and** a *second* legal message for the congestion re-message. If the primary element does not exist,
@@ -127,11 +144,10 @@ Each phase exit is also a **go/no-go gate**:
   strategy or repeater signs (PL-04) before building.
 - **After P3** — if the state machine cannot hit false-alarm/miss targets in simulation, retune dwell/
   hysteresis/fusion before committing hardware effort.
-- **After P3 (radar gate)** — confirm the Phase-1 spike on the *final* hardware, now including
-  **lane discrimination**: if a real radar cannot reliably pick a *stationary* vehicle out of roadside
-  clutter **and** place it in the shoulder ROI, the night/adverse claim is **not** evidence-backed —
-  fund a better radar or **down-scope the adverse-condition target to field-deferred**; do not rest it
-  on synthetic data ([ADR-0001](adr/ADR-0001-sensing-modality.md)).
+- ~~**After P3 (radar gate)**~~ — **REMOVED 2026-07-10; deferred to cấp sở.** There is no radar to gate.
+  The instruction this gate carried has been executed in the only way left: the adverse-condition target
+  is **down-scoped** and **not rested on synthetic data**
+  ([ADR-0001](adr/ADR-0001-sensing-modality.md) Rejected; [doc 04](04-risk-and-safety.md) R5/R20/R21).
 - **After P4** — if fault-injection coverage is below target, the fail-safe design
   ([ADR-0005](adr/ADR-0005-fail-safe-and-system-safety.md)/[ADR-0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.md)/[ADR-0013](adr/ADR-0013-degraded-hold-unification.md))
   is not yet acceptance-ready; in particular **SM-kill, edge-box-kill, and link-cut must each blank the
