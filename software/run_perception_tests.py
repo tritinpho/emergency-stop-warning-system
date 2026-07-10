@@ -112,8 +112,10 @@ def _closed_loop(case):
     on_at = {}
     for i in range(steps):
         t = round(i * TICK_DT, 3)
+        # radar False: the bench build is camera-only (ADR-0001 Rejected), so the closed loop is
+        # exercised in CAMERA_ONLY -- the only sensing mode this prototype can actually be in.
         decision = sm.tick(t, perc.step(detections_at(case, t), t),
-                           {"camera": True, "radar": True})
+                           {"camera": True, "radar": False})
         frame = actuator.step(t, decision)
         if frame is not None:
             sign.receive(t, frame)

@@ -78,7 +78,9 @@ def _closed_loop(case):
         t = round(i * TICK_DT, 3)
         boxes, cids, confs = yolo_frame(case, t)
         dets = detections_from_yolo(boxes, cids, confs, COCO_LABELS)
-        decision = sm.tick(t, perc.step(dets, t), {"camera": True, "radar": True})
+        # radar False: the bench build is camera-only (ADR-0001 Rejected), so the closed loop is
+        # exercised in CAMERA_ONLY -- the only sensing mode this prototype can actually be in.
+        decision = sm.tick(t, perc.step(dets, t), {"camera": True, "radar": False})
         frame = actuator.step(t, decision)
         if frame is not None:
             sign.receive(t, frame)

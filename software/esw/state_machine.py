@@ -80,8 +80,12 @@ class StateMachine:
         self.tracks = {}
 
     def _mode(self, health):
-        cam = health.get("camera", True)
-        rad = health.get("radar", True)
+        # A MISSING key means that sensor reported no liveness at all, so it is absent, not healthy.
+        # Camera-only build (ADR-0001 Rejected): a health dict legitimately carries no "radar" key,
+        # and defaulting it True would read FULL -- silently retiring the permanent CAMERA_ONLY /
+        # DEGRADED posture that R21 records as an accepted consequence of the descope.
+        cam = health.get("camera", False)
+        rad = health.get("radar", False)
         if cam and rad:
             return FULL
         if cam and not rad:
@@ -114,7 +118,7 @@ class StateMachine:
         alarm_count}. `inputs` carries the non-IF-2 channels: {sign_status (IF-3 read-back),
         ota (IF-9 request), drift (FR-10 monitor)}."""
         if health is None:
-            health = {"camera": True, "radar": True}
+            health = {"camera": True, "radar": False}   # no monitor wired -> the camera-only build
         if inputs is None:
             inputs = {}
         self._now = now
