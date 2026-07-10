@@ -42,7 +42,7 @@ def score(case, boot, timeline, link=None):
             fails.append(("tx-count", (case["tx_min"], case["tx_max"]), link.sent))
     for c in case.get("checks", []):
         rec = sample_at(timeline, c["t"])
-        for key in ("on", "state", "assertion", "mode"):
+        for key in ("on", "state", "assertion", "mode", "congestion_reason"):
             if key in c:
                 got = rec.get(key) if rec else None
                 if got != c[key]:

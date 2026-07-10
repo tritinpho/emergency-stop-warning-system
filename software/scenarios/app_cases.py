@@ -24,6 +24,21 @@ def _car(leave=60.0):
     return d
 
 
+def _jam(n, vx=20.0):
+    """`n` large vehicles CRAWLING across the 640x480 inference frame.
+
+    vx = 20 px/s through the affine CALIB (0.05 m/px) is 3.6 km/h -- above the 3.0 km/h
+    stationarity gate. So a queue like this yields ZERO stationary tracks, and the R14
+    track-count rule is blind to it: the only stationary vehicle in the scene is the shoulder car
+    it is supposed to protect. Density (count + occupancy) is what sees the jam."""
+    out = []
+    for i in range(n):
+        out.append({"cls_id": 2, "score": 0.90, "vx": vx,
+                    "xywh": [10 + (i % 3) * 200, 20 + (i // 3) * 200, 190, 180],
+                    "enter": 0.0, "leave": 60.0})
+    return out
+
+
 CASES = [
     {
         "id": "AP-01", "title": "stopped car -> whole app chain lights an AUTHENTICATED sign",
@@ -125,6 +140,27 @@ CASES = [
         # regression guard: the dead-man's window only ever needed a 4x margin.
         "checks": [{"t": 15.0, "on": True}],
         "tx_min": 15, "tx_max": 25,
+    },
+    {
+        "id": "AP-12", "title": "dense jam -> perception measures it -> sign suppressed (R14 end to end)",
+        "duration": 12.0,
+        # The whole density path through the real loop: raw YOLO boxes -> adapter -> perception
+        # measures n_vehicles + occupancy -> state machine suppresses. The point of the case is that
+        # the traffic CRAWLS at 3.6 km/h -- above the stationarity gate -- so the only stationary
+        # track in the scene is the shoulder car itself. The R14 track-count rule sees no jam at
+        # all here; `congestion_reason: density` is the assertion that the harvested signal, and
+        # nothing else, is what held the sign dark.
+        "objects": [_car()] + _jam(6),
+        "checks": [{"t": 10.0, "on": False, "state": "WARN_ON",
+                    "congestion_reason": "density"}],
+    },
+    {
+        "id": "AP-12c", "title": "(control) same shoulder car, jam removed -> sign lights",
+        "duration": 12.0,
+        # Without the jam the identical car warns. AP-12 therefore measures the suppression, not a
+        # car that never confirmed in the first place.
+        "objects": [_car()],
+        "checks": [{"t": 10.0, "on": True, "congestion_reason": None}],
     },
 ]
 

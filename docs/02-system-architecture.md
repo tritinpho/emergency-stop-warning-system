@@ -509,6 +509,8 @@ tunable *outside* this table.
 | `T_drift_debounce` | bounded constant | 2 s | **0–10 s** | a drift residual must exceed tolerance this long before the unit is marked DEGRADED (FR-10, R15) |
 | `T_sign_stuck_grace` | bounded constant | 0.5 s | **0–2 s** | IF-3 read-back may lag a commanded OFF this far past `T_signhold` before sign-stuck is declared ([ADR-0013 §C.3](adr/ADR-0013-degraded-hold-unification.md)) |
 | `congestion_min_tracks` | bounded constant | 4 | **3–10** | R14 jam threshold: stationary tracks scene-wide; the lower bound (≥ 3) exists so no pushed value can make ordinary 1–2-car shoulder stops self-suppress |
+| `congestion_min_vehicles` | bounded constant | 6 | **4–20** | R14 density corroboration (ADR-0016 #3): vehicle *detections* in frame. Both this and `congestion_min_occupancy` must hold. Bounded low because congestion **suppresses** the sign — an eager jam detector is a silent miss |
+| `congestion_min_occupancy` | bounded constant | 0.35 | **0.20–0.90** | R14 density corroboration: summed vehicle bbox area ÷ inference-frame area (boxes clipped to frame). Alone it would trip on one near-field truck, hence the AND with the count |
 | drift tolerance | bounded constant (per-site at commissioning) | per-site | within surveyed envelope | drift-monitor threshold (§4, R15) |
 
 **Rule:** the safety-critical backstops (`T_watchdog`, `T_signhold`, `T_assert_refresh`, `T_degraded_max`,

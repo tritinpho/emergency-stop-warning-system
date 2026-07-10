@@ -64,6 +64,7 @@ class StateMachine:
         self.mode = FULL
         self.escalation = None        # latched max-severity escalation (e.g. forced clear)
         self.config_rejected = None   # latched fail-loud report of the last runtime config push (FR-21)
+        self.congestion_reason = None # why the shoulder warning is R14-suppressed, if it is
         self.override_active = None    # applied operator override this tick (IF-10, ADR-0010)
         self.override_rejected = None  # reason an override was rejected/clamped, if any
         self.warn_evidence_since = None  # last tick a warning had FRESH evidence (watchdog)
@@ -200,7 +201,34 @@ class StateMachine:
                     and o.get("cls", "car") != "person"
                     and o.get("speed_kph", 0.0) < gate):
                 stationary_ids.add(o["track_id"])
-        congestion = len(stationary_ids) >= cfg["congestion_min_tracks"]
+        stationary_jam = len(stationary_ids) >= cfg["congestion_min_tracks"]
+
+        # Density corroboration (R14, ADR-0016 backlog #3 -- harvested from ACLAB's
+        # OverVehiclesFilter). `inputs["scene"]` is a DETECTION-level count + frame occupancy from
+        # esw.perception, computed before association: in a jam, overlapping boxes churn track ids
+        # and the stationary-track count under-reports the jam it exists to catch.
+        #
+        # THE DIRECTION OF HARM DECIDES THE RULE. Congestion suppresses the sign, so a jam detector
+        # that fires too eagerly withholds a warning from a real shoulder breakdown -- a silent
+        # miss, the risk this whole system is built around. Their thresholds cannot be adopted:
+        # `max_vehicle_count = 2` reads ordinary free flow as a jam, and `max_occupancy = 0.4`
+        # trips on ONE near-field truck filling the frame. Correct for their filter, which gates
+        # TRACKING; wrong for ours, which gates the SIGN. So the density path demands BOTH a high
+        # vehicle count AND high occupancy, each bounded low in §7a, and it can only ADD suppression
+        # the stationary rule missed -- never subtract it.
+        scene = inputs.get("scene") or {}
+        occ = scene.get("occupancy")
+        density_jam = (occ is not None
+                       and scene.get("n_vehicles", 0) >= cfg["congestion_min_vehicles"]
+                       and occ >= cfg["congestion_min_occupancy"])
+
+        congestion = stationary_jam or density_jam
+        if stationary_jam:
+            self.congestion_reason = "stationary_tracks"
+        elif density_jam:
+            self.congestion_reason = "density"
+        else:
+            self.congestion_reason = None
 
         # Split IF-2 events by corroboration source (ICD IF-2 sensor_source). Camera
         # (or fused) events drive dwell / confirm / exit -- the camera owns class + image
@@ -507,4 +535,5 @@ class StateMachine:
                 "override_rejected": self.override_rejected,
                 "ota_deferred": self.ota_deferred, "alarm_count": self.alarm_count,
                 "config_rejected": self.config_rejected,
+                "congestion_reason": self.congestion_reason,
                 "cfg_ver": self.cfg_ver}

@@ -124,10 +124,11 @@ class K230Detector:
     Returning [] for a dead camera would make the unit permanently, silently blind: the health
     monitor would call the camera healthy and the state machine would sit in IDLE forever."""
 
-    def __init__(self, pipeline, det):
+    def __init__(self, pipeline, det, preprocess=None):
         self.pl = pipeline
         self.det = det
         self.labels = det.labels
+        self.preprocess = preprocess    # optional frame transform; see main.py ESW_LIGHT_FILTER
         self.misses = 0
         self.frames = 0
 
@@ -137,6 +138,8 @@ class K230Detector:
             self.misses += 1
             return None
         try:
+            if self.preprocess is not None:
+                img = self.preprocess(img)
             res = self.det.run(img)
         except Exception as e:                 # inference failure is a dropped frame, never an empty one
             print("[DET] inference error:", e)

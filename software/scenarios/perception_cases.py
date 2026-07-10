@@ -21,6 +21,7 @@ CALIB = {
     "score_min": 0.4, "score_low": 0.1, "assoc_gate_m": 3.0,
     "track_max_age_s": 2.0,      # coast a lost track this long before retiring its id
     "speed_window_s": 0.5, "speed_alpha": 0.3,   # jitter-robust speed (baseline + EMA)
+    "frame_wh": [640, 480],      # inference-frame size -> R14 scene occupancy (ADR-0016 #3)
 }
 
 # A PERSPECTIVE camera calibration (≈6 m mast, 20° down-tilt, f≈500 px) for PC-11. The
@@ -172,5 +173,26 @@ CASES = [
         "checks": [{"t": 8.0, "n_detected": 1, "n_in_roi": 0,
                     "max_in_roi_gt": 0.35, "max_in_roi_lt": 0.5}],   # ~0.42, not the box's ~0.58
         "loop_checks": [{"t": 10.0, "on": False}],                    # no false confirmation
+    },
+    {
+        "id": "PC-12", "title": "Scene density measured from detections, before tracking (R14)",
+        "duration": 4.0,
+        # Six stationary cars, each 80x80 px in the 640x480 frame: 6 * 6400 / 307200 = 0.125.
+        # The state machine's density gate needs BOTH >= 6 vehicles and >= 0.35 occupancy, so this
+        # scene is dense in count and sparse in area: it must NOT read as a jam. What is asserted
+        # here is the MEASUREMENT; whether it suppresses is SC-44/45/46's job.
+        "objects": [
+            {"id": "v1", "cls": "car", "enter": 0.0, "leave": 4.0, "bbox": [40, 300, 120, 380]},
+            {"id": "v2", "cls": "car", "enter": 0.0, "leave": 4.0, "bbox": [130, 300, 210, 380]},
+            {"id": "v3", "cls": "car", "enter": 0.0, "leave": 4.0, "bbox": [220, 300, 300, 380]},
+            {"id": "v4", "cls": "car", "enter": 0.0, "leave": 4.0, "bbox": [310, 300, 390, 380]},
+            {"id": "v5", "cls": "car", "enter": 0.0, "leave": 4.0, "bbox": [400, 300, 480, 380]},
+            {"id": "v6", "cls": "car", "enter": 0.0, "leave": 4.0, "bbox": [490, 300, 570, 380]},
+            # A bystander. Excluded from the vehicle count and from occupancy (SC-43): three people
+            # standing by the road are not a jam and must not suppress a genuine shoulder warning.
+            {"id": "p1", "cls": "person", "enter": 0.0, "leave": 4.0, "bbox": [10, 10, 60, 130]},
+        ],
+        "checks": [{"t": 2.0, "n_detected": 7}],
+        "scene_checks": [{"t": 2.0, "n_vehicles": 6, "occupancy": 0.125}],
     },
 ]

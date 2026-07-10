@@ -304,7 +304,10 @@ class _SmokeStore:
 
 
 _scal = {"H": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
-         "roi": [[300.0, 500.0], [500.0, 500.0], [500.0, 700.0], [300.0, 700.0]]}
+         "roi": [[300.0, 500.0], [500.0, 500.0], [500.0, 700.0], [300.0, 700.0]],
+         # 720 tall: the smoke's car sits at y 520..600, so a 480-tall frame would (correctly)
+         # clip its area to zero. Occupancy counts pixels that exist.
+         "frame_wh": [640, 720]}
 _srad = _SmokeRadio()
 _sclk = _SmokeClock()
 _sst = _SmokeStore()
@@ -325,6 +328,11 @@ check("app drives the sign after dwell (IF-4 frames transmitted)", len(_srad.fra
 # five-fold over the ADR-0014 433 MHz duty budget, with the lamp looking identical.
 check("app throttles IF-4 to T_assert_refresh, not the 10 Hz tick", len(_srad.frames) < 30)
 check("app persists evidence to the durable store", len(_sst.entries) > 0)
+# R14 scene density measured under mpy: one 80x80 car in a 640x720 frame -> 6400/460800.
+check("perception measures R14 scene density (ADR-0016 #3)",
+      _sapp.perception.scene["n_vehicles"] == 1 and
+      approx(_sapp.perception.scene["occupancy"], 6400.0 / 460800.0, 1e-9))
+check("app reports the density_congestion capability", _sboot["density_congestion"] is True)
 
 print("-" * 60)
 if _fails:

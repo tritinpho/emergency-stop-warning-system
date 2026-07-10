@@ -30,9 +30,9 @@ jobs:
           python-version: '3.12'
       - name: MicroPython-safety gate (AST lint on esw/)
         run: python software/tools/mp_safe_check.py software/esw
-      - name: Level-A -- state machine (SC-01..43)
+      - name: Level-A -- state machine (SC-01..47)
         run: python software/run_tests.py
-      - name: Level-B -- perception IF-1->IF-2 (PC-01..11)
+      - name: Level-B -- perception IF-1->IF-2 (PC-01..12)
         run: python software/run_perception_tests.py
       - name: Level-C -- health monitor (HM-01..06)
         run: python software/run_health_tests.py
@@ -44,7 +44,7 @@ jobs:
         run: python software/run_command_tests.py
       - name: Level-G -- K230 merged pipeline (IT-01..04, ADR-0016)
         run: python software/run_integration_tests.py
-      - name: Level-H -- the device application loop (AP-01..11)
+      - name: Level-H -- the device application loop (AP-01..12)
         run: python software/run_app_tests.py
       - name: esw smoke -- perception + geometry + sink + command + adapter + app loop
         run: python software/tools/mpy_smoke.py

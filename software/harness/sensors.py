@@ -135,6 +135,20 @@ def drift_at(scenario, t):
     return False
 
 
+def scene_at(scenario, t):
+    """Scene density (R14) at tick t: {n_vehicles, occupancy}. On a real unit esw.perception
+    measures this from the detections; Level A drives the state machine from IF-2 events directly,
+    so it is injected here as `scene: [[t0, t1, n_vehicles, occupancy], ...]`.
+
+    The default is `occupancy: None` -- perception could not measure it (no frame_wh) -- which
+    turns the density path OFF. That is the conservative default: the density path can only ADD
+    suppression, and suppression withholds a warning."""
+    for w in scenario.get("scene", []):
+        if w[0] <= t < w[1]:
+            return {"n_vehicles": w[2], "occupancy": w[3]}
+    return {"n_vehicles": 0, "occupancy": None}
+
+
 def gnss_at(scenario, t):
     """GNSS/PPS lock state at tick t for the health monitor (NFR-16): False while a
     `gnss_loss` window is scripted, True (locked) otherwise."""

@@ -2,14 +2,14 @@
 
 This is **workstream #1** from the build plan: the event-level ("Level A") simulation
 harness ([doc 07 §2](../docs/07-simulation-methodology.md)) driving the **real** decision
-state machine as the system under test (SUT), scored against the **SC-01..43** scenario
+state machine as the system under test (SUT), scored against the **SC-01..47** scenario
 oracles ([doc 07 §5](../docs/07-simulation-methodology.md)). A second board adds the
 **Level-B** perception stage (IF-1→IF-2) — the real ROI-gating + tracking pipeline driven by
-scripted *detections* (with doc 07 §3.1 detector nuisances) — scored against **PC-01..11**.
+scripted *detections* (with doc 07 §3.1 detector nuisances) — scored against **PC-01..12**.
 
 It embodies the three build decisions in **[ADR-0015](../docs/adr/ADR-0015-state-machine-implementation-strategy.md)**:
 
-1. **The SC-01..43 oracles are the executable spec.** The state machine is correct when
+1. **The SC-01..47 oracles are the executable spec.** The state machine is correct when
    its sign-over-time matches every scenario's oracle. TDD against the board.
 2. **Fixed-rate tick execution.** `StateMachine.tick(now, observations, health)` is called
    every cycle (10 Hz in the harness); timers are deadlines against `now`, no wall-clock is
@@ -46,7 +46,7 @@ software/
     commands.py     #   Level-F: scenario commands -> authenticated IF-8/9/10 frames (+ forged/replay)
     devices.py      #   Level-H: host backends for esw/app.py (camera, radio, clock, store, capture)
   scenarios/
-    catalogue.py        #   SC-01..43 — Level-A executable spec (the state machine)
+    catalogue.py        #   SC-01..47 — Level-A executable spec (the state machine)
     perception_cases.py #   PC-01.. — Level-B perception cases (IF-1→IF-2)
     health_cases.py     #   HM-01.. — Level-C health-monitor unit cases
     evidence_cases.py   #   EV-01.. — Level-D acceptance-evidence set (with ground-truth oracles)
@@ -65,7 +65,7 @@ software/
 ## Run
 
 ```
-python software/run_tests.py             # Level A — SC-01..43 state-machine board
+python software/run_tests.py             # Level A — SC-01..47 state-machine board
 python software/run_perception_tests.py  # Level B — perception (IF-1→IF-2) board
 python software/run_health_tests.py      # Level C — health-monitor (FR-10/NFR-16/IF-5) board
 python software/run_metrics.py           # Level D — acceptance-evidence reducer + sample report
@@ -101,7 +101,7 @@ perception pipeline is byte-identical in sim and on the board.
 
 ## The boards today
 
-**Level A — `run_tests.py`: 43 passing · 0 red · 0 pending** (`exit 0`). The full SC-01..43
+**Level A — `run_tests.py`: 47 passing · 0 red · 0 pending** (`exit 0`). The full SC-01..47
 catalogue: the happy path, dwell / creep / cold-start, pass-through, the set-based occlusion
 policy (`WARN_HOLD → CAMERA_OCCLUDED_DEGRADED → T_degraded_max` forced clear, incl. the
 weak-(b) stale-ON guard), the FULL / CAMERA-ONLY / RADAR-ONLY / NEITHER sensor-mode matrix

@@ -113,7 +113,10 @@ class EdgeApp:
                 "absolute_time": self.clock.wall_ms() is not None,
                 "durable_evidence": self.outbox is not None,
                 "oversight_uplink": self._transport is not None,
-                "capture": self._capture is not None}
+                "capture": self._capture is not None,
+                # Not a SAFETY cap: without frame_wh the density path is off, which can only make
+                # the unit warn MORE (cry-wolf), never less. Reported so it is not assumed present.
+                "density_congestion": self.perception.scene_enabled}
         degraded = []
         i = 0
         while i < len(_SAFETY_CAPS):
@@ -142,6 +145,7 @@ class EdgeApp:
                "absolute_time": self.caps["absolute_time"],
                "durable_evidence": self.caps["durable_evidence"],
                "oversight_uplink": self.caps["oversight_uplink"],
+               "density_congestion": self.caps["density_congestion"],
                "degraded": self.caps["degraded"]}
         if self.outbox is not None:
             self.outbox.record([rec])
@@ -222,7 +226,8 @@ class EdgeApp:
                   "ota": ota,
                   "ack": ack,
                   "config_push": config_push,
-                  "drift": drift}
+                  "drift": drift,
+                  "scene": self.perception.scene}     # R14 density (needs calib frame_wh)
         decision = self.sm.tick(now, events, health, override, inputs)
 
         # 5. IF-4. Silence is how the sign is ALLOWED to blank; a force-safe inhibits the refresh

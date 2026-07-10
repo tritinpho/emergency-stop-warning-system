@@ -64,7 +64,8 @@ def drive(case, store=None, transport=None, capture=None):
         link.tick(t)
         d = app.last_decision or {}
         timeline.append({"t": t, "on": link.on, "state": d.get("state"),
-                         "assertion": d.get("assertion"), "mode": d.get("mode")})
+                         "assertion": d.get("assertion"), "mode": d.get("mode"),
+                         "congestion_reason": d.get("congestion_reason")})
     return app, boot, timeline, cap, link
 
 

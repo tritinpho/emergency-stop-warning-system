@@ -40,10 +40,12 @@ def _run(case):
     perc = Perception(case.get("calib", CALIB))       # a case may supply its own calibration
     steps = int(case["duration"] / TICK_DT) + 1
     timeline = []
+    scenes = []
     for i in range(steps):
         t = round(i * TICK_DT, 3)
         timeline.append((t, perc.step(detections_at(case, t), t)))
-    return timeline
+        scenes.append((t, dict(perc.scene)))          # R14 density, measured from the detections
+    return timeline, scenes
 
 
 def _events_at(timeline, t):
@@ -84,6 +86,25 @@ def _score(case, timeline):
                 all_ids.add(ev["track_id"])
         if len(all_ids) != case["n_ids"]:
             fails.append(("run", "n_ids", case["n_ids"], len(all_ids)))
+    return fails
+
+
+def _score_scene(case, scenes):
+    """The R14 density signal perception measures from the raw detections (ADR-0016 #3)."""
+    fails = []
+    for c in case.get("scene_checks", []):
+        sc = {}
+        for (tt, s) in scenes:
+            if tt <= c["t"] + 1e-9:
+                sc = s
+            else:
+                break
+        if "n_vehicles" in c and sc.get("n_vehicles") != c["n_vehicles"]:
+            fails.append((c["t"], "n_vehicles", c["n_vehicles"], sc.get("n_vehicles")))
+        if "occupancy" in c:
+            got = sc.get("occupancy")
+            if got is None or abs(got - c["occupancy"]) > 1e-6:
+                fails.append((c["t"], "occupancy", c["occupancy"], got))
     return fails
 
 
@@ -130,7 +151,8 @@ def main():
     surprises = []
     n_pass = 0
     for case in CASES:
-        fails = _score(case, _run(case))
+        timeline, scenes = _run(case)
+        fails = _score(case, timeline) + _score_scene(case, scenes)
         if "loop_checks" in case:
             fails = fails + _score_loop(case)
         if fails:

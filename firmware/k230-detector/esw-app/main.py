@@ -30,6 +30,20 @@ from detector import EswDetector, K230Detector, load_model_config
 
 from machine import UART
 
+# ADR-0016 backlog #3, LightFilter. ACLAB's noise-filters/light_filter.py clamps pixels above
+# v_threshold to compression_clamp -- a plausible mitigation for headlight glare, which matters
+# more now that radar is rejected and the camera carries night alone (ADR-0001). It is OFF here,
+# because turning it on would be a guess:
+#   * their own pipeline never feeds it to the detector either -- k230/main.py computes `light_res`
+#     and then runs inference on the RAW frame ("for maximum accuracy"). It is measured and dropped.
+#   * the detector is stock COCO YOLOv8n. Hard-clamping highlights shifts the input distribution
+#     away from what it was trained on. That can help at night and hurt in daylight, and no one has
+#     the imagery to say which.
+# This is an A/B question, and the evidence pipeline now answers it: capture a session with the
+# filter off and one with it on, then `python software/tools/score_capture.py` both. Do not enable
+# it in the safety path on the strength of the name.
+ESW_LIGHT_FILTER = False
+
 TICK_DT = 0.1                 # 10 Hz (ADR-0015 D2 fixed-rate tick)
 SYNC_EVERY_S = 30.0           # re-sync the controller's clock (doc 10 edge-synced mode)
 MODEL_INPUT_SIZE = [320, 320]
@@ -56,6 +70,10 @@ def load_calibration():
     calib = _load_json("/sdcard/esw/calib.json")
     if "H" not in calib or "roi" not in calib:
         raise ValueError("calib.json needs H (3x3 image->ground homography) and roi (CCW ground polygon)")
+    if "frame_wh" not in calib:
+        # Not fatal: without it the R14 density path is inert, which makes the unit warn MORE, not
+        # less. Reported at boot as `density_congestion` rather than assumed present.
+        print("[CALIB] no frame_wh -- R14 density congestion suppression is DISABLED")
     return calib
 
 
@@ -82,6 +100,7 @@ def announce(boot):
     print("  absolute_time (GNSS/PPS)         : %s" % boot["absolute_time"])
     print("  durable_evidence                 : %s" % boot["durable_evidence"])
     print("  oversight_uplink                 : %s" % boot["oversight_uplink"])
+    print("  density_congestion (R14)         : %s" % boot["density_congestion"])
     if boot["degraded"]:
         print("")
         print("  *** DEGRADED: %s" % (boot["degraded"],))
@@ -112,7 +131,17 @@ def main():
                 "model_ver": model["kmodel_path"],   # unpinned: no SHA is recorded anywhere (models/README.md)
                 "calib_ver": calib.get("version", "unversioned")}
 
-    backends = {"detector": K230Detector(pl, det),
+    preprocess = None
+    if ESW_LIGHT_FILTER:
+        sys.path.insert(0, "/sdcard/noise-filters")
+        from light_filter import LightFilter
+        _lf = LightFilter({})
+
+        def preprocess(frame):
+            r = _lf.process(frame)
+            return r.frame if r.success else frame
+
+    backends = {"detector": K230Detector(pl, det, preprocess),
                 "radio": radio,
                 "clock": clock,
                 "sign_status": UartSignStatus(uart),

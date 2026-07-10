@@ -13,7 +13,7 @@ from esw.health import HealthMonitor
 from esw.telemetry import Telemetry
 from esw import crypto, if4
 from harness.sensors import (observations_at, health_at, override_at, ota_at, drift_at, ack_at,
-                             gnss_at, selftest_at)
+                             gnss_at, scene_at, selftest_at)
 from harness.sign import Sign
 from harness.commands import CommandFeed
 
@@ -139,7 +139,8 @@ def run_scenario(scenario, outbox=None):
                       "ota": ota_flag,
                       "drift": drift_at(scenario, t),
                       "ack": ack_val,
-                      "config_push": cfg_push}
+                      "config_push": cfg_push,
+                      "scene": scene_at(scenario, t)}
             decision = sm.tick(t, observations_at(scenario, t), health, ov, inputs)
 
         # The edge emits an authenticated refresh iff it is alive and asserting SHOW. A dead
@@ -194,6 +195,7 @@ def run_scenario(scenario, outbox=None):
             "override_rejected": decision.get("override_rejected"),
             "ota_deferred": decision.get("ota_deferred"),
             "config_rejected": decision.get("config_rejected"),
+            "congestion_reason": decision.get("congestion_reason"),
             "alarm_count": decision.get("alarm_count"),
             "rejects": sign.rejects,
             "cmd_rejects": feed.rejects if feed is not None else 0,
@@ -225,8 +227,8 @@ def sign_on_at(timeline, t):
 # doc 07 §4 scores disposition correctness (degraded/clear/safe-state), not just
 # the sign -- e.g. SC-25/26/27 must prove mode/alert, not merely that ON matches.
 _DISPOSITION_KEYS = ("state", "posture", "mode", "alert", "override", "override_rejected",
-                     "ota_deferred", "config_rejected", "alarm_count", "hm_status",
-                     "cmd_rejects", "cmd_last_reject")
+                     "ota_deferred", "config_rejected", "congestion_reason", "alarm_count",
+                     "hm_status", "cmd_rejects", "cmd_last_reject")
 
 
 def evaluate(scenario, timeline):
