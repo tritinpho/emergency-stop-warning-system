@@ -43,10 +43,11 @@ merge reversible and avoid pinning a binary-in-git choice prematurely. Options f
 2. **External artifact store** — release asset / object storage, retrieved at deploy time by
    SHA (table above). Keeps the git repo lean.
 
-Until then, retrieve from the source repo (verify against the SHA-256 above):
+Until then, retrieve from the source repo (verify against the SHA-256 above). **The source
+repo is private** — you need to be granted access, and an unauthenticated clone will 404:
 
 ```bash
-git clone https://github.com/KendyKeb/Solar-Powered-Intelligent-Emergency-Lane-Monitoring-and-Warning-System
+gh repo clone KendyKeb/Solar-Powered-Intelligent-Emergency-Lane-Monitoring-and-Warning-System
 # day:   model/mp_deployment_source_day/best_AnchorBaseDet_can2_5_s_20260704215736.kmodel
 # night: model/mp_deployment_source_night/best_AnchorBaseDet_can2_5_s_20260702232105.kmodel
 ```
