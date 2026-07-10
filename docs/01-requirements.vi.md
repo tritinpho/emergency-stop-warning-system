@@ -10,6 +10,21 @@ Tài liệu này chuyển các mục tiêu được trình bày dưới dạng v
 
 ---
 
+> ## ⚠ LƯU Ý GIAI ĐOẠN — bản dựng này CHỈ DÙNG CAMERA
+>
+> [ADR-0001](adr/ADR-0001-sensing-modality.vi.md) (hợp nhất camera + radar) đã bị **Bác bỏ ngày 2026-07-10**. Nguyên mẫu trên bàn
+> (cấp trường) **chỉ dùng camera**. Mọi hành vi phụ thuộc radar được mô tả bên dưới — radar chứng thực,
+> khoảng giữ-khi-che-khuất (`WARN_HOLD` / `CAMERA_OCCLUDED_DEGRADED`), `T_degraded_max`, và các chế độ
+> cảm biến `FULL` / `RADAR-ONLY` — đều **đang tạm ngưng: mã nguồn vẫn giữ, nhưng không bao giờ chạy**,
+> vì `corr` không bao giờ đúng khi không có kênh radar.
+>
+> Hệ quả được chấp nhận: **R5** (mù ban đêm/mưa/sương mù) **không còn biện pháp giảm thiểu** và khả năng
+> phát hiện ban đêm/bất lợi **không được tuyên bố**; **R20** — xe bị che khuất bị xóa sau `T_hold`
+> (~10 giây), biển báo tắt trong khi mối nguy vẫn còn; **R21** — thiết bị nằm vĩnh viễn ở `CAMERA_ONLY`,
+> do đó vĩnh viễn `DEGRADED`. Xem [tài liệu 04](04-risk-and-safety.vi.md).
+>
+> Nội dung radar bên dưới là **thiết kế mục tiêu cấp sở**, không phải bản dựng của giai đoạn này.
+
 ## 1. Tái định khung an toàn (đọc phần này trước)
 
 Đề xuất xem công việc này là "phát hiện một chiếc xe đang dừng và hiển thị một bảng cảnh báo." Về mặt chức năng thì đúng, nhưng hệ thống này **liên quan đến an toàn**: đầu ra của nó ảnh hưởng đến cách những người lái xe đang di chuyển nhanh hành xử khi ở gần một chướng ngại vật đứng yên. Điều đó thay đổi cách chúng ta phải lập luận về sự cố.
@@ -84,7 +99,7 @@ Máy trạng thái (state machine) đầy đủ, kèm các bộ định thời v
 | NFR-02 | **Độ trễ** | Xe đã rời đi → cảnh báo TẮT trong vòng hold + ≤ 2 s. |
 | NFR-03 | **Độ sẵn sàng** | Độ sẵn sàng **chức năng** ≥ 99% trên mỗi điểm giám sát trong suốt giai đoạn thử nghiệm — tỉ lệ thời gian mà thiết bị thực sự có thể *phát hiện-và-cảnh báo đúng đặc tả*, không chỉ là "có điện và đang báo cáo"; thời gian ở trạng thái suy giảm/an toàn được tính là **không sẵn sàng**. Không tính bảo trì theo lịch. Đo tại hiện trường (xem §3a); **con số ≥ 99% là tạm thời, chờ một ngân sách độ tin cậy MTBF/MTTR** — một lần sửa chữa từ xa kéo dài nhiều ngày có thể làm cạn nó ([tài liệu 04 §5 Q6](04-risk-and-safety.vi.md#5-các-câu-hỏi-an-toàn-còn-mở-cho-nhóm)). |
 | NFR-04 | **Độ tin cậy** | Không một lỗi nào — **phần mềm *hay* phân biệt-cảm-biến** — được phép để một cảnh báo **BẬT cũ kỹ (stale ON)** kéo dài vô thời hạn. Một watchdog giới hạn thời gian mọi lần kích hoạt không có đối chứng; vì đối chứng bằng radar cố ý vô hiệu hóa watchdog, **`T_degraded_max`** giới hạn riêng việc giữ `CAMERA_OCCLUDED_DEGRADED` — cảnh báo bị giữ BẬT khi **camera không xác thực được vết (bị che khuất _hoặc_ lỗi)** mà radar nếu không sẽ duy trì mãi — buộc một định đoạt lớn tiếng ([tài liệu 02 §4](02-system-architecture.vi.md#4-máy-trạng-thái-phát-hiệncảnh-báo), [ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md), [ADR-0013](adr/ADR-0013-degraded-hold-unification.vi.md) làm cho giới hạn này không phụ thuộc nguyên nhân). Không trạng thái nào — và không chế độ cảm-biến-suy-giảm nào — giữ bảng BẬT mà thiếu xác nhận **được camera xác thực, quy-được-về-làn**. |
-| NFR-05 | **Độ bền vững** | Duy trì mức phát hiện mục tiêu trong mưa và vào ban đêm thông qua cảm biến đa cảm biến ([ADR-0001](adr/ADR-0001-sensing-modality.vi.md)) — **phụ thuộc vào cổng kiểm chứng phát hiện vật đứng yên bằng radar**; được kiểm chứng tại hiện trường, không thể tuyên bố từ một bàn thử radar tổng hợp (§3a, §5). |
+| ~~NFR-05~~ | **Độ bền vững** | **KHÔNG ĐẠT — đã giảm phạm vi 2026-07-10, và cố ý không hạ xuống thành một "Phải" yếu hơn.** Việc duy trì mức phát hiện trong mưa và ban đêm đòi hỏi cảm biến đa nguồn; [ADR-0001](adr/ADR-0001-sensing-modality.vi.md) (camera + radar) đã bị **Bác bỏ** cho giai đoạn này, nên không có cảm biến thứ hai. Độ bền vững ban đêm/mưa/sương mù **không được tuyên bố** và **R5 được mang theo mà không có biện pháp giảm thiểu** ([doc 04](04-risk-and-safety.vi.md)). Khôi phục ở cấp sở, nơi cổng radar có bối cảnh kiểm chứng. |
 | NFR-06 | **Tự chủ tại biên** | Vòng lặp phát hiện→cảnh báo phải hoạt động được khi WAN/đám mây hoàn toàn mất kết nối ([ADR-0002](adr/ADR-0002-edge-vs-cloud-processing.vi.md)). |
 | NFR-07 | **Năng lượng** | Chạy bằng điện lưới, hoặc pin mặt trời + ắc quy với khả năng tự chủ ≥ 72 h khi không có nắng ([ADR-0006](adr/ADR-0006-connectivity-and-power.vi.md)). |
 | NFR-08 | **Khả năng bảo trì** | Giám sát tình trạng từ xa, cấu hình từ xa, cập nhật OTA; các khối cảm biến/tính toán/bảng cảnh báo dạng mô-đun. |
@@ -108,7 +123,7 @@ Không phải mọi yêu cầu ở trên đều có thể được *kiểm chứ
 | FR-09 (ngày/đêm/mưa/sương mù) | **S (xấp xỉ) + F** | Một bàn thử không thể tạo ra mưa/lóa/sương mù thật; mô phỏng chỉ xấp xỉ. Recall trong điều kiện thực được hoãn sang giai đoạn hiện trường. |
 | FR-17 (tái sử dụng VMS hiện có) | **F** | Cần một VMS thật do người vận hành điều khiển; bàn thử dùng một LED thay thế. |
 | NFR-03 (độ sẵn sàng chức năng) | **F** | Một chỉ số vận hành; bàn thử chỉ có thể đặc trưng hóa MTBF của vòng lặp phần mềm dưới điều kiện tiêm lỗi. |
-| NFR-05 (độ bền vững mưa/đêm) | **F** | Phụ thuộc vào cổng radar của [ADR-0001](adr/ADR-0001-sensing-modality.vi.md); không thể tuyên bố từ một bàn thử radar tổng hợp. |
+| ~~NFR-05~~ (độ bền vững mưa/đêm) | **—** | **Đã giảm phạm vi.** [ADR-0001](adr/ADR-0001-sensing-modality.vi.md) bị Bác bỏ 2026-07-10 → không radar, không cổng, không tuyên bố. Không phải "hoãn sang hiện trường" — mà là **rút lại** cho giai đoạn này (R5 không còn giảm thiểu). |
 | NFR-07 (pin mặt trời tự chủ ≥ 72 h) | **F** | Chỉ thiết kế ở phạm vi bàn thử (điện lưới phòng thí nghiệm). |
 | NFR-11 / NFR-14 (tiêu chuẩn, khả năng mở rộng) | **D** | Rà soát mức độ tuân thủ và lập luận kiến trúc, không phải một phép kiểm thử lúc chạy. |
 | NFR-13 (môi trường IP65) | **F** | Không có vỏ bảo vệ cấp hiện trường nào được chế tạo ở phạm vi bàn thử. |
@@ -177,7 +192,7 @@ L_unwarned ≈ τ · V        (quãng đường một xe đi sau đi được tr
 
 | Chỉ số | Định nghĩa | Chỉ tiêu mô hình thử nghiệm (bench/sim) | Chỉ tiêu thử nghiệm hiện trường |
 |--------|-----------|------------------------------|--------------------|
-| **Recall — phương tiện** | số sự kiện xe dừng thực được phát hiện ÷ tất cả sự kiện như vậy | ≥ 95% ban ngày (bench/sim). **Ban đêm/điều kiện bất lợi bị khóa (gated)** — chỉ có thể tuyên bố nếu cổng radar của [ADR-0001](adr/ADR-0001-sensing-modality.vi.md) vượt qua trên phần cứng thật; nếu không thì **hoãn sang giai đoạn hiện trường**, không bao giờ khẳng định từ radar tổng hợp | ≥ 98% ban ngày · ≥ 95% ban đêm/điều kiện bất lợi |
+| **Recall — phương tiện** | số sự kiện xe dừng thực được phát hiện ÷ tất cả sự kiện như vậy | ≥ 95% ban ngày (bench/sim). **Ban đêm/bất lợi: KHÔNG CÓ MỤC TIÊU, KHÔNG TUYÊN BỐ.** [ADR-0001](adr/ADR-0001-sensing-modality.vi.md) đã bị Bác bỏ 2026-07-10, nên cổng radar sẽ không bao giờ chạy và tuyên bố này bị **rút lại**, không phải hoãn. Không bao giờ khẳng định từ radar tổng hợp. Chỉ báo cáo recall ban ngày, kèm cận dưới Wilson trên các lượt thu **thật** | ≥ 98% ban ngày · ≥ 95% ban đêm/bất lợi *(cấp sở)* |
 | **Recall — người đi bộ** | số sự kiện người mắc kẹt trên xe được phát hiện ÷ tất cả sự kiện như vậy (FR-08) | theo dõi **riêng biệt**, nỗ lực tối đa (RCS nhỏ + camera yếu nhất vào ban đêm); chỉ tiêu được đặt sau khi có dữ liệu Giai đoạn 3, **không** giả định bằng với phương tiện | ≥ 90% ban ngày · nỗ lực tối đa vào ban đêm |
 | **Tỉ lệ kích hoạt sai** | các cảnh báo sai ÷ **mức phơi nhiễm (exposure)** — báo cáo **cả hai** trên mỗi 100 kịch bản dàn dựng *và* trên mỗi giờ vận hành (số đếm thô qua các tổ hợp kịch bản khác nhau không thể so sánh được) | ≤ 1 trên mỗi 100 kịch bản dàn dựng *và* một tỉ lệ trên mỗi giờ được báo cáo | **tạm thời** ≤ 1 / điểm / tuần, **chờ hiệu chỉnh niềm tin của người vận hành** ([tài liệu 04 §5](04-risk-and-safety.vi.md#5-các-câu-hỏi-an-toàn-còn-mở-cho-nhóm)) |
 | **Độ trễ phát hiện** | phương tiện trở nên đứng yên → cảnh báo BẬT | ≤ dwell + 2 s | như nhau |
@@ -234,7 +249,7 @@ L_unwarned ≈ τ · V        (quãng đường một xe đi sau đi được tr
 |---|-----------------|------------------------|-----|
 | 1 | "Phát hiện một chiếc xe đang dừng, hiển thị một bảng cảnh báo." | Tái định khung thành một hệ thống **liên quan đến an toàn** với các yêu cầu an toàn khi sự cố + niềm tin. | Sự cố thầm lặng và báo động giả lặp lại mới là những rủi ro thực sự. |
 | 2 | Bảng cảnh báo "ở đầu làn." | **Yêu cầu bố trí dựa trên DSD** với các con số theo từng tốc độ (§4). | Nếu không, cảnh báo có thể quá muộn để hữu ích. |
-| 3 | Đa cảm biến được liệt kê như một tùy chọn "có thể phát triển hướng tới." | **Nâng camera+radar lên thành cốt lõi** cho điều kiện đêm/mưa/sương mù. | Đó là những điều kiện rủi ro cao được nêu tên và phương án chỉ-camera là yếu nhất ở đó. |
+| 3 | Đa cảm biến được liệt kê như một tùy chọn "có thể phát triển hướng tới." | **Camera+radar đã được nâng lên thành cốt lõi** cho điều kiện đêm/mưa/sương mù — rồi **bị Bác bỏ cho giai đoạn này (2026-07-10)** vì chi phí, và vì tiêu chí cổng (b) không kiểm chứng được trên bàn thử. Bản dựng **chỉ dùng camera**; tuyên bố đêm/bất lợi bị rút lại; **R5 không còn giảm thiểu**; radar trở lại ở cấp sở. | Đó là những điều kiện rủi ro cao được nêu tên và phương án chỉ-camera là yếu nhất ở đó — chính vì thế khoảng trống này được *nêu rõ* thay vì che lấp bằng radar tổng hợp. |
 | 4 | "Vòng kín: phát hiện–xác nhận–cảnh báo–theo dõi–hủy." | Biến thành một **máy trạng thái cụ thể** với dwell + trễ (hysteresis) + watchdog. | Ngăn các lần kích hoạt sai, sự chập chờn, và tình trạng BẬT cũ kỹ. |
 | 5 | "Bộ xử lý trung tâm." | Được đặc tả thành **cục bộ tại biên**; đám mây không trọng yếu. | Một cảnh báo an toàn không được phép chờ một vòng truyền qua mạng. |
 | 6 | "Đánh giá khả năng phát hiện." | **Các tiêu chí nghiệm thu bằng số** (§5). | "Đánh giá" cần một ngưỡng đạt/không đạt. |

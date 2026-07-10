@@ -19,6 +19,21 @@ amber is everything the driver sees. The detailed views follow below.*
 
 ---
 
+> ## ⚠ PHASE NOTE — this build is CAMERA-ONLY
+>
+> [ADR-0001](adr/ADR-0001-sensing-modality.md) (camera + radar fusion) was **Rejected on 2026-07-10**. The cấp trường bench
+> prototype ships **camera-only**. Every radar-dependent behaviour described below — radar
+> corroboration, the occlusion hold (`WARN_HOLD` / `CAMERA_OCCLUDED_DEGRADED`), `T_degraded_max`, and
+> the `FULL` / `RADAR-ONLY` sensing modes — is **dormant: the code retains it, but it never executes**,
+> because `corr` is never true without a radar channel.
+>
+> Accepted consequences: **R5** (night/rain/fog blindness) is **unmitigated** and night/adverse recall
+> is **not claimed**; **R20** — an occluded vehicle is cleared at `T_hold` (~10 s), blanking the sign
+> with the hazard present; **R21** — the unit sits permanently in `CAMERA_ONLY`, hence permanently
+> `DEGRADED`. See [doc 04](04-risk-and-safety.md).
+>
+> Radar content below is the **cấp sở** target design, not this phase's build.
+
 ## 1. Architectural drivers
 
 The shape of this architecture follows directly from the requirements:

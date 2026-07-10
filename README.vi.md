@@ -58,7 +58,7 @@ phản ánh trung thực bởi kiến trúc trong tài liệu 02.
 ```mermaid
 flowchart LR
     subgraph Field["Roadside Unit (edge, at the monitored segment)"]
-        S["Sensors<br/>AI camera + radar"] --> E["Edge controller<br/>detect · confirm · decide"]
+        S["Sensors<br/>AI camera<br/>(radar: cấp sở)"] --> E["Edge controller<br/>detect · confirm · decide"]
         E --> A["Warning actuators<br/>upstream VMS / LED sign"]
         E -.heartbeat / telemetry.-> N
     end
@@ -93,16 +93,24 @@ chỉnh. Những điểm quan trọng nhất:
    định và chuyển làn*. Tài liệu 01 dẫn xuất cự ly cảnh báo phía trước cần thiết
    (cự ly tầm nhìn / cự ly tầm nhìn quyết định) và biến nó thành một yêu cầu bắt buộc.
 
-3. **Nâng cảm biến đa cảm biến từ "tùy chọn" lên "cốt lõi" cho các điều kiện quan trọng.**
-   Thuyết minh nêu đêm / mưa / sương mù / chói lóa là các điều kiện rủi ro cao nhất — và đây chính là
-   nơi một hệ thống chỉ dùng camera yếu nhất. Chúng tôi khuyến nghị **hợp nhất camera + radar** (radar
-   thấy được khoảng cách và sự hiện diện trong bóng tối và xuyên qua mưa/sương mù).
-   Xem [ADR-0001](docs/adr/ADR-0001-sensing-modality.vi.md).
+3. **Đã xác định cảm biến đa nguồn là câu trả lời đúng cho các điều kiện quan trọng — rồi không đủ
+   kinh phí cho nó.** Thuyết minh nêu đêm / mưa / sương mù / chói lóa là các điều kiện rủi ro cao
+   nhất, và đây chính là nơi một hệ thống chỉ dùng camera yếu nhất. **Hợp nhất camera + radar** là câu
+   trả lời về mặt thiết kế. Nó đã bị **Bác bỏ cho giai đoạn này ngày 2026-07-10**: tiêu chí cổng quyết
+   định (phân giải lề đường với làn thông hành ở **cự ly giám sát**) không thể kiểm chứng trên bàn thử
+   ở bất kỳ mức ngân sách nào đề tài này với tới được. **Bản dựng này chỉ dùng camera, và do đó tuyên
+   bố về ban đêm/điều kiện bất lợi không được đưa ra** — rủi ro R5 được mang theo mà không có biện pháp
+   giảm thiểu, thay vì dựa nó lên radar tổng hợp. Xem
+   [ADR-0001](docs/adr/ADR-0001-sensing-modality.vi.md) và [doc 04](docs/04-risk-and-safety.vi.md)
+   (R5, R20, R21). Radar sẽ trở lại cùng đề tài hiện trường cấp sở.
 
 4. **Cụ thể hóa vòng kín** thành một máy trạng thái với **xác nhận theo thời gian chờ (dwell), trễ
-   (hysteresis), giữ trạng thái khi che khuất có radar chứng thực, ngữ nghĩa tập hợp đa phương tiện,
-   một bộ giám sát (watchdog), và một trạng thái an toàn theo cơ chế an toàn tự kích hoạt khi mất tín
-   hiệu (dead-man's switch)** — để một chiếc xe chỉ đơn thuần đi ngang qua không kích hoạt sai, một lần
+   (hysteresis), ngữ nghĩa tập hợp đa phương tiện, một bộ giám sát (watchdog), và một trạng thái an
+   toàn theo cơ chế tự ngắt an toàn (dead-man's switch)** — để một chiếc xe chỉ đơn thuần đi ngang qua
+   không kích hoạt sai, và một bộ điều khiển bị sập không thể để biển báo kẹt BẬT. **Khoảng giữ-khi-che-khuất
+   có radar chứng thực** đã được thiết kế và hiện thực nhưng **đang tạm ngưng trong bản dựng chỉ-dùng-camera
+   này**: một xe tải che lề đường lâu hơn `T_hold` (~10 giây) *sẽ* làm rơi cảnh báo (một lần xóa lớn tiếng,
+   có báo cho người trực — R20). Một lần
    che khuất kéo dài bởi xe tải dài không làm rớt một cảnh báo đang hoạt động, và một bộ điều khiển bị
    sập không thể để bảng cảnh báo kẹt ở trạng thái bật. **Cơ chế tự ngắt an toàn (dead-man's switch)
    nằm trong bộ điều khiển biển báo** (nên một hộp biên bị chết hoặc một liên kết bị cắt cũng làm trống

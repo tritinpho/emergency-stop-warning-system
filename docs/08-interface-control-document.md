@@ -17,6 +17,21 @@ to first integration** (Phase 4) — see [§7](#7-frozen-in-v1-vs-deferred-to-in
 
 ---
 
+> ## ⚠ PHASE NOTE — this build is CAMERA-ONLY
+>
+> [ADR-0001](adr/ADR-0001-sensing-modality.md) (camera + radar fusion) was **Rejected on 2026-07-10**. The cấp trường bench
+> prototype ships **camera-only**. Every radar-dependent behaviour described below — radar
+> corroboration, the occlusion hold (`WARN_HOLD` / `CAMERA_OCCLUDED_DEGRADED`), `T_degraded_max`, and
+> the `FULL` / `RADAR-ONLY` sensing modes — is **dormant: the code retains it, but it never executes**,
+> because `corr` is never true without a radar channel.
+>
+> Accepted consequences: **R5** (night/rain/fog blindness) is **unmitigated** and night/adverse recall
+> is **not claimed**; **R20** — an occluded vehicle is cleared at `T_hold` (~10 s), blanking the sign
+> with the hazard present; **R21** — the unit sits permanently in `CAMERA_ONLY`, hence permanently
+> `DEGRADED`. See [doc 04](04-risk-and-safety.md).
+>
+> Radar content below is the **cấp sở** target design, not this phase's build.
+
 ## 1. Interface inventory
 
 ```
@@ -62,9 +77,9 @@ The contract the **event-level simulation** ([doc 07 §2](07-simulation-methodol
 | `class` | enum | `car·truck·bus·motorcycle·person` |
 | `footprint` | polygon / bbox | ground footprint (preferred) or image bbox |
 | `in_roi` | float | **fractional overlap** of footprint with ROI polygon (gate ≥ 0.5, [doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine)) |
-| `range_m` | float | metres (radar) |
+| `range_m` | float | metres (radar) — **always absent this phase** ([ADR-0001](adr/ADR-0001-sensing-modality.md) Rejected) |
 | `speed_kph` | float | km/h; signed toward/away |
-| `sensor_source` | enum/flags | `camera·radar·fused` — lets the SM know corroboration source |
+| `sensor_source` | enum/flags | `camera·radar·fused` — lets the SM know corroboration source. **This phase emits only `camera`**; `radar`/`fused` are cấp sở values, so `corr` is never true and the occlusion hold never arms (R20) |
 | `ts` | timestamp | **absolute**, GNSS/PPS-disciplined (NFR-16) |
 
 ### IF-3 — Sign command + status read-back (State machine ↔ Actuator abstraction)
@@ -139,8 +154,8 @@ Fixed cadence; carries health **and posture** so a degraded unit can never look 
 |-------|------|-------|
 | `site_id` | string | |
 | `fw_ver` `cfg_ver` `model_ver` `calib_ver` | hashes | **version fingerprint** (R10 audit, [doc 02 §7](02-system-architecture.md#7-interfaces--contracts-initial)) |
-| `subsystem_health[]` | list | per camera/radar/compute/link/sign |
-| `sensor_mode` | enum | `FULL·CAMERA-ONLY·RADAR-ONLY·NEITHER` ([ADR-0009 §B](adr/ADR-0009-failsafe-placement-and-degraded-modes.md), [ADR-0013](adr/ADR-0013-degraded-hold-unification.md) matrix) |
+| `subsystem_health[]` | list | per camera/radar/compute/link/sign — **no radar subsystem this phase** |
+| `sensor_mode` | enum | `FULL·CAMERA-ONLY·RADAR-ONLY·NEITHER` ([ADR-0009 §B](adr/ADR-0009-failsafe-placement-and-degraded-modes.md), [ADR-0013](adr/ADR-0013-degraded-hold-unification.md) matrix). **Only `CAMERA-ONLY` and `NEITHER` are reachable this phase** — the unit therefore reports a permanent `DEGRADED` posture (R21) |
 | `posture` | enum | `NORMAL·OVERRIDDEN·BLIND-TO-NEW·CAMERA_OCCLUDED_DEGRADED·SAFE_STATE` |
 | `drift_status` | enum | drift-monitor verdict (FR-10, R15) |
 | `state` | enum | current warning state |

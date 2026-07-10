@@ -6,6 +6,21 @@
 **Ngày:** 2026-06-27
 **Người quyết định:** Chủ nhiệm đề tài (PI) (ThS. Phó Trí Tín), trưởng nhóm kỹ thuật, kỹ sư thị giác máy tính (CV), cố vấn an toàn giao thông đường bộ
 
+> ## ⚠ LƯU Ý GIAI ĐOẠN — bản dựng này CHỈ DÙNG CAMERA
+>
+> [ADR-0001](ADR-0001-sensing-modality.vi.md) (hợp nhất camera + radar) đã bị **Bác bỏ ngày 2026-07-10**. Nguyên mẫu trên bàn
+> (cấp trường) **chỉ dùng camera**. Mọi hành vi phụ thuộc radar được mô tả bên dưới — radar chứng thực,
+> khoảng giữ-khi-che-khuất (`WARN_HOLD` / `CAMERA_OCCLUDED_DEGRADED`), `T_degraded_max`, và các chế độ
+> cảm biến `FULL` / `RADAR-ONLY` — đều **đang tạm ngưng: mã nguồn vẫn giữ, nhưng không bao giờ chạy**,
+> vì `corr` không bao giờ đúng khi không có kênh radar.
+>
+> Hệ quả được chấp nhận: **R5** (mù ban đêm/mưa/sương mù) **không còn biện pháp giảm thiểu** và khả năng
+> phát hiện ban đêm/bất lợi **không được tuyên bố**; **R20** — xe bị che khuất bị xóa sau `T_hold`
+> (~10 giây), biển báo tắt trong khi mối nguy vẫn còn; **R21** — thiết bị nằm vĩnh viễn ở `CAMERA_ONLY`,
+> do đó vĩnh viễn `DEGRADED`. Xem [tài liệu 04](../04-risk-and-safety.vi.md).
+>
+> Nội dung radar bên dưới là **thiết kế mục tiêu cấp sở**, không phải bản dựng của giai đoạn này.
+
 ## Bối cảnh
 
 Máy trạng thái ra quyết định ([tài liệu 02 §4](../02-system-architecture.vi.md#4-máy-trạng-thái-phát-hiệncảnh-báo)) phải giữ một cảnh báo ở trạng thái BẬT chừng nào một mối nguy thực vẫn còn hiện diện, và xóa nó kịp thời khi mối nguy thực sự rời đi — dưới ba thực tế hiện trường mà bản phác thảo đầu tiên của vòng lặp đã không phân tách:
@@ -45,7 +60,7 @@ Các bộ định thời cụ thể và sơ đồ trạng thái được bổ su
 **Ưu điểm:** đơn giản tầm thường.
 **Nhược điểm:** lẫn lộn rời đi với che khuất; đơn vết; buộc phải có một sự thỏa hiệp bộ định thời thiếu an toàn.
 
-### Phương án B: Dựa trên tập hợp, phân biệt thoát-ra-so-với-mất-vết, giữ-được-radar-đối-chứng *(được chọn)*
+### Phương án B: Dựa trên tập hợp, phân biệt thoát-ra-so-với-mất-vết, giữ-được-radar-đối-chứng *(được chọn — ngữ nghĩa tập hợp và phân biệt thoát-ra/mất-vết vẫn chạy; **khoảng giữ có radar đối chứng đang tạm ngưng** trong giai đoạn chỉ-dùng-camera này, [ADR-0001](ADR-0001-sensing-modality.vi.md) bị Bác bỏ → xem R20)*
 | Khía cạnh | Đánh giá |
 |-----------|------------|
 | Độ phức tạp | Trung bình (ghi sổ tập hợp vết + biên thoát ra) |

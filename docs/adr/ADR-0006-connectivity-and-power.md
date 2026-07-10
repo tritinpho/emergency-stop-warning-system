@@ -4,6 +4,21 @@
 **Date:** 2026-06-26
 **Deciders:** PI, technical lead, field/installation engineer
 
+> ## ⚠ PHASE NOTE — this build is CAMERA-ONLY
+>
+> [ADR-0001](ADR-0001-sensing-modality.md) (camera + radar fusion) was **Rejected on 2026-07-10**. The cấp trường bench
+> prototype ships **camera-only**. Every radar-dependent behaviour described below — radar
+> corroboration, the occlusion hold (`WARN_HOLD` / `CAMERA_OCCLUDED_DEGRADED`), `T_degraded_max`, and
+> the `FULL` / `RADAR-ONLY` sensing modes — is **dormant: the code retains it, but it never executes**,
+> because `corr` is never true without a radar channel.
+>
+> Accepted consequences: **R5** (night/rain/fog blindness) is **unmitigated** and night/adverse recall
+> is **not claimed**; **R20** — an occluded vehicle is cleared at `T_hold` (~10 s), blanking the sign
+> with the hazard present; **R21** — the unit sits permanently in `CAMERA_ONLY`, hence permanently
+> `DEGRADED`. See [doc 04](../04-risk-and-safety.md).
+>
+> Radar content below is the **cấp sở** target design, not this phase's build.
+
 ## Context
 
 The proposal does not address two field realities that decide whether a roadside unit can be sited at
@@ -77,16 +92,18 @@ Option B is the balanced choice.
   private data egress.
 - **Harder:** solar/battery sizing, enclosure thermal design, and field maintenance; a hard power
   budget that sensor/compute choices must honour; store-and-forward sync logic (ordering, retention,
-  backpressure). The **gate-grade mmWave radar** ([ADR-0001](ADR-0001-sensing-modality.md)) draws more
-  than a generic presence unit — its power is a **first-class input to this budget**, reconciled like its
-  cost was ([doc 03 §1](../03-roadmap-and-phasing.md#1-scope--budget-reality-check-read-first)).
+  backpressure). ~~The **gate-grade mmWave radar** draws more than a generic presence unit — its power is
+  a first-class input to this budget.~~ **Void for this phase:** [ADR-0001](ADR-0001-sensing-modality.md)
+  is **Rejected (2026-07-10)**, so there is no radar and no radar draw. Reinstate this input at cấp sở,
+  when a module is actually selected ([doc 03 §1](../03-roadmap-and-phasing.md#1-scope--budget-reality-check-read-first)).
 - **Revisit when:** a corridor offers reliable mains + fibre (simplify to Option A locally), or
   richer real-time central analytics justify premium backhaul.
 
 ## Action Items
 
 1. [ ] Compute the site energy budget (sensors + compute + sign signalling) and size panel + battery
-       for ≥72 h autonomy — **including the gate-grade mmWave radar's draw**, which exceeds the
+       for ≥72 h autonomy — ~~including the gate-grade mmWave radar's draw~~ **(no radar this phase:
+       [ADR-0001](ADR-0001-sensing-modality.md) Rejected; the radar line drops out of the budget entirely)**, which exceeds the
        generic-presence assumption in [ADR-0001](ADR-0001-sensing-modality.md); fold it in once the
        module is selected.
 2. [ ] Select the cellular module/plan; design the store-and-forward outbox (retention, ordering).

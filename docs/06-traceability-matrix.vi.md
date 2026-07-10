@@ -23,19 +23,34 @@ nghiệm hiện trường ([tài liệu 05 §11](05-field-pilot-proposal.vi.md#1
 
 ---
 
+> ## ⚠ LƯU Ý GIAI ĐOẠN — bản dựng này CHỈ DÙNG CAMERA
+>
+> [ADR-0001](adr/ADR-0001-sensing-modality.vi.md) (hợp nhất camera + radar) đã bị **Bác bỏ ngày 2026-07-10**. Nguyên mẫu trên bàn
+> (cấp trường) **chỉ dùng camera**. Mọi hành vi phụ thuộc radar được mô tả bên dưới — radar chứng thực,
+> khoảng giữ-khi-che-khuất (`WARN_HOLD` / `CAMERA_OCCLUDED_DEGRADED`), `T_degraded_max`, và các chế độ
+> cảm biến `FULL` / `RADAR-ONLY` — đều **đang tạm ngưng: mã nguồn vẫn giữ, nhưng không bao giờ chạy**,
+> vì `corr` không bao giờ đúng khi không có kênh radar.
+>
+> Hệ quả được chấp nhận: **R5** (mù ban đêm/mưa/sương mù) **không còn biện pháp giảm thiểu** và khả năng
+> phát hiện ban đêm/bất lợi **không được tuyên bố**; **R20** — xe bị che khuất bị xóa sau `T_hold`
+> (~10 giây), biển báo tắt trong khi mối nguy vẫn còn; **R21** — thiết bị nằm vĩnh viễn ở `CAMERA_ONLY`,
+> do đó vĩnh viễn `DEGRADED`. Xem [tài liệu 04](04-risk-and-safety.vi.md).
+>
+> Nội dung radar bên dưới là **thiết kế mục tiêu cấp sở**, không phải bản dựng của giai đoạn này.
+
 ## 1. Yêu cầu chức năng
 
 | ID | Yêu cầu (rút gọn) | Ưu tiên | ADR chi phối | Tầng | Kịch bản / phép thử kiểm chứng | Tiêu chí đạt |
 |----|-------------------|---------|--------------|------|--------------------------------|--------------|
 | FR-01 | Giám sát ROI cấu hình được | M | [0003](adr/ADR-0003-detection-algorithm.vi.md) | B·S | Mọi kịch bản; kiểm thử đơn vị giới hạn-ROI (chồng lấn ≥ 50 %) | Phát hiện ngoài ROI bị loại; tư thế nằm vắt ranh giới xác định |
-| FR-02 | Phát hiện xe trong ROI | M | [0001](adr/ADR-0001-sensing-modality.vi.md)/[0003](adr/ADR-0003-detection-algorithm.vi.md) | B·S (ngày) · **F** (đêm/bất lợi) | Tập ngày/đêm/mưa; chỉ số recall (§5) | Recall ≥ 95 % ban ngày; đêm/bất lợi **bị cổng**, nếu không thì hoãn-hiện-trường |
+| FR-02 | Phát hiện xe trong ROI | M | [0001](adr/ADR-0001-sensing-modality.vi.md) *(Bác bỏ)* /[0003](adr/ADR-0003-detection-algorithm.vi.md) | B·S (ngày) · **—** (đêm/bất lợi) | Tập ngày; chỉ số recall (§5) trên các lượt thu **thật** | Recall ≥ 95 % ban ngày. Đêm/bất lợi **bị rút lại** — không radar, không cổng, không tuyên bố (R5 không còn giảm thiểu) |
 | FR-03 | Phân biệt dừng vs. đi ngang | M | [0003](adr/ADR-0003-detection-algorithm.vi.md)/[0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md) | B·S | Đi-ngang thoáng qua; bò dọc lề | Đi-ngang **không** kích hoạt (kích hoạt sai §5) |
 | FR-04 | Xác nhận bằng dwell | M | [0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md) | B·S | Dừng-và-giữ; quét dwell 3–10 s | Chỉ xác nhận sau `T_dwell`; cân theo ngân sách phơi-nhiễm |
 | FR-05 | Kích hoạt biển khi xác nhận | M | [0004](adr/ADR-0004-warning-actuator-integration.vi.md) | B·S | Vòng kín đường thuận lợi | Biển BẬT ≤ dwell + 2 s (NFR-01) |
 | FR-06 | Theo dõi khi đang BẬT | M | [0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md) | B·S | Hiện diện kéo dài; đa phương tiện | Cảnh báo giữ khi tập khác rỗng |
 | FR-07 | Xóa + hysteresis | M | [0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md) | B·S | Rời đi; che khuất ngắn | Xóa ≤ hold + 2 s khi thoát ra xác nhận; rớt ngắn không nhấp nháy |
 | FR-08 | Cảnh báo người đi bộ (**khởi-phát-theo-hiện-diện**) | S | [0003](adr/ADR-0003-detection-algorithm.vi.md)/[0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md) | S(xấp xỉ)·**F** | **Người mắc kẹt di chuyển** (đi bộ, không bao giờ đứng yên); người trong/cạnh ROI | Kích hoạt theo hiện-diện-khử-dội; recall theo dõi **riêng** (§5), đêm best-effort |
-| FR-09 | Ngày/đêm/mưa/sương mù | M | [0001](adr/ADR-0001-sensing-modality.vi.md) | S(xấp xỉ)·**F** | Bất lợi mô phỏng; điều kiện thực hiện trường | Suy-giảm-nhưng-chức-năng; recall thực **hoãn-hiện-trường** |
+| ~~FR-09~~ | Ngày/đêm/mưa/sương mù | ~~M~~ **đã giảm phạm vi** | [0001](adr/ADR-0001-sensing-modality.vi.md) *(Bác bỏ 2026-07-10)* | **—** | *(không có — giai đoạn này không nghiệm thu điều kiện bất lợi)* | **Rút lại.** Chỉ ban ngày. Đêm/mưa/sương mù cần cảm biến thứ hai vốn không được cấp kinh phí; R5 không còn giảm thiểu, khôi phục ở cấp sở |
 | FR-10 | Tự giám sát + nhịp tín hiệu (**gồm cả bộ giám sát trôi hiệu chuẩn**) | M | [0005](adr/ADR-0005-fail-safe-and-system-safety.vi.md) | B·S · **F** (trôi thực) | Sức khỏe từng hệ con; nhịp định kỳ; **bộ giám sát trôi** — tiêm một phép dịch homography tổng hợp | Nhịp mang sức khỏe + vân tay phiên bản; lỗi được phát hiện; dịch trôi → suy giảm + cảnh báo (trôi thực hoãn-hiện-trường, R15) |
 | FR-11 | Trạng thái an toàn + báo khi lỗi | M | [0005](adr/ADR-0005-fail-safe-and-system-safety.vi.md)/[0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)/[0013](adr/ADR-0013-degraded-hold-unification.vi.md) | B·S | **Tiêm lỗi** (giết SM, giết hộp, cắt liên kết; **giết camera khi đang cảnh báo**; **CLEAR đối với bảng kẹt-BẬT**) | Biển trống trong `T_signhold` (SM/hộp/liên kết); giết-camera → trạng thái giữ có giới hạn → buộc xóa lớn tiếng `T_degraded_max`; kẹt-BẬT → TRẠNG THÁI AN TOÀN + leo thang biển-báo-bị-kẹt; báo người trực ở mọi trường hợp |
 | FR-12 | Sự kiện tới TMC + audit | S | [0002](adr/ADR-0002-edge-vs-cloud-processing.vi.md) | B·S | Sự kiện kích hoạt/xóa/lỗi; xếp hàng khi mất liên kết | Sự kiện kèm vân tay phiên bản tới audit; lưu-và-chuyển sống sót outage |
@@ -57,7 +72,7 @@ nghiệm hiện trường ([tài liệu 05 §11](05-field-pilot-proposal.vi.md#1
 | NFR-02 | Xe-đi→tắt ≤ hold + 2 s | [0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md) | B·S | Độ trễ xóa khi thoát ra xác nhận | ≤ hold + 2 s; che khuất được giữ **không** phải lỗi độ trễ xóa |
 | NFR-03 | Khả dụng chức năng ≥ 99 % | [0005](adr/ADR-0005-fail-safe-and-system-safety.vi.md) | **F** | Đo hiện trường; bàn thử = MTBF vòng phần mềm dưới tiêm lỗi | **Tạm thời** ≥ 99 %, **chờ ngân sách MTBF/MTTR** ([tài liệu 04 Q6](04-risk-and-safety.vi.md#5-các-câu-hỏi-an-toàn-còn-mở-cho-nhóm)) |
 | NFR-04 | Không kẹt-BẬT (mọi lỗi) | [0005](adr/ADR-0005-fail-safe-and-system-safety.vi.md)/[0008](adr/ADR-0008-detection-persistence-and-multitrack.vi.md)/[0009](adr/ADR-0009-failsafe-placement-and-degraded-modes.vi.md)/[0013](adr/ADR-0013-degraded-hold-unification.vi.md) | B·S | Hết hạn watchdog; **buộc-xóa `T_degraded_max` (nguyên nhân che khuất _và_ lỗi-camera)**; logic kẹt | Không trạng thái nào — và không chế độ cảm-biến-suy-giảm nào — giữ bảng BẬT mà thiếu xác nhận được-camera-xác-thực, quy-được-về-làn; xóa có giới hạn trong mọi trường hợp |
-| NFR-05 | Bền vững mưa/đêm | [0001](adr/ADR-0001-sensing-modality.vi.md) | **F** | Cổng radar (a) bàn thử, (b) đường thử/hiện trường | **Phụ thuộc cổng radar**; không thể tuyên bố từ radar tổng hợp |
+| ~~NFR-05~~ | Bền vững mưa/đêm | [0001](adr/ADR-0001-sensing-modality.vi.md) *(Bác bỏ 2026-07-10)* | **—** | *(cổng đã gỡ — hoãn sang cấp sở)* | **Giảm phạm vi, không phải hoãn.** Không radar → không cổng → **không tuyên bố**; không bao giờ dựa lên radar tổng hợp (R5 không còn giảm thiểu) |
 | NFR-06 | Tự chủ tại biên (WAN offline) | [0002](adr/ADR-0002-edge-vs-cloud-processing.vi.md) | B·S | Tiêm outage WAN | Vòng phát-hiện→cảnh-báo không bị ảnh hưởng; sự kiện xếp hàng |
 | NFR-07 | Pin mặt trời ≥ 72 h | [0006](adr/ADR-0006-connectivity-and-power.vi.md) | **F** (D ở bàn thử) | Ngân sách năng lượng gồm radar đạt-chuẩn-cổng | Chỉ thiết kế ở bàn thử; đo hiện trường ở thử nghiệm |
 | NFR-08 | Khả năng bảo trì | [0002](adr/ADR-0002-edge-vs-cloud-processing.vi.md) | B·D | Sức khỏe/cấu hình/OTA từ xa | Mô-đun hóa; bảo trì được từ xa |

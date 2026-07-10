@@ -10,6 +10,21 @@ math**, and **measurable acceptance criteria**.
 
 ---
 
+> ## ⚠ PHASE NOTE — this build is CAMERA-ONLY
+>
+> [ADR-0001](adr/ADR-0001-sensing-modality.md) (camera + radar fusion) was **Rejected on 2026-07-10**. The cấp trường bench
+> prototype ships **camera-only**. Every radar-dependent behaviour described below — radar
+> corroboration, the occlusion hold (`WARN_HOLD` / `CAMERA_OCCLUDED_DEGRADED`), `T_degraded_max`, and
+> the `FULL` / `RADAR-ONLY` sensing modes — is **dormant: the code retains it, but it never executes**,
+> because `corr` is never true without a radar channel.
+>
+> Accepted consequences: **R5** (night/rain/fog blindness) is **unmitigated** and night/adverse recall
+> is **not claimed**; **R20** — an occluded vehicle is cleared at `T_hold` (~10 s), blanking the sign
+> with the hazard present; **R21** — the unit sits permanently in `CAMERA_ONLY`, hence permanently
+> `DEGRADED`. See [doc 04](04-risk-and-safety.md).
+>
+> Radar content below is the **cấp sở** target design, not this phase's build.
+
 ## 1. The safety reframe (read this first)
 
 The proposal treats the work as "detect a stopped car and show a sign." Functionally true, but the
@@ -93,7 +108,7 @@ The full state machine, with timers and edge cases, is specified in
 | NFR-02 | **Latency** | Vehicle-gone → warning OFF within hold + ≤ 2 s. |
 | NFR-03 | **Availability** | **Functional** availability ≥ 99% per monitored site over the pilot period — the fraction of time the unit can actually *detect-and-warn to spec*, not merely "powered and reporting"; time spent in a degraded/safe state counts as **unavailable**. Excludes scheduled maintenance. Field-measured (see §3a); the **≥ 99% figure is provisional pending an MTBF/MTTR reliability budget** — a single multi-day remote repair can exhaust it ([doc 04 §5 Q6](04-risk-and-safety.md#5-open-safety-questions-for-the-team)). |
 | NFR-04 | **Reliability** | No fault — **software *or* sensor-discrimination** — may leave a **stale ON** warning indefinitely. A watchdog time-bounds any activation with no corroboration; because radar corroboration deliberately suppresses the watchdog, **`T_degraded_max`** separately bounds the `CAMERA_OCCLUDED_DEGRADED` hold — the warning held ON while the **camera cannot verify the track (occluded _or_ faulted)** and radar would otherwise sustain it forever — forcing a loud disposition ([doc 02 §4](02-system-architecture.md#4-the-detectionwarning-state-machine), [ADR-0009 §C](adr/ADR-0009-failsafe-placement-and-degraded-modes.md), [ADR-0013](adr/ADR-0013-degraded-hold-unification.md) makes the bound cause-agnostic). No state — and no sensor-degraded mode — holds the sign ON without **camera-verified, lane-attributed** confirmation. |
-| NFR-05 | **Robustness** | Maintain target detection in rain and at night via multi-sensor sensing ([ADR-0001](adr/ADR-0001-sensing-modality.md)) — **contingent on the radar stationary-detection validation gate**; field-validated, not claimable from a synthetic-radar bench (§3a, §5). |
+| ~~NFR-05~~ | **Robustness** | **NOT MET — descoped 2026-07-10, and deliberately not restated as a weaker Must.** Maintaining target detection in rain and at night required multi-sensor sensing; [ADR-0001](adr/ADR-0001-sensing-modality.md) (camera + radar) is **Rejected** for this phase, so there is no second sensor. Night/rain/fog robustness is **not claimed** and **R5 is carried unmitigated** ([doc 04](04-risk-and-safety.md)). Reinstate at cấp sở, where the radar gate has a venue. |
 | NFR-06 | **Edge autonomy** | The detect→warn loop must function with the WAN/cloud fully offline ([ADR-0002](adr/ADR-0002-edge-vs-cloud-processing.md)). |
 | NFR-07 | **Power** | Run on mains, or solar+battery with ≥ 72 h autonomy without sun ([ADR-0006](adr/ADR-0006-connectivity-and-power.md)). |
 | NFR-08 | **Maintainability** | Remote health, remote config, OTA update; modular sensor/compute/sign units. |
@@ -121,7 +136,7 @@ methodology behind this split is [ADR-0007](adr/ADR-0007-validation-and-data-str
 | FR-09 (day/night/rain/fog) | **S (approx) + F** | A bench cannot make real rain/glare/fog; simulation only approximates. Real-condition recall is field-deferred. |
 | FR-17 (reuse existing VMS) | **F** | Needs a real operator VMS; the bench uses an LED stand-in. |
 | NFR-03 (functional availability) | **F** | An operational metric; the bench can only characterise software-loop MTBF under fault injection. |
-| NFR-05 (rain/night robustness) | **F** | Contingent on the [ADR-0001](adr/ADR-0001-sensing-modality.md) radar gate; not claimable from a synthetic-radar bench. |
+| ~~NFR-05~~ (rain/night robustness) | **—** | **Descoped.** [ADR-0001](adr/ADR-0001-sensing-modality.md) Rejected 2026-07-10 → no radar, no gate, no claim. Not "field-deferred" — *withdrawn* for this phase (R5 unmitigated). |
 | NFR-07 (solar ≥ 72 h autonomy) | **F** | Design-only at bench scope (lab mains). |
 | NFR-11 / NFR-14 (standards, extensibility) | **D** | Conformance review and architectural argument, not a runtime test. |
 | NFR-13 (IP65 environment) | **F** | No field-grade enclosure is built at bench scope. |
@@ -238,7 +253,7 @@ because they are validated very differently.
 
 | Metric | Definition | Prototype target (bench/sim) | Field-pilot target |
 |--------|-----------|------------------------------|--------------------|
-| **Recall — vehicles** | genuine stopped-vehicle events detected ÷ all such events | ≥ 95% day (bench/sim). **Night/adverse is gated** — claimable only if the [ADR-0001](adr/ADR-0001-sensing-modality.md) radar gate passes on real hardware; otherwise **field-deferred**, never asserted from synthetic radar | ≥ 98% day · ≥ 95% night/adverse |
+| **Recall — vehicles** | genuine stopped-vehicle events detected ÷ all such events | ≥ 95% day (bench/sim). **Night/adverse: NO TARGET, NO CLAIM.** [ADR-0001](adr/ADR-0001-sensing-modality.md) was Rejected 2026-07-10, so the radar gate will never run and the claim is **withdrawn**, not deferred. It is never asserted from synthetic radar. Report day recall only, with its Wilson lower bound over **real** captures | ≥ 98% day · ≥ 95% night/adverse *(cấp sở)* |
 | **Recall — pedestrians** | stranded-occupant events detected ÷ all such (FR-08) | tracked **separately**, best-effort (small RCS + camera weakest at night); target set after Phase-3 data, **not** assumed equal to vehicles | ≥ 90% day · best-effort night |
 | **False activation rate** | false warnings ÷ **exposure** — report **both** per-100-staged-scenarios *and* per-operating-hour (raw counts across different scenario mixes are not comparable) | ≤ 1 per 100 staged scenarios *and* a reported per-hour rate | **provisional** ≤ 1 / site / week, **pending operator trust-calibration** ([doc 04 §5](04-risk-and-safety.md#5-open-safety-questions-for-the-team)) |
 | **Detection latency** | vehicle becomes stationary → warning ON | ≤ dwell + 2 s | same |
@@ -320,7 +335,7 @@ result with its tier (§3a) so no claim outruns its evidence.
 |---|-----------------|------------------------|-----|
 | 1 | "Detect a stopped car, show a sign." | Reframed as a **safety-related** system with fail-safe + trust requirements. | Silent failure and cry-wolf are the real risks. |
 | 2 | Sign "at the start of the lane." | **DSD-based placement requirement** with per-speed numbers (§4). | Otherwise the warning may be too late to be useful. |
-| 3 | Multi-sensor listed as optional "can develop toward." | **Camera+radar elevated to core** for night/rain/fog. | Those are the named high-risk conditions and camera-only is weakest there. |
+| 3 | Multi-sensor listed as optional "can develop toward." | **Camera+radar was elevated to core** for night/rain/fog — then **Rejected for this phase (2026-07-10)** on cost, and because gate criterion (b) is not bench-testable. Build is **camera-only**; night/adverse claim withdrawn; **R5 unmitigated**; radar returns at cấp sở. | Those are the named high-risk conditions and camera-only is weakest there — which is exactly why the gap is *stated* rather than papered over with synthetic radar. |
 | 4 | "Closed loop: detect–confirm–warn–track–cancel." | Made a **concrete state machine** with dwell + hysteresis + watchdog. | Prevents false triggers, flapping, and stale-ON. |
 | 5 | "Central processor." | Specified as **edge-local**; cloud non-critical. | A safety warning must not wait on a network round-trip. |
 | 6 | "Evaluate detection." | **Numeric acceptance criteria** (§5). | "Evaluate" needs a pass/fail bar. |

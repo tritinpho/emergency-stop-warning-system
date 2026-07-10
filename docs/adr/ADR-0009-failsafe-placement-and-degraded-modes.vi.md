@@ -6,6 +6,24 @@
 **Ngày:** 2026-06-27
 **Người quyết định:** Chủ nhiệm đề tài (PI) (ThS. Phó Trí Tín), trưởng nhóm kỹ thuật, cố vấn an toàn giao thông đường bộ, kỹ sư hiện trường/lắp đặt
 
+> ## ⚠ LƯU Ý GIAI ĐOẠN — bản dựng này CHỈ DÙNG CAMERA
+>
+> [ADR-0001](ADR-0001-sensing-modality.vi.md) (hợp nhất camera + radar) đã bị **Bác bỏ ngày 2026-07-10**. Nguyên mẫu trên bàn
+> (cấp trường) **chỉ dùng camera**. Mọi hành vi phụ thuộc radar được mô tả bên dưới — radar chứng thực,
+> khoảng giữ-khi-che-khuất (`WARN_HOLD` / `CAMERA_OCCLUDED_DEGRADED`), `T_degraded_max`, và các chế độ
+> cảm biến `FULL` / `RADAR-ONLY` — đều **đang tạm ngưng: mã nguồn vẫn giữ, nhưng không bao giờ chạy**,
+> vì `corr` không bao giờ đúng khi không có kênh radar.
+>
+> Hệ quả được chấp nhận: **R5** (mù ban đêm/mưa/sương mù) **không còn biện pháp giảm thiểu** và khả năng
+> phát hiện ban đêm/bất lợi **không được tuyên bố**; **R20** — xe bị che khuất bị xóa sau `T_hold`
+> (~10 giây), biển báo tắt trong khi mối nguy vẫn còn; **R21** — thiết bị nằm vĩnh viễn ở `CAMERA_ONLY`,
+> do đó vĩnh viễn `DEGRADED`. Xem [tài liệu 04](../04-risk-and-safety.vi.md).
+>
+> Nội dung radar bên dưới là **thiết kế mục tiêu cấp sở**, không phải bản dựng của giai đoạn này.
+>
+> **Không bị ảnh hưởng và vẫn được triển khai:** §A (cơ chế tự ngắt an toàn trong bộ điều khiển biển báo)
+> và quy tắc `CLEARING → SAFE_STATE` khi biển báo kẹt **không** phụ thuộc radar. Chúng vẫn còn hiệu lực.
+
 ## Bối cảnh
 
 [ADR-0005](ADR-0005-fail-safe-and-system-safety.vi.md) đã thiết lập nguyên tắc **an toàn khi sự cố + báo lỗi rõ ràng (fail-safe + fail-loud)** và đặt tên cho một **cơ chế tự ngắt an toàn (dead-man's switch)** để một máy trạng thái bị sập không thể để lại một cảnh báo đang được khẳng định. [ADR-0008](ADR-0008-detection-persistence-and-multitrack.vi.md) đã thiết lập **tính bền vững dựa trên tập hợp (set-based persistence)** với một **khoảng giữ-khi-che-khuất được radar đối chứng (corroborate)**. Ba câu hỏi tiếp nối đã bị để lại ngầm định — và mỗi câu đều mang tính quyết định về an toàn một khi ta nhìn vào topology *vật lý* và các chế độ *một-cảm-biến-hỏng* thay vì sơ đồ khối logic.
