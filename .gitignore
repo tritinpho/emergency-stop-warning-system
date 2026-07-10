@@ -20,3 +20,9 @@ venv/
 
 # PlatformIO (firmware/ — build output + per-machine caches)
 .pio/
+
+# K230 detector weights. ACLAB ELMS IP; this repo is PUBLIC. models/README.md tells
+# you to place the binaries next to their deploy_config.json, so an accidental
+# `git add .` is one command away from publishing them. Storage is still undecided
+# (ADR-0016 backlog #7) — if that lands on git-LFS, drop this rule deliberately.
+*.kmodel
