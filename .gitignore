@@ -31,5 +31,12 @@ venv/
 # YOLO weights into the CWD on first use, and capture sessions land in captures/ by
 # default. Weights are pinned by SHA-256 in each session's ground_truth.json, never
 # by committing them; sessions are evidence, reviewed and archived deliberately.
+# *.onnx is the compile_kmodel.py intermediate; the built kmodel is covered by *.kmodel
+# above and pinned by models/host-parity/manifest.json (which IS committed).
 *.pt
+*.onnx
 captures/
+
+# nncase compile byproducts (dropped in the CWD by the k230 compiler/simulator).
+gmodel_dump_dir/
+/tmp/

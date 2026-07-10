@@ -85,6 +85,26 @@ python software/tools/host_yolo_loop.py --selftest
 python software/tools/host_yolo_loop.py --video clip.mp4 --calib calib.json --hazard 12.5:96 --score
 python software/tools/host_yolo_loop.py --video night.mp4 --calib calib.json --light-filter  # backlog #4b A/B
 
+# Survey -> calibration, with the MANDATORY scale sanity check (PC-13/14 pin why: a
+# wrong-scale H turns detector pixel noise into km/h and silently defeats the dwell):
+python software/tools/make_calib.py --selftest
+python software/tools/make_calib.py --frame clip.mp4 --click --rect-size 3.75x10 --out calib.json
+
+# Ground-truth annotation for capture sessions (detector-derived proposals stay quarantined
+# in hazards_proposed until a human confirms them -- the scorer reads only hazards):
+python software/tools/annotate_clip.py --selftest
+python software/tools/annotate_clip.py --propose captures/host-a
+python software/tools/annotate_clip.py --video clip.mp4 --gt captures/host-a/ground_truth.json
+
+# INT8 parity: compile yolov8n -> k230 kmodel with the BASELINE toolchain (nncase 2.9.0) and
+# drive the whole loop with the QUANTIZED model under the nncase simulator. Runs in a
+# container -- no nncase wheel exists for the host Python. Also the proven conversion path a
+# future retrain would reuse (firmware/k230-detector/models/README.md).
+docker build -t esw-nncase:2.9.0 software/tools/nncase
+docker run --rm -v "$PWD:/w" -w /w esw-nncase:2.9.0 python software/tools/compile_kmodel.py
+docker run --rm -v "$PWD:/w" -w /w esw-nncase:2.9.0 python software/tools/host_yolo_loop.py \
+    --selftest --kmodel firmware/k230-detector/models/host-parity/yolov8n_320_int8.kmodel
+
 # The shipped esw/ subset also RUNS under the real MicroPython unix port (not just CPython):
 cd software && micropython run_tests.py && micropython run_health_tests.py && micropython tools/mpy_smoke.py
 ```
