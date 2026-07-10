@@ -39,13 +39,14 @@ sys.path.insert(0, _swdir if _swdir != "" else ".")
 
 # Every shipped esw module must at least LOAD under MicroPython.
 from esw import (state_machine, params, actuator, if4, health, telemetry, perception, geometry,
-                 sink, crypto, command)
+                 sink, crypto, command, app)
 from esw.geometry import bbox_ground_point, footprint_box, overlap_fraction, is_convex_ccw
 from esw.perception import Perception
 from esw.sink import Outbox
 from esw.command import CommandReceiver, encode_command, verify_command, CMD_OVERRIDE
 from esw.crypto import derive_key
 from esw.k230_adapter import detections_from_yolo
+from esw.app import EdgeApp
 
 _fails = []
 
@@ -250,9 +251,92 @@ _afr = _act.step(1.0, {"assertion": "SHOW", "message_id": "STOPPED_VEHICLE_AHEAD
 check("actuator wall_ms sets the wire timestamp",
       _afr is not None and int.from_bytes(_afr[15:21], "big") == 123456)
 
+
+# --- esw.app: the DEVICE LOOP itself runs here, not just the parts it wires ---------------
+# The K230 entrypoint (firmware/k230-detector/esw-app/main.py) cannot run on this box, but the
+# object it constructs can. Backends are the four things a bench has no version of: a camera, a
+# radio, a clock, storage. Everything between them is the code that ships.
+class _SmokeDetector:
+    labels = ["person", "bicycle", "car"]
+
+    def read(self):
+        return [[360, 520, 80, 80]], [2], [0.9]      # one stopped car, every frame
+
+
+class _SmokeRadio:
+    def __init__(self):
+        self.frames = []
+
+    def send(self, frame):
+        self.frames.append(frame)
+
+
+class _SmokeClock:
+    def __init__(self):
+        self.t = 0.0
+
+    def monotonic(self):
+        return self.t
+
+    def wall_ms(self):
+        return None                                   # no GNSS -> absolute_time degraded
+
+    def gnss_lock(self):
+        return False
+
+
+class _SmokeStore:
+    def __init__(self):
+        self.entries = []
+        self.w = -1
+
+    def append(self, e):
+        self.entries.append(e)
+
+    def load(self):
+        return self.entries
+
+    def ack(self, s):
+        self.w = s
+
+    def acked(self):
+        return self.w
+
+
+_scal = {"H": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+         "roi": [[300.0, 500.0], [500.0, 500.0], [500.0, 700.0], [300.0, 700.0]],
+         # 720 tall: the smoke's car sits at y 520..600, so a 480-tall frame would (correctly)
+         # clip its area to zero. Occupancy counts pixels that exist.
+         "frame_wh": [640, 720]}
+_srad = _SmokeRadio()
+_sclk = _SmokeClock()
+_sst = _SmokeStore()
+_sapp = EdgeApp(derive_key(b"m" * 32, "IF4", "mpy"), "mpy",
+                {"fw_ver": "t", "model_ver": "t", "calib_ver": "t"}, _scal,
+                {"detector": _SmokeDetector(), "radio": _srad, "clock": _sclk, "store": _sst})
+_sboot = _sapp.start()
+check("app boot names its degraded capabilities",
+      ("sign_readback" in _sboot["degraded"]) and ("absolute_time" in _sboot["degraded"]))
+check("app boot record is CRITICAL when degraded", _sboot["severity"] == "CRITICAL")
+_i = 0
+while _i < 120:                                       # 12 s at 10 Hz; T_dwell 5.0 -> confirm at 5.0
+    _sclk.t = round(_i * 0.1, 3)
+    _sapp.step()
+    _i += 1
+check("app drives the sign after dwell (IF-4 frames transmitted)", len(_srad.frames) > 0)
+# ~7 s of assertion at T_assert_refresh 0.5 s is ~15 frames. A per-tick transmit would be ~70 --
+# five-fold over the ADR-0014 433 MHz duty budget, with the lamp looking identical.
+check("app throttles IF-4 to T_assert_refresh, not the 10 Hz tick", len(_srad.frames) < 30)
+check("app persists evidence to the durable store", len(_sst.entries) > 0)
+# R14 scene density measured under mpy: one 80x80 car in a 640x720 frame -> 6400/460800.
+check("perception measures R14 scene density (ADR-0016 #3)",
+      _sapp.perception.scene["n_vehicles"] == 1 and
+      approx(_sapp.perception.scene["occupancy"], 6400.0 / 460800.0, 1e-9))
+check("app reports the density_congestion capability", _sboot["density_congestion"] is True)
+
 print("-" * 60)
 if _fails:
     print("mpy_smoke: %d CHECK(S) FAILED" % len(_fails))
     sys.exit(1)
-print("mpy_smoke OK -- all esw modules load; perception + geometry + sink + command run here.")
+print("mpy_smoke OK -- all esw modules load; perception + geometry + sink + command + the app loop run here.")
 sys.exit(0)

@@ -682,4 +682,65 @@ SCENARIOS = [
                    {"t": 6.0, "on": True, "state": "WARN_ON"},    # asserts (pre-fix: R14-suppressed OFF)
                    {"t": 12.0, "on": True}],                      # stays asserted
     },
+    {
+        "id": "SC-44", "status": "impl",
+        "title": "Dense jam the tracker under-counts -> density path suppresses (R14, ADR-0016 #3)",
+        "duration": 16.0,
+        # The jam the stationary-track rule MISSES. Overlapping boxes churn track ids, so only two
+        # stationary tracks survive association -- below congestion_min_tracks (4) -- while the
+        # detector plainly sees 8 vehicles filling half the frame. Harvested from ACLAB's
+        # OverVehiclesFilter: detection count + occupancy need no track ids to be right.
+        "config_push": {"T_dwell": 3.0},
+        "tracks": [{"id": "T-SH", "enter": 1.0, "leave": 16.0, "speed": 0.0, "in_roi": 1.0},
+                   {"id": "T-L1", "enter": 1.0, "leave": 16.0, "speed": 0.0, "in_roi": 0.1}],
+        "scene": [[0.0, 16.0, 8, 0.55]],                     # 8 vehicles, 55% of frame
+        "checks": [{"t": 8.0, "on": False, "state": "WARN_ON",
+                    "congestion_reason": "density"},          # confirmed, suppressed, and says why
+                   {"t": 14.0, "on": False}],
+    },
+    {
+        "id": "SC-45", "status": "impl",
+        "title": "Free flow is not a jam -> many moving vehicles never suppress (density control)",
+        "duration": 16.0,
+        # THE CONTROL THAT MATTERS. Congestion SUPPRESSES the sign, so a jam detector that fires in
+        # ordinary traffic is a silent miss. ACLAB's own default, max_vehicle_count=2, would call
+        # this a jam: 8 vehicles in frame. Correct for their filter, which gates TRACKING; fatal in
+        # ours, which gates the SIGN. Occupancy is low (moving traffic is spread out), so the
+        # density path requires BOTH and stays quiet -- the genuine shoulder warning asserts.
+        "config_push": {"T_dwell": 3.0},
+        "tracks": [{"id": "T-SH", "enter": 1.0, "leave": 16.0, "speed": 0.0, "in_roi": 1.0}],
+        "scene": [[0.0, 16.0, 8, 0.12]],                     # 8 vehicles, only 12% of frame
+        "checks": [{"t": 8.0, "on": True, "congestion_reason": None},
+                   {"t": 14.0, "on": True}],
+    },
+    {
+        "id": "SC-46", "status": "impl",
+        "title": "One near-field truck fills the frame -> occupancy alone never suppresses",
+        "duration": 16.0,
+        # The other half of the AND. A single truck close to the mast can cover 60% of the frame --
+        # well past ACLAB's max_occupancy=0.4, which would suppress on it alone. One vehicle is not
+        # a jam, so the count gate (>= 6) holds the density path shut and the shoulder car warns.
+        "config_push": {"T_dwell": 3.0},
+        "tracks": [{"id": "T-SH", "enter": 1.0, "leave": 16.0, "speed": 0.0, "in_roi": 1.0}],
+        "scene": [[0.0, 16.0, 1, 0.60]],                     # 1 vehicle, 60% of frame
+        "checks": [{"t": 8.0, "on": True, "congestion_reason": None},
+                   {"t": 14.0, "on": True}],
+    },
+    {
+        "id": "SC-47", "status": "impl",
+        "title": "No frame_wh -> occupancy unmeasurable -> density path OFF, stationary rule intact",
+        "duration": 16.0,
+        # A unit whose calibration omits frame_wh cannot compute occupancy. The density path must
+        # then be inert rather than guess: `occupancy: None`. The failure direction is cry-wolf, not
+        # silent miss, which is why EdgeApp reports `density_congestion` as a non-safety capability.
+        # The four-stationary-track rule is untouched and still suppresses (this IS SC-11's jam).
+        "config_push": {"T_dwell": 3.0},
+        "tracks": [{"id": "T-SH", "enter": 1.0, "leave": 16.0, "speed": 0.0, "in_roi": 1.0},
+                   {"id": "T-L1", "enter": 1.0, "leave": 16.0, "speed": 0.0, "in_roi": 0.1},
+                   {"id": "T-L2", "enter": 1.0, "leave": 16.0, "speed": 0.0, "in_roi": 0.1},
+                   {"id": "T-L3", "enter": 1.0, "leave": 16.0, "speed": 0.0, "in_roi": 0.1}],
+        "scene": [[0.0, 16.0, 9, None]],                     # detector saw 9; occupancy unmeasurable
+        "checks": [{"t": 8.0, "on": False, "state": "WARN_ON",
+                    "congestion_reason": "stationary_tracks"}],
+    },
 ]

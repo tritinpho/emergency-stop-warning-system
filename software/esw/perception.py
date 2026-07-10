@@ -40,6 +40,9 @@ _DEFAULT_FOOTPRINT = {
     "motorcycle": (0.8, 2.0), "person": (0.6, 0.6),
 }
 
+# What counts toward scene density (R14). Persons are excluded: bystanders are not a jam (SC-43).
+_VEHICLE_CLASSES = ("car", "truck", "bus", "motorcycle")
+
 
 def default_calibration(roi):
     """A minimal calibration around a given ground ROI polygon (identity image scale).
@@ -73,6 +76,15 @@ class Perception:
         # = perspective base-projection + depth extrusion (needs a real perspective H).
         self.footprint_mode = calib.get("footprint_mode", "box")
         self.footprint = calib.get("footprint", _DEFAULT_FOOTPRINT)
+        # Scene density (R14, ADR-0016 backlog #3). Occupancy needs the inference-frame size, which
+        # only the calibration knows. Absent it, occupancy stays None and the state machine's
+        # density path is OFF -- the conservative default, since that path SUPPRESSES the sign.
+        wh = calib.get("frame_wh")
+        self.frame_w = float(wh[0]) if wh else 0.0
+        self.frame_h = float(wh[1]) if wh else 0.0
+        self.frame_area = self.frame_w * self.frame_h
+        self.scene_enabled = self.frame_area > 0.0
+        self.scene = {"n_vehicles": 0, "occupancy": None}
         self.tracks = {}          # track_id -> track record
         self._next_id = 1
 
@@ -166,6 +178,33 @@ class Perception:
                 highs.append(cand)
             else:
                 lows.append(cand)
+
+        # Scene density (R14) from DETECTIONS, before association. This is the point of harvesting
+        # ACLAB's OverVehiclesFilter: in a dense jam the tracker under-counts stationary tracks,
+        # because overlapping boxes churn track ids -- so a track-count rule can miss the very jam
+        # it exists to catch. A detection count and a summed-area occupancy depend on no ids at all.
+        n_veh = 0
+        area = 0.0
+        for c in highs:
+            if c["cls"] in _VEHICLE_CLASSES:
+                n_veh += 1
+                if self.scene_enabled:
+                    # Clip to the inference frame first. Detectors emit boxes that run off the edge
+                    # (letterbox padding; a truck entering shot), and unclipped area counts pixels
+                    # that do not exist -- inflating occupancy, which biases toward SUPPRESSION.
+                    b = c["bbox"]
+                    x1 = b[0] if b[0] > 0.0 else 0.0
+                    y1 = b[1] if b[1] > 0.0 else 0.0
+                    x2 = b[2] if b[2] < self.frame_w else self.frame_w
+                    y2 = b[3] if b[3] < self.frame_h else self.frame_h
+                    if x2 > x1 and y2 > y1:
+                        area += float(x2 - x1) * float(y2 - y1)
+        occ = None
+        if self.scene_enabled:
+            occ = area / self.frame_area
+            if occ > 1.0:
+                occ = 1.0     # overlapping boxes double-count area; a jam saturates the frame, not more
+        self.scene = {"n_vehicles": n_veh, "occupancy": occ}
 
         tids = list(self.tracks.keys())
         pred = {}

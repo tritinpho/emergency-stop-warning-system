@@ -2,14 +2,14 @@
 
 This is **workstream #1** from the build plan: the event-level ("Level A") simulation
 harness ([doc 07 §2](../docs/07-simulation-methodology.md)) driving the **real** decision
-state machine as the system under test (SUT), scored against the **SC-01..43** scenario
+state machine as the system under test (SUT), scored against the **SC-01..47** scenario
 oracles ([doc 07 §5](../docs/07-simulation-methodology.md)). A second board adds the
 **Level-B** perception stage (IF-1→IF-2) — the real ROI-gating + tracking pipeline driven by
-scripted *detections* (with doc 07 §3.1 detector nuisances) — scored against **PC-01..11**.
+scripted *detections* (with doc 07 §3.1 detector nuisances) — scored against **PC-01..12**.
 
 It embodies the three build decisions in **[ADR-0015](../docs/adr/ADR-0015-state-machine-implementation-strategy.md)**:
 
-1. **The SC-01..43 oracles are the executable spec.** The state machine is correct when
+1. **The SC-01..47 oracles are the executable spec.** The state machine is correct when
    its sign-over-time matches every scenario's oracle. TDD against the board.
 2. **Fixed-rate tick execution.** `StateMachine.tick(now, observations, health)` is called
    every cycle (10 Hz in the harness); timers are deadlines against `now`, no wall-clock is
@@ -33,6 +33,7 @@ software/
     sink.py         #   durable evidence outbox: store-and-forward IF-6/IF-7 records (ADR-0007, doc 08 §4)
     crypto.py       #   shared HMAC-SHA256 + constant-time compare (both hardened channels; ADR-0012)
     command.py      #   IF-8/9/10 auth command channel: verify override/OTA/ack (doc 08 §5, ADR-0012)
+    app.py          #   THE DEVICE LOOP — wires all of the above; backends injected (K230 = firmware/k230-detector/esw-app/)
   harness/          # host tooling — NOT shipped. Replaces only the sensor + sign ends.
     sensors.py      #   Level-A: scenario script -> IF-2 track events (+ gnss/self-test liveness)
     frames.py       #   Level-B: scenario -> detector output + doc 07 §3.1 nuisances
@@ -40,13 +41,17 @@ software/
     runner.py       #   tick loop, health monitor, telemetry, fault injection, oracle comparator
     metrics.py      #   acceptance-evidence reducer: recall+Wilson, false-activation, latency (ADR-0007)
     store.py        #   Level-E: file-backed durable store + fake uplink for the evidence outbox
+    evidence.py     #   offline scorer for DEVICE logs: observed-hours, provenance + capability gates
+    rig.py          #   the EdgeApp bench rig (shared by Levels D and H)
     commands.py     #   Level-F: scenario commands -> authenticated IF-8/9/10 frames (+ forged/replay)
+    devices.py      #   Level-H: host backends for esw/app.py (camera, radio, clock, store, capture)
   scenarios/
-    catalogue.py        #   SC-01..43 — Level-A executable spec (the state machine)
+    catalogue.py        #   SC-01..47 — Level-A executable spec (the state machine)
     perception_cases.py #   PC-01.. — Level-B perception cases (IF-1→IF-2)
     health_cases.py     #   HM-01.. — Level-C health-monitor unit cases
     evidence_cases.py   #   EV-01.. — Level-D acceptance-evidence set (with ground-truth oracles)
     command_cases.py    #   CMD-01.. — Level-F authenticated-command cases (IF-8/9/10)
+    app_cases.py        #   AP-01.. — Level-H device-loop cases (esw/app.py end to end)
   run_tests.py            # Level-A state-machine board
   run_perception_tests.py # Level-B perception board
   run_health_tests.py     # Level-C health-monitor board
@@ -54,27 +59,30 @@ software/
   run_sink_tests.py       # Level-E durable-evidence-outbox board (store-and-forward, at-least-once)
   run_command_tests.py    # Level-F authenticated command-channel board (IF-8/9/10 override/OTA/ack)
   run_integration_tests.py # Level-G merged K230 pipeline (raw YOLO -> adapter -> perception -> SM -> sign, ADR-0016)
+  run_app_tests.py         # Level-H the device application loop (esw/app.py) under host backends
 ```
 
 ## Run
 
 ```
-python software/run_tests.py             # Level A — SC-01..43 state-machine board
+python software/run_tests.py             # Level A — SC-01..47 state-machine board
 python software/run_perception_tests.py  # Level B — perception (IF-1→IF-2) board
 python software/run_health_tests.py      # Level C — health-monitor (FR-10/NFR-16/IF-5) board
 python software/run_metrics.py           # Level D — acceptance-evidence reducer + sample report
 python software/run_sink_tests.py        # Level E — durable evidence outbox (store-and-forward)
 python software/run_command_tests.py     # Level F — authenticated command channel (IF-8/9/10)
 python software/run_integration_tests.py # Level G — merged K230 pipeline (adapter→perception→SM→sign)
+python software/run_app_tests.py         # Level H — the device loop (esw/app.py), incl. boot capability report
 python software/tools/mp_safe_check.py software/esw   # MicroPython-safety AST lint on esw/
-python software/tools/mpy_smoke.py        # esw smoke: perception + geometry + sink + command + adapter
+python software/tools/mpy_smoke.py        # esw smoke: perception + geometry + sink + command + adapter + app loop
+python software/tools/score_capture.py <session-dir>...   # score real device captures (exits 1 unless acceptance-grade)
 
 # The shipped esw/ subset also RUNS under the real MicroPython unix port (not just CPython):
 cd software && micropython run_tests.py && micropython run_health_tests.py && micropython tools/mpy_smoke.py
 ```
 
 Both are enforced in CI on every push/PR ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)): a
-**cpython** job runs all seven boards + the AST lint + the smoke, and a **micropython** job runs the
+**cpython** job runs all eight boards + the AST lint + the smoke, and a **micropython** job runs the
 shipped subset under `micropython/unix:v1.28.0` — see the *MicroPython / K230 note* below.
 
 Boards A–C, E, and F exit 0 when healthy and 1 on any surprise; D exits 0 when the reducer unit tests pass
@@ -93,7 +101,7 @@ perception pipeline is byte-identical in sim and on the board.
 
 ## The boards today
 
-**Level A — `run_tests.py`: 43 passing · 0 red · 0 pending** (`exit 0`). The full SC-01..43
+**Level A — `run_tests.py`: 47 passing · 0 red · 0 pending** (`exit 0`). The full SC-01..47
 catalogue: the happy path, dwell / creep / cold-start, pass-through, the set-based occlusion
 policy (`WARN_HOLD → CAMERA_OCCLUDED_DEGRADED → T_degraded_max` forced clear, incl. the
 weak-(b) stale-ON guard), the FULL / CAMERA-ONLY / RADAR-ONLY / NEITHER sensor-mode matrix

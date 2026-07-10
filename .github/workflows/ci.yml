@@ -1,7 +1,7 @@
 name: ESW software CI
 
 # Two gates for the ESW software (docs/07, ADR-0015):
-#   * cpython     -- the logic gate: all seven scenario boards (Level A/B/C/D/E/F/G) plus the
+#   * cpython     -- the logic gate: all eight scenario boards (Level A/B/C/D/E/F/G/H) plus the
 #                    MicroPython-safety AST lint on esw/ and the esw smoke, on CPython.
 #   * micropython -- the runtime-portability gate: the SHIPPED esw/ subset actually
 #                    LOADS AND RUNS under the real MicroPython unix port, proving the
@@ -30,9 +30,9 @@ jobs:
           python-version: '3.12'
       - name: MicroPython-safety gate (AST lint on esw/)
         run: python software/tools/mp_safe_check.py software/esw
-      - name: Level-A -- state machine (SC-01..43)
+      - name: Level-A -- state machine (SC-01..47)
         run: python software/run_tests.py
-      - name: Level-B -- perception IF-1->IF-2 (PC-01..11)
+      - name: Level-B -- perception IF-1->IF-2 (PC-01..12)
         run: python software/run_perception_tests.py
       - name: Level-C -- health monitor (HM-01..06)
         run: python software/run_health_tests.py
@@ -44,7 +44,9 @@ jobs:
         run: python software/run_command_tests.py
       - name: Level-G -- K230 merged pipeline (IT-01..04, ADR-0016)
         run: python software/run_integration_tests.py
-      - name: esw smoke -- perception + geometry + sink + command + k230 adapter
+      - name: Level-H -- the device application loop (AP-01..12)
+        run: python software/run_app_tests.py
+      - name: esw smoke -- perception + geometry + sink + command + adapter + app loop
         run: python software/tools/mpy_smoke.py
 
   micropython:
@@ -66,7 +68,9 @@ jobs:
         run: >
           docker run --rm -v "$PWD":/repo -w /repo/software
           --entrypoint micropython "$MPY_IMAGE" run_health_tests.py
-      - name: esw smoke (perception + geometry) under MicroPython
+      # The smoke now constructs and ticks a real esw.app.EdgeApp, so the DEVICE LOOP -- not just
+      # the modules it wires -- is proven to run under MicroPython before it reaches a K230.
+      - name: esw smoke (perception + geometry + app loop) under MicroPython
         run: >
           docker run --rm -v "$PWD":/repo -w /repo/software
           --entrypoint micropython "$MPY_IMAGE" tools/mpy_smoke.py

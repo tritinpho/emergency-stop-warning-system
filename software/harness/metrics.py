@@ -102,8 +102,11 @@ def aggregate(per_scenario, n_scenarios, total_hours):
     }
 
 
-def format_report(agg, tier="S (synthetic)"):
-    """A human-readable acceptance-evidence report, honestly tagged by tier."""
+def format_report(agg, tier="S (synthetic)", rate_label="per sim-hour"):
+    """A human-readable acceptance-evidence report, honestly tagged by tier.
+
+    `rate_label` names the FA denominator: synthetic runs measure sim-hours, device captures
+    measure hours the unit was demonstrably watching (harness/evidence.py observed_seconds)."""
     L = []
     L.append("ACCEPTANCE-EVIDENCE REPORT  [tier: {}]".format(tier))
     L.append("-" * 64)
@@ -116,7 +119,7 @@ def format_report(agg, tier="S (synthetic)"):
     if agg["fa_per_100_scenarios"] is not None:
         L.append("  per 100 scenarios       : {:.2f}".format(agg["fa_per_100_scenarios"]))
     if agg["fa_per_hour"] is not None:
-        L.append("  per sim-hour            : {:.2f}".format(agg["fa_per_hour"]))
+        L.append("  {:<24}: {:.2f}".format(rate_label, agg["fa_per_hour"]))
     if agg["max_latency"] is not None:
         L.append("Detection latency         : mean {:.2f}s  max {:.2f}s".format(
             agg["mean_latency"], agg["max_latency"]))

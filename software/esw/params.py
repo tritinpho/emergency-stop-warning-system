@@ -51,6 +51,13 @@ DEFAULTS = {
     #                                                                      genuine 1-2 car shoulder warnings.
     #                                                                      int: counts hold integers -- a pushed
     #                                                                      4.5 truncates to 4 and is flagged.
+    # R14 density corroboration (ADR-0016 backlog #3). BOTH must hold, and both bound LOW, because
+    # congestion SUPPRESSES the sign: a value that detects a jam too eagerly withholds a warning
+    # from a real shoulder breakdown. lo=4 vehicles keeps free flow from reading as a jam; lo=0.20
+    # occupancy keeps one near-field truck from doing so on its own.
+    "congestion_min_vehicles": {"default": 6, "lo": 4, "hi": 20,         # vehicle DETECTIONS in frame
+                                "int": True},
+    "congestion_min_occupancy": {"default": 0.35, "lo": 0.20, "hi": 0.90},  # summed bbox area / frame area
 }
 
 

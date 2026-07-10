@@ -16,11 +16,19 @@ COCO_LABELS = ["person", "bicycle", "car", "motorcycle", "airplane", "bus", "tra
 
 
 def yolo_frame(case, t):
-    """The raw K230 postprocess result at time t: (boxes[xywh], class_ids, confidences)."""
+    """The raw K230 postprocess result at time t: (boxes[xywh], class_ids, confidences).
+
+    An object may carry `vx`/`vy` (image-plane px/s) to move at constant velocity from its `xywh`
+    at `enter`. Crawling traffic needs this: a queue creeping above the stationarity gate produces
+    NO stationary tracks, which is precisely the jam the R14 track-count rule cannot see."""
     boxes, class_ids, confs = [], [], []
     for o in case["objects"]:
         if o["enter"] <= t < o["leave"]:
-            boxes.append(list(o["xywh"]))
+            b = list(o["xywh"])
+            dt = t - o["enter"]
+            b[0] = b[0] + o.get("vx", 0.0) * dt
+            b[1] = b[1] + o.get("vy", 0.0) * dt
+            boxes.append(b)
             class_ids.append(o["cls_id"])
             confs.append(o["score"])
     return boxes, class_ids, confs
