@@ -17,41 +17,72 @@ Both are custom-trained, converted with nncase/kmodel **2.9.0** for the Yahboom 
 Shared config (both `deploy_config.json`): `model_type = AnchorBaseDet`, input `320×320`,
 `mean = [0.485,0.456,0.406]`, `std = [0.229,0.224,0.225]`, 3-scale anchors, `nms_option = false`.
 
-## ⚠️ Finding: the production model is single-class `"vehicle"`
+## ⚠️ Finding: these `kmodel`s are **dead** — `main.py` refuses to load them
 
-`deploy_config.json` for **both** models declares `num_classes: 1`, `categories: ["vehicle"]`.
-That is **not** the COCO YOLOv8n (car / truck / bus / person) that `k230/main.py` loads
-via `MODEL_PATH = ".../yolov8n_320.kmodel"`. So the repo carries **two detector paths**:
+`deploy_config.json` for **both** models declares `num_classes: 1`, `categories: ["vehicle"]`,
+`model_type: AnchorBaseDet`. But [`k230/main.py`](../k230/main.py) `load_model_config()` guards
+against exactly that:
 
-- a generic **COCO `yolov8n_320`** (80 classes, incl. `person`) — what `main.py` references;
-- these **custom single-class `AnchorBaseDet`** day/night models — what was actually trained
-  and deployed (dated 2026-07-04 / 07-02).
+```python
+kmodel_path = f".../mp_deployment_source_{mode}/{deploy_conf['kmodel_path']}"
+if "AnchorBaseDet" in kmodel_path or "best_" in kmodel_path:
+    raise ValueError("AnchorBaseDet not supported, forcing fallback")   # -> except:
+```
 
-This is **backlog #1** in [ADR-0016](../../../docs/adr/ADR-0016-repo-consolidation-and-perception-source.md).
-Our `esw.perception` uses the class for per-type ground footprint (car/truck/bus sizes) and
-routes `person` to presence-onset (SC-12). A single `"vehicle"` class **loses both**.
+Both configs point at `best_AnchorBaseDet_*.kmodel`, so the guard **always** fires, the
+`except` **always** runs, and the device **always** loads the fallback:
+`/sdcard/kmodel/yolov8n_320.kmodel` with the **full 80-class COCO label list**. ACLAB's own
+comment calls the custom models *"old"*.
 
-### Decision (2026-07-10): target COCO; single-class is a *degraded* mode, reported loudly
+Three consequences:
+
+1. **These two binaries are never executed.** They are a dead training run, not the production
+   detector. Store them for provenance; do not treat them as the thing that runs.
+2. **The real detector is stock COCO YOLOv8n**, so `person` (class 0) *is* emitted and **SC-12 is
+   reachable on the device**. Per-class footprints work too.
+3. **Day/night switching is inert.** `mode` only picks a config path; both paths raise and land on
+   the same fallback. `design-log/demo.md` §2.2 lists auto day/night switching as out of scope —
+   in fact it is **non-functional**, not merely unscoped.
+
+This resolves **backlog #1** in [ADR-0016](../../../docs/adr/ADR-0016-repo-consolidation-and-perception-source.md):
+the device already made the choice. `esw.perception` needs the class label for per-type ground
+footprint (car/truck/bus) *and* to route `person` to presence-onset (SC-12) — and COCO supplies both.
+
+### Decision (2026-07-10): target COCO; a single-class model is a *degraded* mode, reported loudly
 
 `esw.k230_adapter.model_capabilities(labels)` derives what a loaded model's label set can
 actually carry, and the Level-G board asserts it both ways:
 
-| Model | `sees_person` | `per_class_footprint` | SC-12 reachable? |
+| Label set | `sees_person` | `per_class_footprint` | SC-12 reachable? |
 |---|---|---|---|
-| COCO `yolov8n_320` | ✅ | ✅ | yes |
-| these day/night `kmodel`s | ❌ | ❌ (all → `car`) | **no** |
+| COCO 80-class (what the device loads) | ✅ | ✅ | **yes** |
+| `["vehicle"]` (what these configs declare) | ❌ | ❌ (all → `car`) | no |
 
-The trap this closes: a single-class model still lights the sign for a shoulder car, so
-**nothing downstream looks broken** while the unit is blind to pedestrians. The host sim
-cannot catch it either — it injects scripted `person` labels no single-class detector would
-emit, so all 88 scenarios stay green. Silent loss of coverage is exactly what
-[ADR-0005](../../../docs/adr/ADR-0005-fail-safe-and-system-safety.md) forbids, so the
-capability is now an explicit, tested fact rather than an assumption.
+The guard is not redundant just because `main.py` currently forces the fallback. Delete that
+`raise ValueError` — or rename a `kmodel` so it no longer matches `"best_"` — and the device
+silently loads a single-class model. It would still light the sign for a shoulder car, so
+**nothing downstream looks broken** while the unit is blind to pedestrians. The host sim cannot
+catch it either: it injects scripted `person` labels no single-class detector would emit, so
+all 88 scenarios stay green over a dead SC-12. Silent loss of coverage is what
+[ADR-0005](../../../docs/adr/ADR-0005-fail-safe-and-system-safety.md) forbids, so the capability
+is now an explicit, tested fact rather than an assumption.
 
-**Consequence:** on the *currently deployed* binaries, SC-12 must be reported **unverified**,
-not passing. Restoring it needs a multi-class retrain — and **no repo contains the training
-pipeline** (no dataset, no labels, no `.pt`/`.onnx`, no nncase config). That pipeline, not the
-weights, is the asset to request from ACLAB ELMS.
+### ⚠️ The real detector is an unversioned file nobody pins
+
+`/sdcard/kmodel/yolov8n_320.kmodel` is what actually runs. It is **in neither repo** — it ships
+on the Yahboom image / SD card. Nothing records its **version, provenance, or SHA-256**, and
+nothing would notice if it were swapped, corrupted, or silently upgraded. The two `kmodel`s
+catalogued above are pinned by hash; the model the safety case actually depends on is not.
+
+That is the real gap, and it is the opposite of what this file said before 2026-07-10. **Open
+question for Tin:** capture `yolov8n_320.kmodel`'s SHA-256 and record it here alongside the
+others, and decide whether the ROI/acceptance evidence should refuse to run against an unpinned
+detector.
+
+A domain-tuned (multi-class, day/night) retrain remains worthwhile — the stock COCO model is not
+trained on Vietnamese expressway shoulders at night. That needs ACLAB's **training pipeline**
+(no dataset, labels, `.pt`/`.onnx`, or nncase config exists in *any* repo). But it is an
+**improvement**, not a repair: nothing is currently broken by its absence.
 
 ## Binary storage (open decision — backlog #7)
 
