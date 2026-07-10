@@ -62,13 +62,16 @@ def _adapter_units():
     if len(d5) != 1 or d5[0]["cls"] != "car":                   # case-insensitive normalisation
         fails.append(("case-insensitive", "car", d5))
 
-    # Backlog #1 -- the label set decides which safety claims are even reachable. COCO (the
-    # chosen target) carries them; the DEPLOYED single-class kmodel carries neither, and must
-    # say so out loud rather than degrade quietly (ADR-0005 fail-loud).
+    # Backlog #1 -- the label set decides which safety claims are even reachable. The device
+    # loads 80-class COCO (main.py refuses the AnchorBaseDet configs and forces the yolov8n_320
+    # fallback), which carries them. A single-class label set carries neither. This guard is what
+    # stops that regressing SILENTLY: drop main.py's `raise ValueError`, or rename a kmodel so it
+    # no longer matches "best_", and the device would load ["vehicle"] -- still lighting the sign
+    # for a shoulder car while blind to pedestrians. ADR-0005: fail loud, never quiet.
     coco = model_capabilities(COCO_LABELS)
     if not coco["sees_person"] or not coco["per_class_footprint"]:
         fails.append(("coco-capable", {"sees_person": True, "per_class_footprint": True}, coco))
-    vehicle_only = model_capabilities(["vehicle"])              # models/{day,night}/deploy_config
+    vehicle_only = model_capabilities(["vehicle"])              # what models/{day,night} DECLARE
     if vehicle_only["sees_person"]:                             # SC-12 would be a false claim
         fails.append(("single-class-blind-to-person", False, True))
     if vehicle_only["per_class_footprint"]:                     # truck/bus collapse onto car
