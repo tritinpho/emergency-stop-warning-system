@@ -7,7 +7,7 @@ consequences. They follow the standard ADR format. The **software-owned** decisi
 
 | ADR | Decision | Status |
 |-----|----------|--------|
-| [ADR-0001](ADR-0001-sensing-modality.md) | Sensing modality — camera + radar fusion (not camera-only) | Proposed — **hardware + business** |
+| [ADR-0001](ADR-0001-sensing-modality.md) | Sensing modality — camera + radar fusion (not camera-only) | **Rejected (2026-07-10)** — this phase is **camera-only**; retained as the cấp sở spec. Consequences: R5 unmitigated, R20, R21 |
 | [ADR-0002](ADR-0002-edge-vs-cloud-processing.md) | Run the safety loop at the edge; cloud is monitoring-only | **Accepted (sw)** 2026-06-27 |
 | [ADR-0003](ADR-0003-detection-algorithm.md) | Lightweight detector + ROI gating + dwell logic (not heavy end-to-end DL, not pure background subtraction) | **Accepted (sw)** 2026-06-27 |
 | [ADR-0004](ADR-0004-warning-actuator-integration.md) | Pluggable actuator — reuse existing VMS where present, dedicated solar LED sign otherwise | Proposed — **hardware + ops/regulator** |

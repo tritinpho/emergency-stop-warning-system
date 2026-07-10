@@ -2,9 +2,62 @@
 
 > 🇬🇧 Bản gốc tiếng Anh: [ADR-0001-sensing-modality.md](ADR-0001-sensing-modality.md)
 
-**Trạng thái:** Đề xuất
-**Ngày:** 2026-06-26
+**Trạng thái:** **Bác bỏ (2026-07-10)** — cho giai đoạn nguyên mẫu trên bàn (cấp trường). Hệ thống
+**chỉ dùng camera**. Mở lại ở đề tài hiện trường cấp sở.
+**Ngày:** 2026-06-26 · **Ngày khép lại:** 2026-07-10
 **Người quyết định:** Chủ nhiệm đề tài (ThS. Phó Trí Tín), trưởng nhóm kỹ thuật, cố vấn an toàn giao thông
+**Người khép lại:** trưởng dự án — phần cứng + kinh doanh, các nhóm sở hữu ADR này *(điền tên)*
+
+> ## Biên bản quyết định — KHÔNG dùng radar trong giai đoạn này
+>
+> ADR này **chưa bao giờ được Duyệt**. Nay nó được **Bác bỏ cho giai đoạn nguyên mẫu trên bàn**. Toàn
+> bộ nội dung dưới mục Bối cảnh được **giữ nguyên**: đó là đặc tả cho đề tài **cấp sở** kế tiếp,
+> **không phải** một yêu cầu đang có hiệu lực cho giai đoạn này. Hãy đọc nó như một tài liệu lưu trữ,
+> không phải một kế hoạch.
+>
+> ### Lý do
+>
+> 1. Sản phẩm của giai đoạn này là **tính dựng được và tính đúng của logic, không phải hiệu quả an
+>    toàn** ([doc 01 §5](../01-requirements.vi.md)). Radar đóng góp ≈ 0 vào việc đó.
+> 2. Tiêu chí cổng **(b)** — phân giải làn dừng khẩn cấp với làn thông hành liền kề ở **cự ly giám
+>    sát** — **không kiểm chứng được trên bàn thử** (xem mục Cảnh báo bên dưới), và **cự ly giám sát
+>    chưa được nêu ở bất kỳ đâu trong kho tài liệu này**. Độ phân giải góc tỉ lệ với λ/khẩu độ: một
+>    mô-đun phân giải được khoảng cách làn 3,5 m ở cự ly 100 m (≈ 2°) có thể đắt hơn toàn bộ đề tài
+>    20 triệu VND. Radar mua cho *giai đoạn này* chỉ giải quyết được **(a)**, để lại mọi bảo đảm phụ
+>    thuộc radar đúng ở chỗ nó đang đứng — *được thiết kế, chưa được kiểm chứng*.
+> 3. Chi phí **6–8 triệu trên tổng 20 triệu VND**, cộng thời gian đặt hàng 8–12 tuần.
+> 4. Cách dùng tiền cạnh tranh — **≥ 200 lượt thu thập dữ liệu thật, bao gồm ban đêm**, cho con số
+>    recall kèm cận dưới Wilson ([ADR-0007](ADR-0007-validation-and-data-strategy.vi.md)) — *thì*
+>    làm được trên bàn thử, và đã không được cấp kinh phí.
+>
+> ### Hệ quả được chấp nhận
+>
+> Ghi lại ở đây để chúng được **quyết định, chứ không phải phát hiện ra về sau**. Chính ADR này đã
+> yêu cầu như vậy: *"nếu ngân sách phần cứng buộc phải loại radar ra, hãy hạ thấp tuyên bố về ban
+> đêm/điều kiện bất lợi, đừng lặng lẽ dựa nó lên dữ liệu tổng hợp."*
+>
+> - **Khoảng giữ-khi-che-khuất không bao giờ kích hoạt.** `esw/state_machine.py` chỉ cho vào
+>   `WARN_HOLD` / `CAMERA_OCCLUDED_DEGRADED` khi có radar chứng thực (`corr`) — điều không bao giờ
+>   đúng khi không có kênh radar. Một xe đã xác nhận mà camera mất dấu do che khuất sẽ bị **xóa sau
+>   `T_hold` (mặc định 10 giây)** theo nhánh xóa-lớn-tiếng — một xe tải che lề đường quá 10 giây sẽ
+>   làm biển báo tắt trong khi mối nguy vẫn còn đó. Theo dõi ở **[R20](../04-risk-and-safety.vi.md)**.
+> - **Thiết bị chạy vĩnh viễn ở chế độ `CAMERA_ONLY`**, nên cảnh báo cho người trực vĩnh viễn ở mức
+>   `DEGRADED`. Một trạng thái lúc nào cũng bật thì không mang thông tin gì.
+>   Theo dõi ở **[R21](../04-risk-and-safety.vi.md)**.
+> - **[R5](../04-risk-and-safety.vi.md) (mù trong điều kiện bất lợi) không còn biện pháp giảm thiểu.**
+>   Khả năng phát hiện ban đêm, mưa, sương mù **không được tuyên bố** — không từ radar trên bàn thử,
+>   cũng không từ dữ liệu tổng hợp.
+>
+> ### Không thay đổi mã nguồn
+>
+> `esw/health.py` đã tự suy ra `CAMERA_ONLY` từ tình trạng sống của cảm biến, và máy trạng thái tự suy
+> giảm. Phần hỗ trợ radar vẫn nằm trong mã nguồn như một tài sản cho cấp sở. Không xóa gì cả.
+>
+> ### Mở lại khi
+>
+> Đề tài cấp sở cấp kinh phí cho một **đường thử hoặc hiện trường** — nơi duy nhất có thể kiểm chứng
+> tiêu chí (b). **Hãy xác định cự ly giám sát trước**; nó quyết định liệu có radar nào trong tầm ngân
+> sách vượt qua được hay không.
 
 ## Bối cảnh
 

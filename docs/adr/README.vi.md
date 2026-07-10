@@ -10,7 +10,7 @@ cơ quan quản lý) — cột Trạng thái nêu rõ đội nào.
 
 | ADR | Quyết định | Trạng thái |
 |-----|----------|--------|
-| [ADR-0001](ADR-0001-sensing-modality.vi.md) | Phương thức cảm biến — hợp nhất camera + radar (không chỉ dùng camera) | Đề xuất — **phần cứng + kinh doanh** |
+| [ADR-0001](ADR-0001-sensing-modality.vi.md) | Phương thức cảm biến — hợp nhất camera + radar (không chỉ dùng camera) | **Bác bỏ (2026-07-10)** — giai đoạn này **chỉ dùng camera**; giữ lại làm đặc tả cho cấp sở. Hệ quả: R5 không còn giảm thiểu, R20, R21 |
 | [ADR-0002](ADR-0002-edge-vs-cloud-processing.vi.md) | Chạy vòng lặp an toàn tại biên; đám mây chỉ để giám sát | **Đã chấp nhận (pm)** 2026-06-27 |
 | [ADR-0003](ADR-0003-detection-algorithm.vi.md) | Bộ phát hiện nhẹ + giới hạn theo ROI + logic thời gian chờ (không dùng DL đầu-cuối nặng, không dùng trừ nền thuần túy) | **Đã chấp nhận (pm)** 2026-06-27 |
 | [ADR-0004](ADR-0004-warning-actuator-integration.vi.md) | Cơ cấu chấp hành cắm-ghép — tái sử dụng VMS sẵn có nếu có, nếu không thì dùng bảng LED năng lượng mặt trời chuyên dụng | Đề xuất — **phần cứng + vận hành/cơ quan quản lý** |

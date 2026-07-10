@@ -1,8 +1,57 @@
 # ADR-0001: Sensing modality — camera + radar fusion
 
-**Status:** Proposed
-**Date:** 2026-06-26
+**Status:** **Rejected (2026-07-10)** — for the cấp trường bench-prototype phase. The build is
+**camera-only**. Reopen at the cấp sở field project.
+**Date:** 2026-06-26 · **Closed:** 2026-07-10
 **Deciders:** PI (ThS. Phó Trí Tín), technical lead, road-safety advisor
+**Closed by:** project lead — hardware + business, the owning teams for this ADR *(name to be filled in)*
+
+> ## Decision record — radar is NOT used in this phase
+>
+> This ADR was **never Accepted**. It is now **Rejected for the bench-prototype phase**. Everything
+> below the Context heading is **retained unchanged**: it is the specification for the follow-on
+> cấp sở project, **not** a live requirement for this one. Read it as an archive, not a plan.
+>
+> ### Why
+>
+> 1. The phase deliverable is **buildability and logic, not safety efficacy**
+>    ([doc 01 §5](../01-requirements.md)). Radar contributes ≈ 0 to that.
+> 2. Gate criterion **(b)** — resolving the shoulder from the adjacent through lane at the monitored
+>    range — is **not bench-testable** (see the Caveat below), and **the monitored range is nowhere
+>    specified in this repo**. Angular resolution scales as λ/aperture: a module that resolves a
+>    3.5 m lane gap at 100 m (≈ 2°) may cost more than the entire 20M VND project. Radar bought for
+>    *this* phase would discharge **(a) only**, leaving every radar-dependent guarantee exactly where
+>    it already stands — *designed, not validated*.
+> 3. Cost is **6–8M VND of a 20M VND budget**, plus an 8–12 week procurement lead.
+> 4. The competing use of those funds — **≥ 200 real captures including night**, for the
+>    recall-with-Wilson-bound headline ([ADR-0007](ADR-0007-validation-and-data-strategy.md)) — *is*
+>    bench-achievable, and was unfunded.
+>
+> ### Accepted consequences
+>
+> Recorded here so they are **decided, not discovered later**. This ADR always demanded it:
+> *"if hardware budget forces it out, down-scope the night/adverse claim, do not quietly rest it on
+> synthetic data."*
+>
+> - **The occlusion hold is unreachable.** `esw/state_machine.py` gates entry to `WARN_HOLD` /
+>   `CAMERA_OCCLUDED_DEGRADED` on radar corroboration (`corr`), which is never true without a radar
+>   channel. A confirmed vehicle lost to occlusion is **cleared at `T_hold` (default 10 s)** on the
+>   loud-clear path — a truck occluding the shoulder for >10 s blanks the sign with the hazard still
+>   present. Tracked as **[R20](../04-risk-and-safety.md)**.
+> - **The unit runs permanently in `CAMERA_ONLY`**, so the operator alert is permanently `DEGRADED`.
+>   A posture that is always on carries no information. Tracked as **[R21](../04-risk-and-safety.md)**.
+> - **[R5](../04-risk-and-safety.md) (adverse-condition blindness) has no mitigation.** Night, rain
+>   and fog recall is **not claimed** — neither from a bench radar nor from synthetic data.
+>
+> ### No code change
+>
+> `esw/health.py` already derives `CAMERA_ONLY` from sensor liveness, and the state machine degrades
+> on its own. Radar support stays in the codebase as the cấp sở asset. Nothing is deleted.
+>
+> ### Reopen when
+>
+> The cấp sở project funds a **test track or field venue** — the only place criterion (b) can be
+> exercised. **Specify the monitored range first**; it decides whether any affordable radar can pass.
 
 ## Context
 
