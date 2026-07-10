@@ -8,7 +8,10 @@
 # harness.sign.Sign, which decodes and verifies them exactly as the ESP32 firmware does. A test
 # that lights the sign here has driven authenticated frames through a real dead-man's switch.
 
+import json
+
 from esw import if4
+from harness.store import json_default
 
 
 class FakeClock:
@@ -114,6 +117,40 @@ class ListCapture:
 
     def ticks(self):
         return [r for r in self.records if r.get("type") == "tick"]
+
+
+class FileCapture:
+    """The capture backend, writing the EXACT format the K230 writes
+    (firmware/k230-detector/esw-app/backends.py CaptureLog): one JSON object per line, bytes
+    hex-encoded, subsampled every N ticks but never dropping a tick whose sign state, run state,
+    force-safe flag or detection count changed.
+
+    That last rule is load-bearing: harness/evidence.py cross-checks the IF-7 event stream against
+    the lit ticks in this file, which only works because a lamp transition is never subsampled
+    away. Keeping this a faithful mirror is what lets the offline scorer be developed and tested
+    here against logs a real unit will produce."""
+
+    def __init__(self, path, every=5):
+        self.path = path
+        self.every = every
+        self.n = 0
+        self.written = 0
+        self._prev = None
+
+    def _interesting(self, rec):
+        key = (rec.get("sign_on"), rec.get("state"), rec.get("force_safe"), len(rec.get("dets", [])))
+        if key != self._prev:
+            self._prev = key
+            return True
+        return False
+
+    def step(self, rec):
+        self.n += 1
+        if not self._interesting(rec) and (self.n % self.every) != 0:
+            return
+        with open(self.path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, default=json_default) + "\n")
+        self.written += 1
 
 
 class RamStore:

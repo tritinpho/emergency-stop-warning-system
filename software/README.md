@@ -41,6 +41,8 @@ software/
     runner.py       #   tick loop, health monitor, telemetry, fault injection, oracle comparator
     metrics.py      #   acceptance-evidence reducer: recall+Wilson, false-activation, latency (ADR-0007)
     store.py        #   Level-E: file-backed durable store + fake uplink for the evidence outbox
+    evidence.py     #   offline scorer for DEVICE logs: observed-hours, provenance + capability gates
+    rig.py          #   the EdgeApp bench rig (shared by Levels D and H)
     commands.py     #   Level-F: scenario commands -> authenticated IF-8/9/10 frames (+ forged/replay)
     devices.py      #   Level-H: host backends for esw/app.py (camera, radio, clock, store, capture)
   scenarios/
@@ -72,7 +74,8 @@ python software/run_command_tests.py     # Level F — authenticated command cha
 python software/run_integration_tests.py # Level G — merged K230 pipeline (adapter→perception→SM→sign)
 python software/run_app_tests.py         # Level H — the device loop (esw/app.py), incl. boot capability report
 python software/tools/mp_safe_check.py software/esw   # MicroPython-safety AST lint on esw/
-python software/tools/mpy_smoke.py        # esw smoke: perception + geometry + sink + command + adapter
+python software/tools/mpy_smoke.py        # esw smoke: perception + geometry + sink + command + adapter + app loop
+python software/tools/score_capture.py <session-dir>...   # score real device captures (exits 1 unless acceptance-grade)
 
 # The shipped esw/ subset also RUNS under the real MicroPython unix port (not just CPython):
 cd software && micropython run_tests.py && micropython run_health_tests.py && micropython tools/mpy_smoke.py
