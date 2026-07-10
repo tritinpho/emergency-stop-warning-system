@@ -220,7 +220,12 @@ class KmodelSimDetector:
     toolchain (nncase 2.9.0, tools/compile_kmodel.py) produced -- so a host session
     exercises the model class the K230 actually executes, and the remaining host-vs-device
     gap is optics and runtime, not weights. No nncase wheel exists for the host Python;
-    run inside the toolchain container (software/tools/nncase/Dockerfile)."""
+    run inside the toolchain container (software/tools/nncase/Dockerfile).
+
+    SPOT-CHECK ONLY: `nncase.simulator.k230.sc` is a cycle-approximate simulator, seconds
+    to minutes PER inference -- fine for a few-frame parity check (compile_kmodel.py's smoke,
+    or a short --image run), impractical for a 100+ frame video session. Full-session and
+    real-timing parity still need the board; this proves the WEIGHTS+decode agree, not speed."""
 
     def __init__(self, kmodel_path, imgsz=320, conf=0.1, preprocess=None):
         try:
@@ -487,15 +492,21 @@ def _selftest_calib(detector, img):
             "version": "selftest-affine-%.4fmpx" % s}
 
 
-def selftest(weights, keep=False, kmodel=None):
+def selftest(weights, keep=False, kmodel=None, sample=None):
     """End-to-end proof on the bundled ultralytics sample (a stopped bus + pedestrians on its
     near side): real YOLO -> adapter -> perception -> SM -> HMAC'd IF-4 -> lamp, written out as
     a scoreable host-tier session. Asserts the outcomes, not just survival. With --kmodel the
-    same assertions run against the QUANTIZED model under the nncase simulator."""
-    import ultralytics
-    sample = os.path.join(os.path.dirname(ultralytics.__file__), "assets", "bus.jpg")
+    same assertions run against the QUANTIZED model under the nncase simulator (pass --sample
+    there: the toolchain container deliberately has no ultralytics to borrow the image from)."""
+    if not sample:
+        try:
+            import ultralytics
+        except ImportError:
+            sys.exit("selftest: no ultralytics here to supply the sample image -- "
+                     "pass --sample <image with a vehicle and people>")
+        sample = os.path.join(os.path.dirname(ultralytics.__file__), "assets", "bus.jpg")
     if not os.path.exists(sample):
-        sys.exit("selftest: ultralytics sample image not found: %s" % sample)
+        sys.exit("selftest: sample image not found: %s" % sample)
     img = cv2.imread(sample)
 
     if kmodel:
@@ -581,6 +592,9 @@ def main():
         description="Run a real pretrained YOLO through the real EdgeApp loop (host tier).")
     ap.add_argument("--selftest", action="store_true",
                     help="end-to-end self-test on the bundled ultralytics sample image")
+    ap.add_argument("--sample",
+                    help="selftest image override (required in the nncase container, which "
+                         "has no ultralytics)")
     ap.add_argument("--keep", action="store_true", help="keep the self-test session directory")
     ap.add_argument("--video", help="video file to run")
     ap.add_argument("--image", help="still image to run (with --jitter-px, like the self-test)")
@@ -608,7 +622,7 @@ def main():
     args = ap.parse_args()
 
     if args.selftest:
-        return selftest(args.weights, keep=args.keep, kmodel=args.kmodel)
+        return selftest(args.weights, keep=args.keep, kmodel=args.kmodel, sample=args.sample)
 
     if not args.video and not args.image:
         ap.error("one of --selftest, --video or --image is required")

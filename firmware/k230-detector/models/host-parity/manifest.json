@@ -1,0 +1,22 @@
+{
+  "kmodel": "yolov8n_320_int8.kmodel",
+  "sha256": "abf6773dcca2fbbcb1676a7187b01617a9f29c8b6b0a0880ac8ee909d47dc074",
+  "bytes": 3497424,
+  "built": "2026-07-10",
+  "source_weights": "yolov8n.pt",
+  "source_weights_sha256": "f59b3d833e2ff32e194b5bb8e08d211dc7c5bdf144b90d2c8412c47ccfc83b36",
+  "source_onnx": "yolov8n.onnx",
+  "source_onnx_sha256": "b35684857a9b324079b4776277a0285caa35d937ac817d136e73f969c914f203",
+  "toolchain": {
+    "nncase": "2.9.0",
+    "target": "k230",
+    "opset": 13,
+    "imgsz": 320,
+    "ptq": "int8",
+    "set_tensor_data_form": "list[list[ndarray]]"
+  },
+  "input": "float32 RGB NCHW /255, 320x320 letterbox(114)",
+  "calibration": "jitter-augmented --sample captures/calib-frames/bus.jpg (PARITY-GRADE ONLY, not production PTQ)",
+  "smoke": "decoded classes: ['bus', 'person']",
+  "purpose": "host-parity instrument for tools/host_yolo_loop.py --kmodel; also the proven conversion path a future retrain would reuse (models/README.md)"
+}

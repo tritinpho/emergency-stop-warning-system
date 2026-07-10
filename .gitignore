@@ -36,3 +36,7 @@ venv/
 *.pt
 *.onnx
 captures/
+
+# nncase compile byproducts (dropped in the CWD by the k230 compiler/simulator).
+gmodel_dump_dir/
+/tmp/

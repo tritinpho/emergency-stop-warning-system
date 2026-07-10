@@ -8,15 +8,23 @@ k230 -> .kmodel, pinned by SHA-256 with a manifest. The artifact drives host_yol
 `--kmodel` simulator backend, so host-tier sessions can exercise the QUANTIZED model --
 shrinking the host-vs-device gap to optics and runtime.
 
-Runs inside the toolchain container (no nncase wheel exists for the host Python):
+TWO machines, because the dependency sets must never meet: ultralytics (torch) lives on the
+HOST, nncase lives in the toolchain CONTAINER -- on bare PyPI ultralytics drags the multi-GB
+CUDA torch stack, so the container deliberately has neither (see nncase/Dockerfile).
 
+    # 1. HOST: .pt -> .onnx (ultralytics is installed here)
+    python software/tools/compile_kmodel.py --export-only
+
+    # 2. CONTAINER: .onnx -> k230 INT8 kmodel + manifest + simulator smoke
     docker build -t esw-nncase:2.9.0 software/tools/nncase
     docker run --rm -v "<repo>:/w" -w /w esw-nncase:2.9.0 \\
-        python software/tools/compile_kmodel.py --out firmware/k230-detector/models/host-parity
+        python software/tools/compile_kmodel.py \\
+        --onnx firmware/k230-detector/models/host-parity/yolov8n.onnx \\
+        --sample <some-frame.jpg> --out firmware/k230-detector/models/host-parity
 
 Calibration honesty: PTQ ranges come from the frames you pass via --calib-images (your own
-footage stills are the right choice); the default falls back to the two ultralytics sample
-images, which is enough for a parity instrument and nowhere near enough for a production
+footage stills are the right choice); the fallback is jitter-augmented copies of --sample,
+which is enough for a parity instrument and nowhere near enough for a production
 quantization -- the manifest records exactly what was used.
 
 The input convention is float32 RGB NCHW /255 (ultralytics'), applied identically at
@@ -52,20 +60,30 @@ def letterbox_blob(bgr, imgsz=IMGSZ):
     return np.ascontiguousarray(blob.transpose(2, 0, 1))[None], r, (left, top)
 
 
-def _sample_paths(calib_glob):
+def _sample_paths(calib_glob, sample):
     if calib_glob:
         paths = sorted(glob.glob(calib_glob))
         if not paths:
             sys.exit("--calib-images matched nothing: %s" % calib_glob)
         return paths, "user frames: %s (%d)" % (calib_glob, len(paths))
-    import ultralytics
+    if sample:
+        return [sample], "jitter-augmented --sample %s (PARITY-GRADE ONLY, not production PTQ)" % sample
+    try:
+        import ultralytics
+    except ImportError:
+        sys.exit("no --calib-images / --sample, and ultralytics is not installed here "
+                 "(the container deliberately has no torch): pass --sample <frame.jpg>")
     assets = os.path.join(os.path.dirname(ultralytics.__file__), "assets")
     paths = [os.path.join(assets, n) for n in ("bus.jpg", "zidane.jpg")]
     return paths, "ultralytics sample images (PARITY-GRADE ONLY, not production PTQ)"
 
 
 def export_onnx(weights, out_dir):
-    from ultralytics import YOLO
+    try:
+        from ultralytics import YOLO
+    except ImportError:
+        sys.exit("ONNX export needs ultralytics -- run `compile_kmodel.py --export-only` "
+                 "on the HOST (pip install ultralytics), not in the toolchain container")
     model = YOLO(weights)
     onnx_path = model.export(format="onnx", imgsz=IMGSZ, opset=13, simplify=True)
     dst = os.path.join(out_dir, os.path.basename(onnx_path))
@@ -139,12 +157,18 @@ def smoke(kmodel_path, image_path):
 
 def main():
     ap = argparse.ArgumentParser(description="YOLOv8n -> K230 kmodel (nncase 2.9.0) + manifest.")
-    ap.add_argument("--weights", default="yolov8n.pt")
+    ap.add_argument("--weights", default="yolov8n.pt", help="(host, --export-only) .pt weights")
+    ap.add_argument("--export-only", action="store_true",
+                    help="HOST step: export the ONNX and stop (needs ultralytics)")
+    ap.add_argument("--onnx", default=None,
+                    help="CONTAINER step: pre-exported ONNX to compile (skips ultralytics)")
     ap.add_argument("--out", default="firmware/k230-detector/models/host-parity",
                     help="output directory")
+    ap.add_argument("--sample", default=None,
+                    help="an image for the simulator smoke test + fallback PTQ calibration")
     ap.add_argument("--calib-images", default=None,
-                    help="glob of frames for PTQ calibration (use YOUR footage; default: "
-                         "the two ultralytics samples -- parity-grade only)")
+                    help="glob of frames for PTQ calibration (use YOUR footage; fallback: "
+                         "jitter-augmented --sample -- parity-grade only)")
     ap.add_argument("--samples", type=int, default=8,
                     help="calibration sample count (images are jitter-augmented up to this)")
     args = ap.parse_args()
@@ -153,15 +177,36 @@ def main():
     sw = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sys.path.insert(0, sw)
 
-    import cv2
-    import nncase
     os.makedirs(args.out, exist_ok=True)
 
-    print("[1/4] ONNX export (imgsz %d, opset 13)" % IMGSZ)
-    onnx_path = export_onnx(args.weights, args.out)
+    if args.export_only:
+        onnx_path = export_onnx(args.weights, args.out)
+        print("ONNX exported: %s" % onnx_path)
+        print("weights sha256: %s" % sha256(args.weights))
+        print("next: compile it in the toolchain container (see software/tools/nncase/Dockerfile)")
+        return 0
+
+    import cv2
+    import nncase
+
+    # nncase exposes no __version__ attribute; the package metadata carries it.
+    try:
+        import importlib.metadata as _md
+        nncase_ver = _md.version("nncase")
+    except Exception:
+        nncase_ver = "unknown"
+
+    if args.onnx:
+        print("[1/4] using pre-exported ONNX: %s" % args.onnx)
+        onnx_path = args.onnx
+        if not os.path.exists(onnx_path):
+            sys.exit("no such ONNX: %s (host step: compile_kmodel.py --export-only)" % onnx_path)
+    else:
+        print("[1/4] ONNX export (imgsz %d, opset 13)" % IMGSZ)
+        onnx_path = export_onnx(args.weights, args.out)
 
     print("[2/4] PTQ calibration set")
-    paths, calib_desc = _sample_paths(args.calib_images)
+    paths, calib_desc = _sample_paths(args.calib_images, args.sample)
     samples = []
     rng = np.random.RandomState(42)
     while len(samples) < args.samples:
@@ -177,7 +222,7 @@ def main():
         samples.append(letterbox_blob(img)[0])
     print("      %d samples -- %s" % (len(samples), calib_desc))
 
-    print("[3/4] nncase %s compile -> k230 INT8" % nncase.__version__)
+    print("[3/4] nncase %s compile -> k230 INT8" % nncase_ver)
     kmodel_path = os.path.join(args.out, "yolov8n_320_int8.kmodel")
     api_form = compile_kmodel(onnx_path, samples, kmodel_path)
     digest = sha256(kmodel_path)
@@ -193,7 +238,9 @@ def main():
         "built": datetime.date.today().isoformat(),
         "source_weights": os.path.basename(args.weights),
         "source_weights_sha256": sha256(args.weights) if os.path.exists(args.weights) else None,
-        "toolchain": {"nncase": nncase.__version__, "target": "k230",
+        "source_onnx": os.path.basename(onnx_path),
+        "source_onnx_sha256": sha256(onnx_path),
+        "toolchain": {"nncase": nncase_ver, "target": "k230",
                       "opset": 13, "imgsz": IMGSZ, "ptq": "int8",
                       "set_tensor_data_form": api_form},
         "input": "float32 RGB NCHW /255, 320x320 letterbox(114)",
