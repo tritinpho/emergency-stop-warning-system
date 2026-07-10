@@ -22,7 +22,7 @@ sys.path.insert(0, _here[:_cut] if _cut >= 0 else ".")
 
 from scenarios.integration_cases import CASES, COCO_LABELS, yolo_frame
 from scenarios.perception_cases import CALIB
-from esw.k230_adapter import detections_from_yolo
+from esw.k230_adapter import detections_from_yolo, model_capabilities
 from esw.perception import Perception
 from esw.params import default_config
 from esw.state_machine import StateMachine
@@ -61,6 +61,18 @@ def _adapter_units():
     d5 = detections_from_yolo([[360, 520, 80, 80]], [0], [0.9], ["CAR"])   # upper-case label
     if len(d5) != 1 or d5[0]["cls"] != "car":                   # case-insensitive normalisation
         fails.append(("case-insensitive", "car", d5))
+
+    # Backlog #1 -- the label set decides which safety claims are even reachable. COCO (the
+    # chosen target) carries them; the DEPLOYED single-class kmodel carries neither, and must
+    # say so out loud rather than degrade quietly (ADR-0005 fail-loud).
+    coco = model_capabilities(COCO_LABELS)
+    if not coco["sees_person"] or not coco["per_class_footprint"]:
+        fails.append(("coco-capable", {"sees_person": True, "per_class_footprint": True}, coco))
+    vehicle_only = model_capabilities(["vehicle"])              # models/{day,night}/deploy_config
+    if vehicle_only["sees_person"]:                             # SC-12 would be a false claim
+        fails.append(("single-class-blind-to-person", False, True))
+    if vehicle_only["per_class_footprint"]:                     # truck/bus collapse onto car
+        fails.append(("single-class-no-per-class-footprint", False, True))
     return fails
 
 
@@ -106,7 +118,7 @@ def main():
 
     unit_fails = _adapter_units()
     print("{:<7} {:<6} {}".format("ADAPT", "PASS" if not unit_fails else "FAIL",
-          "esw.k230_adapter: class map + person kept + xywh->xyxy + drop rules"))
+          "esw.k230_adapter: class map + person kept + xywh->xyxy + drop rules + model_capabilities"))
     if unit_fails:
         surprises.append(("ADAPT", unit_fails))
 

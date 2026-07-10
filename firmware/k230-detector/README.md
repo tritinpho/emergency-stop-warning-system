@@ -66,7 +66,12 @@ noise-filters/        # VENDORED environmental filters (host CPython + ulab/Micr
 esp32-legacy/
   yolouno-mqtt.py     # SUPERSEDED by firmware/sign-controller (IF-4). Kept for reference only.
 models/               # kmodel I/O configs (+ binary-storage decision) — see models/README.md
-design-log/           # their architecture.md / light_control.md / etc. — DEMOTED, not authoritative
+design-log/           # their design record — DEMOTED, not authoritative
+  architecture.md, light_control.md, init_state.md, flowchart.md, function.md,
+  k230_hardware.md, deployment_guide.md, progress.md, troubleshooting_wifi_bootstrap.md
+  demo.md             #   their prototype demo scope — §2.1 lists the laptop dashboard we do not build
+  ui.md               #   Yahboom LVGL 8.3 app-UI baseline; refs `k230-firmware/`, a vendor image not in either repo
+  setup_roi_development_log.md, test_mqtt_roi_development_log.md
 ```
 
 ## Reconciliation backlog (from ADR-0016 §Consequences)
@@ -76,7 +81,7 @@ here; dispositions in [ADR-0016](../../docs/adr/ADR-0016-repo-consolidation-and-
 
 | # | Item | Their baseline | Our target | Status |
 |---|---|---|---|---|
-| 1 | Detector class set | production `kmodel` = single class `"vehicle"` | per-class footprint car/truck/bus + person (SC-12) | open — COCO model or class remap (task #6) |
+| 1 | Detector class set | production `kmodel` = single class `"vehicle"` | per-class footprint car/truck/bus + person (SC-12) | **resolved** — target COCO; single-class is a *degraded* mode surfaced by `model_capabilities()`, never silent. **SC-12 unreachable on the deployed kmodels** until a multi-class retrain ([models/README.md](models/README.md)) |
 | 2 | Confirm dwell | `PRESENCE_THRESHOLD = 0` (lights on 1st frame) | configurable `T_dwell` confirm | open — SM governs after adapter |
 | 3 | ROI geometry | image-plane bbox∩polygon ≥ 0.2 | ground-projected footprint∩ROI (PC-11) | ours supersedes; theirs = near-nadir fallback |
 | 4 | Shake mitigation | `ShakingFilter` = MicroPython no-op | real stabilisation (field) | **do not count** as on-device mitigation |
@@ -89,8 +94,9 @@ here; dispositions in [ADR-0016](../../docs/adr/ADR-0016-repo-consolidation-and-
 ## Local modifications — secrets (ADR-0016 backlog #6)
 
 The vendored baseline shipped **hardcoded Wi-Fi and CoreIoT credentials**, copied
-verbatim from the public upstream repo. They are already public (so this is not a new
-disclosure), but per ADR-0016 backlog #6 the literals here have been **replaced with
+verbatim from the upstream repo. That repo is **private**, and this one is **public** —
+so vendoring the literals here would have been a **first disclosure**, not a re-disclosure.
+Per ADR-0016 backlog #6 the literals here have been **replaced with
 empty placeholders sourced from `config.json` / `sys_config.json`** — the same device
 mechanism the baseline already uses (`load_wifi_credentials()` / `load_mqtt_config()`).
 This is the standard **secrets exception** to the "do not modernise the device baseline"
@@ -112,13 +118,17 @@ dummy values (`"123"`) in the test/setup scripts are not credentials and were le
 — `{"wifi": {"ssid", "password"}, "server": {"access_token"}}` — with the firmware's
 `/sdcard/configs/sys_config.json` (`WLAN` section) as the secondary Wi-Fi source.
 
-> ### ⚠️ Action required — ACLAB ELMS must ROTATE the exposed credentials
+> ### ⚠️ Action required — ACLAB ELMS must ROTATE the credentials
 > Removing the literals from our vendored copy does **not** invalidate them. The lab
 > Wi-Fi password and **both** CoreIoT device access tokens (`DEVICE_IOT_01`,
-> `DEVICE_IOT_02`) remain live and are still public in the upstream repo and its git
-> history. They must be rotated **at the source** — the Wi-Fi AP and the CoreIoT/ThingsBoard
-> device provisioning — which only ACLAB ELMS can do; no change on our side can. Tracked
+> `DEVICE_IOT_02`) remain live, and remain committed in the upstream repo and its git
+> history. Upstream is private, so they are not published — but they are plaintext in a
+> shared history, and one `Settings → Change visibility` away from being. They must be
+> rotated **at the source** — the Wi-Fi AP and the CoreIoT/ThingsBoard device
+> provisioning — which only ACLAB ELMS can do; no change on our side can. Tracked
 > as ADR-0016 action item #4 (backlog #6).
+>
+> **Do not make the upstream repo public before rotating.**
 
 ## What is authoritative
 

@@ -64,7 +64,7 @@ The cost we take on is a **reconciliation backlog** (below): their pragmatic sho
 
 ## Action Items
 
-1. [ ] **Perception adapter** — map their `collect_vehicle_detections` output to the `Perception.step()` detections shape; host integration test for the closed loop; resolve backlog #1 (class set).
+1. [x] **Perception adapter** — done: [`esw/k230_adapter.py`](../../software/esw/k230_adapter.py) + the Level-G board (`software/run_integration_tests.py`, IT-01..04). **Backlog #1 resolved — the COCO multi-class model (`yolov8n_320`) is the target**, because `esw.perception` needs the class label twice: per-type ground footprint (car/truck/bus) and routing `person` to presence-onset (SC-12). A single-class `"vehicle"` model is a **degraded fallback**, not an equivalent: `model_capabilities()` reports `sees_person=False` and `per_class_footprint=False` so the loss is **loud, never silent** (ADR-0005). ⚠️ The **deployed day/night `kmodel`s are single-class**, so **SC-12 is unreachable on them**; a multi-class retrain needs ACLAB's training pipeline, which is in **no** repo (see [`models/README.md`](../../firmware/k230-detector/models/README.md)).
 2. [ ] **Seam reconciliation in the ICD / [doc 09](../09-software-hardware-handoff.md)** — record that IF-4 supersedes the `LED:ON/OFF` latch and that CoreIoT MQTT is IF-6 telemetry only.
 3. [ ] **Harvest the noise filters** into the perception path — map `OverVehiclesFilter` onto congestion suppression (R14 / SC-11); wire `LightFilter`; drop `ShakingFilter` from the on-device mitigation count.
 4. [ ] **Secrets** — rotate the exposed Wi-Fi password + CoreIoT token; move to `config.json` (backlog #6).
