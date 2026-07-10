@@ -166,6 +166,17 @@ def _device_log_tests():
         if "scored separately and NOT pooled" not in text:
             fails.append(("synthetic sessions are not pooled into the recall claim", True, False))
 
+        # -- host tier (tools/host_yolo_loop.py): a REAL detector on real footage, host runtime.
+        #    Pinned and capability-complete, so exactly ONE thing blocks it -- the tier itself:
+        #    it validates the pipeline, never the unit. And it is never pooled into a claim.
+        hs = _make_session(tmp, "bench-host", EVIDENCE_CASE, "host", _SHA, [[1.0, 12.0]])
+        hblk = evidence.blockers(hs)
+        if len(hblk) != 1 or "tier 'host'" not in hblk[0]:
+            fails.append(("host-tier session blocks on the tier alone", 1, hblk))
+        text, n = evidence.report([clean, hs])
+        if not n or "host-tier session(s) scored separately" not in text:
+            fails.append(("host sessions are not pooled into the recall claim", True, False))
+
         # -- a heartbeat gap is an OUTAGE: the box was dark, and those seconds never happened. Left
         #    in the denominator they would silently deflate the false-activation-per-hour rate.
         gap_dir = os.path.join(tmp, "bench-gap")

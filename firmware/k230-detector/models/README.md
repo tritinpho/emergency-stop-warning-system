@@ -74,10 +74,24 @@ on the Yahboom image / SD card. Nothing records its **version, provenance, or SH
 nothing would notice if it were swapped, corrupted, or silently upgraded. The two `kmodel`s
 catalogued above are pinned by hash; the model the safety case actually depends on is not.
 
-That is the real gap, and it is the opposite of what this file said before 2026-07-10. **Open
-question for Tin:** capture `yolov8n_320.kmodel`'s SHA-256 and record it here alongside the
-others, and decide whether the ROI/acceptance evidence should refuse to run against an unpinned
-detector.
+That is the real gap, and it is the opposite of what this file said before 2026-07-10. The second
+half of the open question is now **decided and implemented**: the acceptance-evidence pipeline
+refuses an unpinned detector (`harness/evidence.py` blocks any session whose `ground_truth.json`
+declares no `model_sha256`). What remains is the hash itself — a two-minute job the moment anyone
+touches an SD card:
+
+```bash
+# SD card mounted on a PC (drive letter/mount point as appropriate):
+sha256sum /path/to/sdcard/kmodel/yolov8n_320.kmodel
+
+# or on a running unit over USB (mpremote):
+mpremote connect <port> exec "import hashlib; print(hashlib.sha256(open('/sdcard/kmodel/yolov8n_320.kmodel','rb').read()).hexdigest())"
+```
+
+Record the result in the table above and in every capture session's `ground_truth.json`.
+Sources for the file: any unit's SD card (ACLAB's units — a one-line ask), a fresh Yahboom
+card, or the Yahboom image itself (`CanMV_K230_YAHBOOM_micropython_V1.4.1.img.gz` from their
+K230 resource portal — mount the FAT partition and hash the file; no board needed).
 
 A domain-tuned (multi-class, day/night) retrain remains worthwhile — the stock COCO model is not
 trained on Vietnamese expressway shoulders at night. That needs ACLAB's **training pipeline**
@@ -94,7 +108,13 @@ merge reversible and avoid pinning a binary-in-git choice prematurely. Options f
 2. **External artifact store** — release asset / object storage, retrieved at deploy time by
    SHA (table above). Keeps the git repo lean.
 
-Until then, retrieve from the source repo (verify against the SHA-256 above). **The source
+**Interim disposition (2026-07-10):** both binaries were fetched from the upstream repo via the
+GitHub contents API and **verified against the SHA-256 table above (exact match, sizes match)**;
+they live locally under `models/day/` and `models/night/` (the `*.kmodel` gitignore keeps them
+out of this public repo). They stay out of git while they are dead provenance artifacts; if a
+retrain ever makes a custom model *live*, decide LFS-vs-release-asset then, deliberately.
+
+To re-fetch, retrieve from the source repo (verify against the SHA-256 above). **The source
 repo is private** — you need to be granted access, and an unauthenticated clone will 404:
 
 ```bash
