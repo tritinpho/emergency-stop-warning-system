@@ -118,7 +118,7 @@ flowchart TB
 
 ## 3. Kiến trúc vật lý / triển khai
 
-![Bố trí triển khai / vật lý: một cột và tủ bên đường chứa đầu cảm biến camera+radar, bộ tính toán biên (IP65), và nguồn pin mặt trời + ắc quy; thiết bị biên giám sát vùng phát hiện, điều khiển một bảng cảnh báo đặt phía trước cách ≥ cự ly tầm nhìn quyết định qua một liên kết cáp/RF, và kết nối tới trung tâm điều hành giao thông qua 4G·LTE/cáp quang.](assets/deployment-diagram-vi.svg)
+![Bố trí triển khai / vật lý: một cột và tủ bên đường chứa đầu cảm biến camera (radar là thiết kế cấp sở, không lắp trong bản dựng chỉ-dùng-camera này), bộ tính toán biên (IP65), và nguồn pin mặt trời + ắc quy; thiết bị biên giám sát vùng phát hiện, điều khiển một bảng cảnh báo đặt phía trước cách ≥ cự ly tầm nhìn quyết định qua một liên kết cáp/RF, và kết nối tới trung tâm điều hành giao thông qua 4G·LTE/cáp quang.](assets/deployment-diagram-vi.svg)
 
 *Thiết bị tại hiện trường là một địa điểm vật lý duy nhất: cảm biến + bộ tính toán biên + nguồn trên
 cột/tủ, bảng cảnh báo đặt phía trước (liên kết cáp hoặc vô tuyến), và một đường lên không trọng yếu

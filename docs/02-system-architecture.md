@@ -117,7 +117,7 @@ flowchart TB
 
 ## 3. Physical / deployment architecture
 
-![Deployment / physical layout: a roadside mast and cabinet hold the camera+radar sensor head, the edge compute (IP65), and solar+battery power; the edge unit watches the detection zone, drives a warning sign placed upstream by ≥ the decision sight distance over a cable/RF link, and connects to the traffic management center over 4G·LTE/fibre.](assets/deployment-diagram.svg)
+![Deployment / physical layout: a roadside mast and cabinet hold the camera sensor head (radar is the cấp sở design and is not fitted in this camera-only build), the edge compute (IP65), and solar+battery power; the edge unit watches the detection zone, drives a warning sign placed upstream by ≥ the decision sight distance over a cable/RF link, and connects to the traffic management center over 4G·LTE/fibre.](assets/deployment-diagram.svg)
 
 *Tiếng Việt: [sơ đồ triển khai](assets/deployment-diagram-vi.svg).*
 

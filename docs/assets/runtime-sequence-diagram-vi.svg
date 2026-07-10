@@ -1,4 +1,4 @@
-<svg width="100%" viewBox="0 0 680 440" role="img" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
+<svg width="100%" viewBox="0 0 680 460" role="img" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Helvetica, Arial, sans-serif">
 <title>Trình tự vận hành — phát hiện, cảnh báo, hủy</title>
 <desc>Sơ đồ trình tự với sáu đường đời: xe, cảm biến, nhận diện và hợp nhất, máy trạng thái, bảng cảnh báo, và trung tâm điều hành. Xe dừng trong làn; cảm biến cấp dữ liệu cho khối nhận diện, khối này gửi vết xe đứng yên đến máy trạng thái; sau thời gian chờ, máy xác nhận và ra lệnh bật bảng; bảng báo trạng thái và trung tâm được thông báo bất đồng bộ. Khi còn xe, các vết liên tục đặt lại bộ đếm giữ. Khi xe rời đi và vắng quá thời gian giữ, máy trạng thái tắt bảng và thông báo trung tâm.</desc>
 <defs>
@@ -18,7 +18,7 @@
 <line x1="90" y1="112" x2="190" y2="112" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
 <text x="140" y="106" font-size="12" fill="#5F5E5A" text-anchor="middle">dừng trong làn</text>
 <line x1="190" y1="134" x2="290" y2="134" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
-<text x="240" y="128" font-size="12" fill="#5F5E5A" text-anchor="middle">khung hình + radar</text>
+<text x="240" y="128" font-size="12" fill="#5F5E5A" text-anchor="middle">khung hình + radar*</text>
 <line x1="290" y1="156" x2="390" y2="156" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
 <text x="340" y="150" font-size="12" fill="#5F5E5A" text-anchor="middle">xe đứng yên (v≈0)</text>
 
@@ -70,4 +70,6 @@
 <rect x="250" y="414" width="13" height="13" rx="3" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.8"/>
 <text x="269" y="424" font-size="12" fill="#5F5E5A">trung tâm</text>
 <text x="440" y="424" font-size="12" fill="#888780" text-anchor="start">- - - bất đồng bộ / phản hồi</text>
+<line x1="20" y1="434" x2="660" y2="434" stroke="#E2E1DB" stroke-width="1"/>
+<text x="20" y="449" font-size="10.5" fill="#5F5E5A">* Bản dựng CHỈ DÙNG CAMERA — ADR-0001 bị bác bỏ 2026-07-10. Radar = thiết kế cấp sở; R5 không còn giảm thiểu (R20/R21).</text>
 </svg>
