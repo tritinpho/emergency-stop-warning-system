@@ -37,6 +37,22 @@ PERSP_CALIB = {
     "track_max_age_s": 2.0, "speed_window_s": 0.5, "speed_alpha": 0.3,
 }
 
+# The PC-13/14 scale pair: one stationary car at image (280..360, 200..260), contact point
+# (320, 260), under two affine surveys of the SAME scene. Correct: 0.015 m/px (what anchoring
+# a known object size yields -- tools/make_calib.py). Wrong: 0.10 m/px, ~7x over. The ROI is
+# the car's ground neighbourhood in each survey's coordinates, so the track is IN-ROI in both:
+# the only thing the scale changes is how many km/h the same pixel noise appears to be.
+REALSCALE_CALIB = {
+    "H": [[0.015, 0.0, 0.0], [0.0, 0.015, 0.0], [0.0, 0.0, 1.0]],
+    "roi": [(0.8, -0.1), (8.8, -0.1), (8.8, 7.9), (0.8, 7.9)],
+    "frame_wh": [640, 480],
+}
+WRONGSCALE_CALIB = {
+    "H": [[0.10, 0.0, 0.0], [0.0, 0.10, 0.0], [0.0, 0.0, 1.0]],
+    "roi": [(28.0, 22.0), (36.0, 22.0), (36.0, 30.0), (28.0, 30.0)],
+    "frame_wh": [640, 480],
+}
+
 CASES = [
     {
         "id": "PC-01", "title": "Car stopped inside ROI -> in_roi ~ 1.0, speed ~ 0",
@@ -194,5 +210,35 @@ CASES = [
         ],
         "checks": [{"t": 2.0, "n_detected": 7}],
         "scene_checks": [{"t": 2.0, "n_vehicles": 6, "occupancy": 0.125}],
+    },
+    {
+        "id": "PC-13", "title": "Wrong-scale H silently defeats the dwell (same pixels, ~7x scale)",
+        "duration": 15.0, "calib": WRONGSCALE_CALIB, "seed": 7,
+        # The host_yolo_loop finding, pinned: a real detector's box noise (jitter + the
+        # inference-size quantization steps a 320-px model reports in source pixels) reads as
+        # metres under an over-scaled homography. Here the SAME stationary car, with the same
+        # nuisance stream as PC-14, sits under an H surveyed ~7x too large: its smoothed speed
+        # pokes over the 3 km/h gate every couple of seconds (longest clean streak ~1.8 s,
+        # measured), so the 5 s dwell NEVER completes and the sign never lights -- while the
+        # track is detected, in-ROI, and nothing looks broken. This is a silent MISS, the
+        # failure mode make_calib.py's scale check exists to refuse at commissioning.
+        "objects": [{"id": "car1", "cls": "car", "enter": 0.0, "leave": 15.0,
+                     "bbox": [280, 200, 360, 260], "jitter_px": 4.0, "quant_px": 2.5}],
+        "checks": [{"t": 8.0, "n_detected": 1, "n_in_roi": 1},       # gated IN: not a ROI miss
+                   {"t": 14.0, "n_detected": 1, "n_in_roi": 1}],
+        "loop_checks": [{"t": 10.0, "on": False}, {"t": 14.5, "on": False}],
+    },
+    {
+        "id": "PC-14", "title": "Control: the same pixel stream at surveyed scale -> dwell completes",
+        "duration": 15.0, "calib": REALSCALE_CALIB, "seed": 7,
+        # Byte-identical detections to PC-13 (same seed, same nuisance): only the survey scale
+        # differs (0.015 m/px -- the plausible value the host self-test derives by anchoring a
+        # known vehicle size). Smoothed speed peaks at ~0.6 km/h, stationarity holds, and the
+        # sign lights after the dwell. The PC-13/14 pair is the executable form of "the speed
+        # gate's jitter robustness is a function of calibration scale".
+        "objects": [{"id": "car1", "cls": "car", "enter": 0.0, "leave": 15.0,
+                     "bbox": [280, 200, 360, 260], "jitter_px": 4.0, "quant_px": 2.5}],
+        "checks": [{"t": 8.0, "n_detected": 1, "n_in_roi": 1}],
+        "loop_checks": [{"t": 10.0, "on": True}, {"t": 14.5, "on": True}],
     },
 ]

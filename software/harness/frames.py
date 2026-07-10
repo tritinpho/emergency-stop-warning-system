@@ -12,6 +12,11 @@
 #                           headlight sweep, debris) -- must never reach a confirmed warning
 #   - BOX JITTER         -- `jitter_px`: per-frame noise on the bbox (footprint/overlap +
 #                           speed robustness) -- must not fake a >speed_gate reading
+#   - QUANTIZATION       -- `quant_px`: bbox coords snap to an inference-size grid. A detector
+#                           inferring at 320 px and reporting in source pixels moves boxes in
+#                           steps of ~source_w/320 (~2.5 px measured on an ~800 px frame; see
+#                           tools/host_yolo_loop.py) -- sub-quantum motion either vanishes or
+#                           JUMPS a whole step, the steppy noise a real YOLO emits
 #   - CLASS CONFUSION    -- `confuse` windows relabel the object (car/truck/.../person)
 #   - LOW-CONFIDENCE DIP -- `score_drops` windows drop the detector score (partial occlusion)
 #
@@ -24,6 +29,7 @@
 #    "path":[[t,[x1,y1,x2,y2]], ...] # keyframes, linearly interpolated
 #    "drop":[[t0,t1], ...]           # intervals the detector misses it (dropout)
 #    "jitter_px": float              # per-frame uniform bbox jitter amplitude (pixels)
+#    "quant_px": float               # snap bbox coords to this grid (inference-size steps)
 #    "confuse":[[t0,t1,"cls"], ...]  # relabel the class during [t0,t1)
 #    "score_drops":[[t0,t1,score],...]} # lower the detector score during [t0,t1)
 # A case may also carry `false_detections` (same shape) and a `seed` (default 0).
@@ -80,6 +86,14 @@ def _jitter_bbox(bbox, jpx, seed, oid, t):
     return [bbox[k] + rng.uniform(-jpx, jpx) for k in range(4)]
 
 
+def _quantize_bbox(bbox, qpx):
+    """Snap bbox coordinates to an inference-size grid (applied AFTER jitter, as in a real
+    detector: the scene moves continuously, the REPORT moves in steps)."""
+    if qpx <= 0.0:
+        return bbox
+    return [round(v / qpx) * qpx for v in bbox]
+
+
 def _emit(trk, t, seed):
     """The detector's report for one scripted object at tick t (None if not visible)."""
     if not (trk["enter"] <= t < trk["leave"]):
@@ -87,6 +101,7 @@ def _emit(trk, t, seed):
     if _dropped(trk, t):
         return None
     bbox = _jitter_bbox(_bbox_at(trk, t), trk.get("jitter_px", 0.0), seed, trk["id"], t)
+    bbox = _quantize_bbox(bbox, trk.get("quant_px", 0.0))
     return {"cls": _class_at(trk, t), "bbox": bbox, "score": _score_at(trk, t)}
 
 

@@ -75,6 +75,32 @@ SITE = "host-01"
 # never talk to a real sign controller, so the master is deliberately public and worthless.
 KEY = crypto.derive_key(b"esw-host-bench-secret-0123456789abcd", "IF4", SITE)
 
+# The standard 80-class COCO label list (ultralytics order) -- what the raw kmodel head's
+# class indices mean. The .pt path reads names from the checkpoint; a bare kmodel carries none.
+COCO80 = [
+    "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat",
+    "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat",
+    "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack",
+    "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball",
+    "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket",
+    "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple",
+    "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair",
+    "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse",
+    "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink",
+    "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier",
+    "toothbrush",
+]
+
+
+def _file_sha256(path):
+    if not os.path.exists(path):
+        return None
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
 
 # ------------------------------------------------------------------- detector backend
 
@@ -106,13 +132,7 @@ class YoloDetector:
     def sha256(self):
         """Pin the weights that RAN. A model nobody can identify cannot carry a number
         (harness/evidence.py); host sessions must never block on provenance, only on tier."""
-        if not os.path.exists(self.weights_path):
-            return None
-        h = hashlib.sha256()
-        with open(self.weights_path, "rb") as f:
-            for chunk in iter(lambda: f.read(1 << 20), b""):
-                h.update(chunk)
-        return h.hexdigest()
+        return _file_sha256(self.weights_path)
 
     def set_frame(self, bgr):
         self.frame = bgr
@@ -133,6 +153,116 @@ class YoloDetector:
             ids.append(int(c))
             confs.append(float(s))
         return boxes, ids, confs
+
+
+def _nms(xyxy, conf, cls, iou_thr):
+    """Greedy class-wise NMS (boxes offset per class so classes never suppress each other)."""
+    if len(xyxy) == 0:
+        return []
+    boxes = xyxy + cls[:, None].astype(np.float32) * 4096.0
+    x1, y1, x2, y2 = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
+    areas = (x2 - x1).clip(0) * (y2 - y1).clip(0)
+    order = conf.argsort()[::-1]
+    keep = []
+    while order.size:
+        i = order[0]
+        keep.append(int(i))
+        xx1 = np.maximum(x1[i], x1[order[1:]])
+        yy1 = np.maximum(y1[i], y1[order[1:]])
+        xx2 = np.minimum(x2[i], x2[order[1:]])
+        yy2 = np.minimum(y2[i], y2[order[1:]])
+        inter = (xx2 - xx1).clip(0) * (yy2 - yy1).clip(0)
+        iou = inter / (areas[i] + areas[order[1:]] - inter + 1e-9)
+        order = order[1:][iou <= iou_thr]
+    return keep
+
+
+def decode_yolov8(raw, r, pad, conf_floor, iou_thr=0.45):
+    """Raw YOLOv8 detect head (1, 4+nc, N) -> (boxes[xywh top-left, SOURCE px], ids, confs).
+
+    This is the host twin of the K230's aidemo.yolov8_det_postprocess: cxcywh in letterbox
+    pixels + per-class scores, best-class threshold, class-wise NMS, then the letterbox
+    (scale r, pad left/top) undone so boxes land in source-frame pixels -- the same frame
+    the calibration H was surveyed on."""
+    p = raw[0]
+    if p.shape[0] > p.shape[1]:                 # tolerate (N, 84) exports
+        p = p.T
+    boxes = p[:4].T
+    scores = p[4:].T
+    cls = scores.argmax(1)
+    conf = scores[np.arange(len(cls)), cls]
+    m = conf >= conf_floor
+    boxes, cls, conf = boxes[m], cls[m], conf[m]
+    xyxy = np.empty_like(boxes)
+    xyxy[:, 0] = boxes[:, 0] - boxes[:, 2] * 0.5
+    xyxy[:, 1] = boxes[:, 1] - boxes[:, 3] * 0.5
+    xyxy[:, 2] = boxes[:, 0] + boxes[:, 2] * 0.5
+    xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] * 0.5
+    left, top = pad
+    out_boxes = []
+    ids = []
+    confs = []
+    for i in _nms(xyxy, conf, cls, iou_thr):
+        x1 = (xyxy[i, 0] - left) / r
+        y1 = (xyxy[i, 1] - top) / r
+        x2 = (xyxy[i, 2] - left) / r
+        y2 = (xyxy[i, 3] - top) / r
+        out_boxes.append((float(x1), float(y1), float(x2 - x1), float(y2 - y1)))
+        ids.append(int(cls[i]))
+        confs.append(float(conf[i]))
+    return out_boxes, ids, confs
+
+
+class KmodelSimDetector:
+    """EdgeApp detector backend: the compiled INT8 kmodel under the nncase SIMULATOR.
+
+    Same contract as YoloDetector, but what runs is the QUANTIZED model the baseline
+    toolchain (nncase 2.9.0, tools/compile_kmodel.py) produced -- so a host session
+    exercises the model class the K230 actually executes, and the remaining host-vs-device
+    gap is optics and runtime, not weights. No nncase wheel exists for the host Python;
+    run inside the toolchain container (software/tools/nncase/Dockerfile)."""
+
+    def __init__(self, kmodel_path, imgsz=320, conf=0.1, preprocess=None):
+        try:
+            import nncase
+        except ImportError:
+            sys.exit("nncase is not installed on this Python (no wheel for the host). "
+                     "Run inside the toolchain container:\n"
+                     "  docker build -t esw-nncase:2.9.0 software/tools/nncase\n"
+                     "  docker run --rm -v \"<repo>:/w\" -w /w esw-nncase:2.9.0 "
+                     "python software/tools/host_yolo_loop.py ... --kmodel <path>")
+        self._nncase = nncase
+        self.sim = nncase.Simulator()
+        with open(kmodel_path, "rb") as f:
+            self.sim.load_model(f.read())
+        self.labels = list(COCO80)
+        self.weights_path = kmodel_path
+        self.imgsz = imgsz
+        self.conf = conf
+        self.preprocess = preprocess
+        self.frame = None
+        self.frames = 0
+        self.misses = 0
+
+    def sha256(self):
+        return _file_sha256(self.weights_path)
+
+    def set_frame(self, bgr):
+        self.frame = bgr
+
+    def read(self):
+        if self.frame is None:
+            self.misses += 1
+            return None
+        self.frames += 1
+        img = self.frame if self.preprocess is None else self.preprocess(self.frame)
+        from compile_kmodel import letterbox_blob       # one letterbox, shared with the compiler
+        blob, r, pad = letterbox_blob(img, self.imgsz)
+        rt = self._nncase.RuntimeTensor.from_numpy(blob)
+        self.sim.set_input_tensor(0, rt)
+        self.sim.run()
+        out = self.sim.get_output_tensor(0).to_numpy()
+        return decode_yolov8(out, r, pad, self.conf)
 
 
 def make_light_preprocess():
@@ -357,17 +487,22 @@ def _selftest_calib(detector, img):
             "version": "selftest-affine-%.4fmpx" % s}
 
 
-def selftest(weights, keep=False):
+def selftest(weights, keep=False, kmodel=None):
     """End-to-end proof on the bundled ultralytics sample (a stopped bus + pedestrians on its
     near side): real YOLO -> adapter -> perception -> SM -> HMAC'd IF-4 -> lamp, written out as
-    a scoreable host-tier session. Asserts the outcomes, not just survival."""
+    a scoreable host-tier session. Asserts the outcomes, not just survival. With --kmodel the
+    same assertions run against the QUANTIZED model under the nncase simulator."""
     import ultralytics
     sample = os.path.join(os.path.dirname(ultralytics.__file__), "assets", "bus.jpg")
     if not os.path.exists(sample):
         sys.exit("selftest: ultralytics sample image not found: %s" % sample)
     img = cv2.imread(sample)
 
-    detector = YoloDetector(weights, imgsz=320, conf=0.1)
+    if kmodel:
+        detector = KmodelSimDetector(kmodel, imgsz=320, conf=0.1)
+        print("selftest detector: INT8 kmodel under the nncase simulator (%s)" % kmodel)
+    else:
+        detector = YoloDetector(weights, imgsz=320, conf=0.1)
     calib = _selftest_calib(detector, img)
     source = StillJitterSource(img, amp_px=3, seed=42)
     duration = 12.0
@@ -456,6 +591,9 @@ def main():
                     help="seconds to run (default: video length, or 30 for --image)")
     ap.add_argument("--weights", default="yolov8n.pt",
                     help="ultralytics weights (default yolov8n.pt; downloads to CWD on first use)")
+    ap.add_argument("--kmodel",
+                    help="run the compiled INT8 kmodel under the nncase simulator instead of "
+                         "--weights (tools/compile_kmodel.py; needs the toolchain container)")
     ap.add_argument("--imgsz", type=int, default=320,
                     help="inference size (default 320 = the K230's MODEL_INPUT_SIZE)")
     ap.add_argument("--conf", type=float, default=0.1,
@@ -470,7 +608,7 @@ def main():
     args = ap.parse_args()
 
     if args.selftest:
-        return selftest(args.weights, keep=args.keep)
+        return selftest(args.weights, keep=args.keep, kmodel=args.kmodel)
 
     if not args.video and not args.image:
         ap.error("one of --selftest, --video or --image is required")
@@ -484,8 +622,12 @@ def main():
         sys.exit("calib.json needs H (3x3 image->ground homography) and roi (CCW ground polygon)")
 
     preprocess = make_light_preprocess() if args.light_filter else None
-    detector = YoloDetector(args.weights, imgsz=args.imgsz, conf=args.conf,
-                            preprocess=preprocess)
+    if args.kmodel:
+        detector = KmodelSimDetector(args.kmodel, imgsz=args.imgsz, conf=args.conf,
+                                     preprocess=preprocess)
+    else:
+        detector = YoloDetector(args.weights, imgsz=args.imgsz, conf=args.conf,
+                                preprocess=preprocess)
 
     if args.video:
         source = VideoSource(args.video)
@@ -510,8 +652,10 @@ def main():
         session_dir = os.path.join("captures", "host-" + stamp)
 
     hazards = [_parse_hazard(h) for h in args.hazard]
-    notes = "host run: %s | weights %s | imgsz %d | light_filter %s" % (
-        args.video or args.image, args.weights, args.imgsz, args.light_filter)
+    notes = "host run: %s | detector %s | imgsz %d | light_filter %s" % (
+        args.video or args.image,
+        ("kmodel-sim:" + args.kmodel) if args.kmodel else args.weights,
+        args.imgsz, args.light_filter)
     summary = run_session(detector, source, calib, session_dir, duration, hazards, notes)
 
     print("")
