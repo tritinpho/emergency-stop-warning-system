@@ -81,7 +81,7 @@ here; dispositions in [ADR-0016](../../docs/adr/ADR-0016-repo-consolidation-and-
 
 | # | Item | Their baseline | Our target | Status |
 |---|---|---|---|---|
-| 1 | Detector class set | production `kmodel` = single class `"vehicle"` | per-class footprint car/truck/bus + person (SC-12) | open — COCO model or class remap (task #6) |
+| 1 | Detector class set | production `kmodel` = single class `"vehicle"` | per-class footprint car/truck/bus + person (SC-12) | **resolved** — target COCO; single-class is a *degraded* mode surfaced by `model_capabilities()`, never silent. **SC-12 unreachable on the deployed kmodels** until a multi-class retrain ([models/README.md](models/README.md)) |
 | 2 | Confirm dwell | `PRESENCE_THRESHOLD = 0` (lights on 1st frame) | configurable `T_dwell` confirm | open — SM governs after adapter |
 | 3 | ROI geometry | image-plane bbox∩polygon ≥ 0.2 | ground-projected footprint∩ROI (PC-11) | ours supersedes; theirs = near-nadir fallback |
 | 4 | Shake mitigation | `ShakingFilter` = MicroPython no-op | real stabilisation (field) | **do not count** as on-device mitigation |

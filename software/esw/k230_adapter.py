@@ -15,7 +15,8 @@
 #   - normalises label aliases (motorbike->motorcycle, pedestrian->person) so per-class
 #     ground footprints (esw.perception) still apply;
 #   - maps a single-class "vehicle" model onto the generic car footprint (ADR-0016 backlog
-#     #1: the COCO multi-class model is the chosen target; "vehicle" is the fallback).
+#     #1, RESOLVED: the COCO multi-class model is the chosen target; "vehicle" is a DEGRADED
+#     fallback, and `model_capabilities()` below makes that degradation loud, never silent).
 #
 # NO radar fusion here (camera source only) -- fusion is a separate stage (RQ-H1).
 # Ships to the K230: MicroPython-safe subset (no f-strings / comprehensions / lambdas).
@@ -30,6 +31,45 @@ _CLASS_ALIASES = {
 
 # Classes the safety pipeline acts on; everything else is dropped at the adapter.
 _KEEP = ("car", "truck", "bus", "motorcycle", "person")
+
+
+def model_capabilities(labels):
+    """Which safety claims the loaded model's LABEL SET can actually carry (backlog #1).
+
+    A single-class "vehicle" model still lights the sign for a shoulder car, so nothing
+    downstream looks broken -- while SC-12 (pedestrian presence-onset) has become
+    UNREACHABLE and every per-class ground footprint has collapsed onto the generic car
+    box. Both are SILENT losses of coverage, which ADR-0005 forbids: on any loss of
+    capability the unit must fail LOUD. The caller checks this at model load and escalates.
+
+    The host sim CANNOT catch this on its own -- it injects scripted `person` labels that
+    no single-class detector would ever emit, so the whole board stays green while the
+    device is blind to pedestrians.
+
+    Returns {sees_person, per_class_footprint, classes}.
+    """
+    seen = {}
+    i = 0
+    n = len(labels)
+    while i < n:
+        raw = labels[i]
+        if hasattr(raw, "lower"):
+            raw = raw.lower()
+        name = _CLASS_ALIASES.get(raw, raw)
+        if name in _KEEP:
+            seen[name] = True
+        i += 1
+    n_vehicle = 0
+    for name in ("car", "truck", "bus", "motorcycle"):
+        if name in seen:
+            n_vehicle += 1
+    kept = []
+    for name in _KEEP:            # deterministic order, no comprehension (MicroPython subset)
+        if name in seen:
+            kept.append(name)
+    return {"sees_person": "person" in seen,
+            "per_class_footprint": n_vehicle > 1,
+            "classes": kept}
 
 
 def detections_from_yolo(boxes, class_ids, confidences, labels,

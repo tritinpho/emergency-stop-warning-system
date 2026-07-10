@@ -29,9 +29,29 @@ via `MODEL_PATH = ".../yolov8n_320.kmodel"`. So the repo carries **two detector 
 
 This is **backlog #1** in [ADR-0016](../../../docs/adr/ADR-0016-repo-consolidation-and-perception-source.md).
 Our `esw.perception` uses the class for per-type ground footprint (car/truck/bus sizes) and
-routes `person` to presence-onset (SC-12). A single `"vehicle"` class **loses both**. The
-adapter (task #6) must either target the COCO model, or add a class remap and accept that
-pedestrian handling needs the COCO/person path. Decide before the closed-loop integration.
+routes `person` to presence-onset (SC-12). A single `"vehicle"` class **loses both**.
+
+### Decision (2026-07-10): target COCO; single-class is a *degraded* mode, reported loudly
+
+`esw.k230_adapter.model_capabilities(labels)` derives what a loaded model's label set can
+actually carry, and the Level-G board asserts it both ways:
+
+| Model | `sees_person` | `per_class_footprint` | SC-12 reachable? |
+|---|---|---|---|
+| COCO `yolov8n_320` | ✅ | ✅ | yes |
+| these day/night `kmodel`s | ❌ | ❌ (all → `car`) | **no** |
+
+The trap this closes: a single-class model still lights the sign for a shoulder car, so
+**nothing downstream looks broken** while the unit is blind to pedestrians. The host sim
+cannot catch it either — it injects scripted `person` labels no single-class detector would
+emit, so all 88 scenarios stay green. Silent loss of coverage is exactly what
+[ADR-0005](../../../docs/adr/ADR-0005-fail-safe-and-system-safety.md) forbids, so the
+capability is now an explicit, tested fact rather than an assumption.
+
+**Consequence:** on the *currently deployed* binaries, SC-12 must be reported **unverified**,
+not passing. Restoring it needs a multi-class retrain — and **no repo contains the training
+pipeline** (no dataset, no labels, no `.pt`/`.onnx`, no nncase config). That pipeline, not the
+weights, is the asset to request from ACLAB ELMS.
 
 ## Binary storage (open decision — backlog #7)
 
