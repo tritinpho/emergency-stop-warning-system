@@ -78,6 +78,12 @@ class EdgeApp:
         self.cfg = self.sm.cfg
         self.monitor = HealthMonitor(self.sm.cfg)
         self.perception = Perception(calib)      # raises on a mis-wound ROI: fail loud at commissioning
+        # Adapter small-box floor (px): a commissioning knob, not a safety timer, so it lives in
+        # calib beside the other perception thresholds (score_min etc.). A distant shoulder car at
+        # imgsz 320 can fall under the default 25 px and be silently dropped, so a site with a long
+        # sightline may lower it -- fewer misses, more noise for perception's two-stage gate to
+        # absorb. Default 25 keeps every existing calib byte-identical.
+        self._min_wh_px = calib.get("min_wh_px", 25)
         self.actuator = Actuator(key, self.sm.cfg_ver)
 
         vers = dict(versions)
@@ -205,7 +211,8 @@ class EdgeApp:
         #    and emits nothing; it never fabricates a detection.
         dets = []
         if camera_live:
-            dets = detections_from_yolo(raw[0], raw[1], raw[2], self.detector.labels)
+            dets = detections_from_yolo(raw[0], raw[1], raw[2], self.detector.labels,
+                                        min_wh_px=self._min_wh_px)
         events = self.perception.step(dets, now)
 
         # 4. The decision.

@@ -39,6 +39,7 @@ import os
 import random
 import sys
 import tempfile
+import time
 
 # Put software/ on the import path (see score_capture.py; this file is two levels down).
 _here = __file__
@@ -128,11 +129,17 @@ class YoloDetector:
         self.frame = None
         self.frames = 0
         self.misses = 0
+        self.t_infer = 0.0               # cumulative inference seconds (the imgsz cost signal)
 
     def sha256(self):
         """Pin the weights that RAN. A model nobody can identify cannot carry a number
         (harness/evidence.py); host sessions must never block on provenance, only on tier."""
         return _file_sha256(self.weights_path)
+
+    def mean_infer_ms(self):
+        """Mean inference time per frame (ms). Host CPU, not the K230 KPU -- but the RELATIVE
+        cost across imgsz is the trade the sweep weighs against the recall gain."""
+        return (1000.0 * self.t_infer / self.frames) if self.frames else 0.0
 
     def set_frame(self, bgr):
         self.frame = bgr
@@ -143,7 +150,9 @@ class YoloDetector:
             return None                      # no fresh frame == what a dead camera looks like
         self.frames += 1
         img = self.frame if self.preprocess is None else self.preprocess(self.frame)
+        _t0 = time.perf_counter()
         r = self.model.predict(img, imgsz=self.imgsz, conf=self.conf, verbose=False)[0]
+        self.t_infer += time.perf_counter() - _t0
         boxes = []
         ids = []
         confs = []
@@ -248,9 +257,13 @@ class KmodelSimDetector:
         self.frame = None
         self.frames = 0
         self.misses = 0
+        self.t_infer = 0.0
 
     def sha256(self):
         return _file_sha256(self.weights_path)
+
+    def mean_infer_ms(self):
+        return (1000.0 * self.t_infer / self.frames) if self.frames else 0.0
 
     def set_frame(self, bgr):
         self.frame = bgr
@@ -265,7 +278,9 @@ class KmodelSimDetector:
         blob, r, pad = letterbox_blob(img, self.imgsz)
         rt = self._nncase.RuntimeTensor.from_numpy(blob)
         self.sim.set_input_tensor(0, rt)
+        _t0 = time.perf_counter()
         self.sim.run()
+        self.t_infer += time.perf_counter() - _t0
         out = self.sim.get_output_tensor(0).to_numpy()
         return decode_yolov8(out, r, pad, self.conf)
 
@@ -292,6 +307,111 @@ def make_light_preprocess():
         out = np.asarray(r.frame).astype(np.uint8)       # the filter's mask math promotes dtype
         return np.ascontiguousarray(out.transpose(1, 2, 0)[:, :, ::-1])  # CHW RGB -> HWC BGR
     return preprocess
+
+
+# ------------------------------------------------------------------- ROI-crop inference
+
+def roi_crop_box(calib, frame_wh, pad_px=48):
+    """Image-pixel rectangle bounding the ground ROI -- the ROI-crop distant-object lever.
+
+    The ROI in calib is a GROUND polygon (metres); H maps image->ground (esw/geometry), so the
+    ROI's image footprint is its ground vertices mapped back through H^-1. Cropping the frame to
+    that box (padded) and running the detector on the crop gives the shoulder band a far higher
+    effective resolution than downscaling the whole frame to imgsz -- a stopped car at the DSD
+    viewing range is only a handful of pixels at imgsz 320, and this is the cheapest way to hand
+    the detector more of them. Returns (x0, y0, x1, y1) ints clamped to the frame, or None if H
+    is singular / the ROI degenerates / the crop would be the whole frame (no benefit).
+
+    CAVEAT (why it is opt-in, not the default): a crop blinds the detector to everything OUTSIDE
+    the ROI, so the R14 scene-density (congestion) signal -- measured over the whole frame -- will
+    UNDER-count under a crop. That errs toward warning MORE (less suppression), never a silent
+    miss, so it is acceptable for an evaluation instrument on shoulder-stop clips; it is not a
+    setting to ship blind to the device without re-examining congestion suppression."""
+    H = calib.get("H")
+    roi = calib.get("roi")
+    if H is None or roi is None or frame_wh is None:
+        return None
+    Hm = np.array(H, dtype=np.float64)
+    if Hm.shape != (3, 3):
+        return None
+    try:
+        Hinv = np.linalg.inv(Hm)
+    except np.linalg.LinAlgError:
+        return None
+    xs = []
+    ys = []
+    for pt in roi:
+        v = Hinv.dot(np.array([pt[0], pt[1], 1.0], dtype=np.float64))
+        if v[2] == 0.0:
+            return None
+        xs.append(v[0] / v[2])
+        ys.append(v[1] / v[2])
+    fw = int(frame_wh[0])
+    fh = int(frame_wh[1])
+    x0 = max(0, int(min(xs) - pad_px))
+    y0 = max(0, int(min(ys) - pad_px))
+    x1 = min(fw, int(max(xs) + pad_px))
+    y1 = min(fh, int(max(ys) + pad_px))
+    if x1 - x0 < 16 or y1 - y0 < 16:
+        return None                          # degenerate crop
+    if x0 <= 0 and y0 <= 0 and x1 >= fw and y1 >= fh:
+        return None                          # crop == full frame: no benefit, don't pretend
+    return (x0, y0, x1, y1)
+
+
+class RoiCropDetector:
+    """Wrap a detector so inference runs on a fixed ROI crop, boxes mapped back to source px.
+
+    Delegates model identity (labels, weights, sha256, timing, frame/miss counts) to the wrapped
+    detector; the ONLY thing it changes is that the frame handed to the inner read() is cropped to
+    the ROI band, and the returned boxes are offset by (x0, y0) so they land in SOURCE-frame pixels
+    again -- the coordinate system the calibration H was surveyed on -- so the adapter, geometry
+    and perception downstream are byte-identical to a full-frame run. See roi_crop_box()."""
+
+    def __init__(self, base, crop_box):
+        self.base = base
+        self.x0, self.y0, self.x1, self.y1 = crop_box
+        self.frame = None
+
+    @property
+    def labels(self):
+        return self.base.labels
+
+    @property
+    def weights_path(self):
+        return self.base.weights_path
+
+    @property
+    def frames(self):
+        return self.base.frames
+
+    @property
+    def misses(self):
+        return self.base.misses
+
+    def sha256(self):
+        return self.base.sha256()
+
+    def mean_infer_ms(self):
+        return self.base.mean_infer_ms()
+
+    def set_frame(self, bgr):
+        self.frame = bgr
+
+    def read(self):
+        if self.frame is None:
+            self.base.set_frame(None)
+            return self.base.read()          # None path -> base counts the miss, returns None
+        crop = self.frame[self.y0:self.y1, self.x0:self.x1]
+        self.base.set_frame(crop)
+        r = self.base.read()
+        if r is None:
+            return None
+        boxes, ids, confs = r
+        out = []
+        for b in boxes:
+            out.append((b[0] + self.x0, b[1] + self.y0, b[2], b[3]))   # crop px -> source px
+        return out, ids, confs
 
 
 # ------------------------------------------------------------------- frame sources
@@ -376,9 +496,10 @@ def announce(boot):
 
 
 def run_session(detector, source, calib, session_dir, duration, hazards, notes,
-                progress_every_s=5.0):
+                progress_every_s=5.0, quiet=False):
     """Run the real EdgeApp over the source and write a device-format session. Returns a
-    summary dict; the session on disk is the artifact that outlives it."""
+    summary dict; the session on disk is the artifact that outlives it. quiet=True suppresses
+    the boot banner and per-tick progress (the sweep runs many cells)."""
     os.makedirs(session_dir, exist_ok=True)
     ev_path = os.path.join(session_dir, "evidence.log")
     if os.path.exists(ev_path):
@@ -401,7 +522,8 @@ def run_session(detector, source, calib, session_dir, duration, hazards, notes,
 
     app = EdgeApp(KEY, SITE, versions, calib, backends)
     boot = app.start()
-    announce(boot)
+    if not quiet:
+        announce(boot)
 
     steps = int(duration / TICK_DT) + 1
     first_on = None
@@ -414,7 +536,7 @@ def run_session(detector, source, calib, session_dir, duration, hazards, notes,
         link.tick(t)
         if link.on and first_on is None:
             first_on = t
-        if i % every == 0:
+        if not quiet and i % every == 0:
             print("  [t=%5.1fs] state=%-22s sign=%-3s tx=%-4d frames=%d"
                   % (t, d.get("state"), "ON" if link.on else "off", link.sent,
                      detector.frames))
@@ -428,7 +550,7 @@ def run_session(detector, source, calib, session_dir, duration, hazards, notes,
               "notes": notes}
         with open(gt_path, "w", encoding="utf-8") as f:
             json.dump(gt, f, indent=2)
-        if not hazards:
+        if not hazards and not quiet:
             print("\n  NOTE: no hazards annotated -- edit %s before scoring;" % gt_path)
             print("        an unannotated capture is not evidence (harness/evidence.py).")
 
@@ -616,6 +738,14 @@ def main():
     ap.add_argument("--jitter-px", type=int, default=3, help="still-image jitter amplitude")
     ap.add_argument("--light-filter", action="store_true",
                     help="A/B: run ACLAB's LightFilter as detector preprocess (backlog #4b)")
+    ap.add_argument("--roi-crop", action="store_true",
+                    help="run inference on a crop bounding the ROI (higher effective resolution "
+                         "on the shoulder; under-counts congestion -- see roi_crop_box)")
+    ap.add_argument("--roi-pad", type=int, default=48,
+                    help="padding in source px around the ROI crop (default 48)")
+    ap.add_argument("--min-wh-px", type=int, default=None,
+                    help="adapter small-box floor (px); overrides calib. Lower recovers small "
+                         "distant vehicles at the cost of more noise (default: calib, else 25)")
     ap.add_argument("--hazard", action="append", default=[], metavar="T0:T1",
                     help="annotate a ground-truth hazard interval (repeatable), e.g. 12.5:96")
     ap.add_argument("--score", action="store_true", help="score the session after the run")
@@ -660,16 +790,30 @@ def main():
         if wh:
             calib["frame_wh"] = wh          # R14 density needs it; the source knows it
 
+    if args.min_wh_px is not None:
+        calib["min_wh_px"] = args.min_wh_px   # commissioning knob -> EdgeApp -> adapter
+
+    if args.roi_crop:
+        fwh = calib.get("frame_wh") or source.frame_wh()
+        cb = roi_crop_box(calib, fwh, args.roi_pad) if fwh else None
+        if cb is None:
+            print("  NOTE: --roi-crop skipped (no frame size, singular H, or crop == full frame)")
+        else:
+            detector = RoiCropDetector(detector, cb)
+            print("  ROI-crop: frame %dx%d -> crop x[%d:%d] y[%d:%d] (pad %d px)"
+                  % (int(fwh[0]), int(fwh[1]), cb[0], cb[2], cb[1], cb[3], args.roi_pad))
+
     session_dir = args.session
     if not session_dir:
         stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         session_dir = os.path.join("captures", "host-" + stamp)
 
     hazards = [_parse_hazard(h) for h in args.hazard]
-    notes = "host run: %s | detector %s | imgsz %d | light_filter %s" % (
+    notes = "host run: %s | detector %s | imgsz %d | light_filter %s | roi_crop %s | min_wh %s" % (
         args.video or args.image,
         ("kmodel-sim:" + args.kmodel) if args.kmodel else args.weights,
-        args.imgsz, args.light_filter)
+        args.imgsz, args.light_filter, args.roi_crop,
+        args.min_wh_px if args.min_wh_px is not None else "calib")
     summary = run_session(detector, source, calib, session_dir, duration, hazards, notes)
 
     print("")
