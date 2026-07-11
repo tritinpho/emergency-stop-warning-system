@@ -84,6 +84,18 @@ python software/tools/score_capture.py <session-dir>...   # score real device ca
 python software/tools/host_yolo_loop.py --selftest
 python software/tools/host_yolo_loop.py --video clip.mp4 --calib calib.json --hazard 12.5:96 --score
 python software/tools/host_yolo_loop.py --video night.mp4 --calib calib.json --light-filter  # backlog #4b A/B
+# no-retrain accuracy knobs (also on host_yolo_loop): --imgsz (resolution), --conf (score floor),
+# --min-wh-px (adapter small-box floor; also the calib "min_wh_px" commissioning knob threaded
+# through EdgeApp), --roi-crop (run inference on a crop bounding the ROI = higher effective
+# resolution on the distant shoulder; under-counts congestion, so it is opt-in -- see roi_crop_box).
+
+# Accuracy sweep: one clip through the SAME EdgeApp at a grid of (imgsz x conf [x min_wh x crop]),
+# every cell scored against the same hazards -> a recall / latency / cost table that picks a setting
+# BEFORE the imgsz cost lands on the K230 KPU (the ADR-0015 D3 timing trade). Cells are host-tier;
+# the comparison is relative, not an acceptance claim. YOLO only (the kmodel sim is too slow to sweep).
+python software/tools/sweep_accuracy.py --selftest
+python software/tools/sweep_accuracy.py --video clip.mp4 --calib calib.json --hazard 12.5:96 \
+    --imgsz 320,416,512,640 --conf 0.1,0.25 --roi-crop
 
 # Survey -> calibration, with the MANDATORY scale sanity check (PC-13/14 pin why: a
 # wrong-scale H turns detector pixel noise into km/h and silently defeats the dwell):
